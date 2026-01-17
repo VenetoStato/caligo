@@ -1,0 +1,7 @@
+Aggiungi queste righe dopo la riga 22 (dopo @export var jump_amount: int = 2):
+
+@export_category("Dash Variables (Hollow Knight Style)")
+@export var dash_speed: float = 600.0
+@export var dash_duration: float = 0.15
+@export var dash_cooldown: float = 0.3
+@export var double_tap_time: float = 0.3

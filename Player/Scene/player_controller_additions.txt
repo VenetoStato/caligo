@@ -1,0 +1,31 @@
+# Aggiunte da inserire in player_controller.gd
+
+# 1. Dopo la riga 119 (dopo is_casting_pastura), aggiungere:
+# Line tension system
+var line_tension: float = 0.0
+var max_line_tension: float = 0.95
+var line_tension_increase_rate: float = 0.5
+var line_tension_decrease_rate: float = 0.3
+var line_break_time: float = 2.0
+var line_break_timer: float = 0.0
+var line_broken: bool = false
+
+# 2. Dopo la riga 247 (dopo update_fish_struggle), aggiungere:
+# line tension system
+if line_extended and hook_instance != null:
+	update_line_tension(delta)
+
+# 3. Dopo la riga 273 (dopo update_line_visual), aggiungere:
+# Controlla se la lenza si è rotta
+if line_broken:
+	destroy_hook()
+	line_broken = false
+
+# 4. Modificare cast_hook_charged() per supportare Node2D con RigidBody2D figlio (righe 574-581)
+
+# 5. Modificare on_fish_spawned() per aggiungere line_tension = 0.0 e line_break_timer = 0.0
+
+# 6. Aggiungere alla fine del file (dopo exit_water()):
+# - update_line_tension()
+# - convert_fish_to_rigidbody()
+# - on_fish_hooked()

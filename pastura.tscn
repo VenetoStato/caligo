@@ -1,0 +1,108 @@
+[gd_scene load_steps=9 format=3 uid="uid://c3ppxe0weekk1"]
+
+[ext_resource type="Texture2D" uid="uid://ck71v2vsgb72n" path="res://Landscape/Sprites/pastura.png" id="1_vogv8"]
+[ext_resource type="Script" uid="uid://bykmmfh3nrjj8" path="res://pastura.gd" id="2_pastura"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_0d1qr"]
+
+[sub_resource type="Animation" id="Animation_tqagc"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("../pastura:frame")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [1]
+}
+
+[sub_resource type="Animation" id="Animation_0d1qr"]
+resource_name = "hook_with_worm"
+length = 0.6
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("../pastura:frame")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.10000001, 0.20000002, 0.3, 0.40000004, 0.5),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1),
+"update": 1,
+"values": [1, 2, 3, 4, 5, 6]
+}
+
+[sub_resource type="Animation" id="Animation_mdxum"]
+resource_name = "pastura_lancio"
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("../pastura:frame")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.13333334, 0.26666668, 0.46666667, 0.6666667, 0.8666667),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1),
+"update": 1,
+"values": [0, 5, 1, 2, 3, 4]
+}
+
+[sub_resource type="Animation" id="Animation_446fr"]
+resource_name = "pastura"
+length = 0.4
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("../pastura:frame")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.2, 0.4),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 1,
+"values": [0, 5, 0]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_42l0x"]
+_data = {
+&"RESET": SubResource("Animation_tqagc"),
+&"hook_with_worm": SubResource("Animation_0d1qr"),
+&"pastura_acqua": SubResource("Animation_mdxum"),
+&"pastura_lancio": SubResource("Animation_446fr")
+}
+
+[node name="Node2D" type="Node2D"]
+script = ExtResource("2_pastura")
+
+[node name="Area2D" type="Area2D" parent="."]
+monitoring = false
+monitorable = true
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+scale = Vector2(30, 30)
+shape = SubResource("CircleShape2D_0d1qr")
+
+[node name="RigidBody2D" type="RigidBody2D" parent="."]
+scale = Vector2(0.99999994, 0.99999994)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="RigidBody2D"]
+scale = Vector2(0.010000001, 0.010000001)
+shape = SubResource("CircleShape2D_0d1qr")
+
+[node name="pastura" type="Sprite2D" parent="."]
+position = Vector2(1, -6)
+scale = Vector2(0.1, 0.1)
+texture = ExtResource("1_vogv8")
+hframes = 3
+vframes = 2
+frame = 1
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="pastura"]
+libraries = {
+&"": SubResource("AnimationLibrary_42l0x")
+}

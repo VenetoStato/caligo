@@ -1,0 +1,11 @@
+[gd_scene load_steps=3 format=3 uid="uid://b1hg15ugg6w4e"]
+
+[ext_resource type="Script" uid="uid://wrt740lkj5wy" path="res://fishinghook.gd" id="2_fishinghook"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_0d1qr"]
+
+[node name="RigidBody2D" type="RigidBody2D"]
+script = ExtResource("2_fishinghook")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_0d1qr")
