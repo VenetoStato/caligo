@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3 uid="uid://c064mwp5bwak4"]
+[gd_scene load_steps=18 format=3 uid="uid://c064mwp5bwak4"]
 
 [ext_resource type="Texture2D" uid="uid://d3oicsx8lp473" path="res://Player/Sprites/sprite_sheet.png" id="1_gqxai"]
 [ext_resource type="Script" uid="uid://c14so0210pd47" path="res://Player/Scene/player_controller.gd" id="1_qfdc6"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://b1hg15ugg6w4e" path="res://fishinghook.tscn" id="3_p0c61"]
 [ext_resource type="PackedScene" uid="uid://c3ppxe0weekk1" path="res://pastura.tscn" id="4_2qgpt"]
 [ext_resource type="PackedScene" uid="uid://j65rarmv02vh" path="res://fish.tscn" id="5_50lji"]
+[ext_resource type="PackedScene" uid="uid://b8k2m3n4p5q6r" path="res://Fx/black_particle.tscn" id="6_p0c61"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_186t8"]
 
@@ -159,10 +160,12 @@ _data = {
 
 [node name="CharacterBody2D" type="CharacterBody2D"]
 script = ExtResource("1_qfdc6")
+move_speed = 150.0
 hook_scene = ExtResource("2_t3pcw")
 fishing_hook_scene = ExtResource("3_p0c61")
 pastura_scene = ExtResource("4_2qgpt")
 fish_scene = ExtResource("5_50lji")
+black_particle_scene = ExtResource("6_p0c61")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 position = Vector2(3, -19)

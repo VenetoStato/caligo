@@ -482,8 +482,24 @@ func spawn_fish_in_water():
 			fish_pos.x += randf_range(-100, 100)
 			fish_pos.y += randf_range(-50, 50)
 		
-		# MODIFICA: Riduci la scala del pesce (10 volte più piccolo = 0.01)
-		fish.scale = Vector2(0.01, 0.01)
+		# Riduci molto la scala dei pesci (più piccoli)
+		fish.scale = Vector2(0.1, 0.1)
+		
+		# Riduci anche la scala dello sprite direttamente
+		var sprite = fish.get_node_or_null("Fishes")
+		if sprite == null:
+			sprite = fish.get_node_or_null("Sprite2D")
+		if sprite == null:
+			sprite = fish.get_node_or_null("Sprite")
+		if sprite != null:
+			sprite.scale = Vector2(0.1, 0.1)
+		
+		# Riduci anche la scala del CollisionShape2D
+		var collision = fish.get_node_or_null("CollisionShape2D")
+		if collision == null:
+			collision = fish.get_node_or_null("Area2D/CollisionShape2D")
+		if collision != null:
+			collision.scale = Vector2(0.1, 0.1)
 		
 		fish.global_position = fish_pos
 		# Usa call_deferred per aggiungere il pesce dopo che il setup è completato

@@ -1,11 +1,28 @@
-[gd_scene load_steps=3 format=3 uid="uid://b1hg15ugg6w4e"]
+[gd_scene load_steps=5 format=3 uid="uid://b1hg15ugg6w4e"]
 
+[ext_resource type="Texture2D" uid="uid://e8v842viaytr" path="res://Landscape/Sprites/vermi (1).png" id="1_0d1qr"]
 [ext_resource type="Script" uid="uid://wrt740lkj5wy" path="res://fishinghook.gd" id="2_fishinghook"]
+[ext_resource type="Texture2D" uid="uid://bgxqkj0nsvcdh" path="res://Player/Sprites/white light.png" id="3_42l0x"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_0d1qr"]
+radius = 21.023796
 
 [node name="RigidBody2D" type="RigidBody2D"]
 script = ExtResource("2_fishinghook")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_0d1qr")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(0.01, 0.01)
+texture = ExtResource("1_0d1qr")
+hframes = 3
+vframes = 3
+frame = 1
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+
+[node name="PointLight2D" type="PointLight2D" parent="."]
+position = Vector2(0, 1)
+energy = 0.1
+texture = ExtResource("3_42l0x")
