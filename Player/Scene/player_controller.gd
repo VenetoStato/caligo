@@ -1,10 +1,11 @@
 extends CharacterBody2D
 
 # ===========================================
-# PLAYER SCRIPT v3 - COMPLETO
-# Include: Movimento, Dash, Pesca, Lenza dinamica, Sistema vita
-# I pallini vita sono disegnati direttamente (nessun script esterno)
+# PLAYER SCRIPT - VERSIONE CON DEATH SYSTEM
 # ===========================================
+# Fade in/out stile Hollow Knight
+# Morte con freeze frame + particelle + respawn
+# Vita visibile solo quando cambia
 
 @export_category("Setup")
 @export var sprite_node: Sprite2D
@@ -92,15 +93,28 @@ extends CharacterBody2D
 @export var health_color_empty: Color = Color(0.3, 0.3, 0.3, 0.5)
 @export var health_dot_size: float = 6.0
 @export var health_dot_spacing: float = 14.0
+@export var health_display_time: float = 3.0
+
+@export_category("Death & Respawn")
+## Gruppo dei nodi usati come checkpoint/spawn point
+@export var spawn_point_group: String = "spawn_point"
+## Se true, usa l'ultimo terreno toccato come respawn
+@export var use_last_ground_as_respawn: bool = true
+## Offset Y dal punto di respawn (per non spawnare nel terreno)
+@export var respawn_y_offset: float = -20.0
 
 # Nodi
 @onready var anim: AnimationPlayer = $anim
 var fishing_line: Line2D = null
+var transition_manager: Node = null
 
 # Health UI
 var _health_states: Array[bool] = []
 var _health_scales: Array[float] = []
 var _health_pulse: Array[float] = []
+var _health_visible: bool = true
+var _health_visible_timer: float = 0.0
+var _health_alpha: float = 1.0
 
 # Dash
 var is_dashing: bool = false
@@ -121,11 +135,14 @@ var facing_right: bool = true
 var is_in_water: bool = false
 var water_gravity_multiplier: float = 1.0
 
-# Health
+# Health & Death
 var current_health: int = 5
 var is_invincible: bool = false
 var invincibility_timer: float = 0.0
 var blink_timer: float = 0.0
+var is_dead: bool = false
+var last_safe_ground_position: Vector2 = Vector2.ZERO
+var initial_spawn_position: Vector2 = Vector2.ZERO
 
 # Fishing
 enum LineMode { NONE, FISHING, GRAB }
@@ -161,9 +178,17 @@ func _ready():
 	_setup_sprite()
 	_setup_fishing_line()
 	_setup_health()
+	_setup_transition_manager()
+	
 	if anim:
 		anim.animation_finished.connect(_on_anim_finished)
+	
 	current_health = max_health
+	initial_spawn_position = global_position
+	last_safe_ground_position = global_position
+	
+	# La vita si mostra all'inizio (dopo il fade in)
+	_show_health_ui()
 
 func _setup_sprite():
 	if sprite_node == null:
@@ -191,40 +216,118 @@ func _setup_health():
 		_health_scales.append(1.0)
 		_health_pulse.append(0.0)
 
+func _setup_transition_manager():
+	# Cerca il TransitionManager nella scena
+	transition_manager = get_tree().get_first_node_in_group("transition_manager")
+	
+	# Se non esiste, crealo
+	if transition_manager == null:
+		var tm_script = load("res://scripts/transition_manager.gd")
+		if tm_script:
+			transition_manager = tm_script.new()
+			transition_manager.add_to_group("transition_manager")
+			get_tree().root.add_child(transition_manager)
+		else:
+			# Crea un TransitionManager inline semplificato
+			_create_simple_transition_manager()
+
+func _create_simple_transition_manager():
+	# Versione semplificata se lo script non è trovato
+	var canvas = CanvasLayer.new()
+	canvas.layer = 100
+	canvas.name = "TransitionManager"
+	canvas.add_to_group("transition_manager")
+	
+	var rect = ColorRect.new()
+	rect.name = "FadeRect"
+	rect.color = Color(0, 0, 0, 1)
+	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(rect)
+	
+	get_tree().root.add_child(canvas)
+	transition_manager = canvas
+	
+	# Fade in iniziale
+	_simple_fade_in(rect)
+
+func _simple_fade_in(rect: ColorRect):
+	var tween = create_tween()
+	tween.tween_property(rect, "color:a", 0.0, 1.0)
+
 func _on_anim_finished(anim_name: String):
 	if anim_name == "Fishing":
 		fishing_anim_finished = true
 
+# ===========================================
+# HEALTH UI
+# ===========================================
+func _show_health_ui():
+	_health_visible = true
+	_health_visible_timer = health_display_time
+	_health_alpha = 1.0
+
+func _update_health_visibility(delta: float):
+	if _health_visible:
+		_health_visible_timer -= delta
+		if _health_visible_timer <= 0.5:
+			_health_alpha = max(0.0, _health_visible_timer / 0.5)
+		else:
+			_health_alpha = 1.0
+		if _health_visible_timer <= 0:
+			_health_visible = false
+			_health_alpha = 0.0
+
 func _draw():
+	if _health_alpha <= 0.01:
+		return
+	
 	var total_w = (max_health - 1) * health_dot_spacing
 	var start_x = -total_w / 2.0
+	
 	for i in range(max_health):
 		var pos = health_ui_offset + Vector2(start_x + i * health_dot_spacing, 0)
 		var is_full = _health_states[i] if i < _health_states.size() else false
 		var sc = _health_scales[i] if i < _health_scales.size() else 1.0
 		var pulse = _health_pulse[i] if i < _health_pulse.size() else 0.0
+		
 		if is_full and pulse > 0:
 			sc *= 1.0 + sin(pulse * 4.0) * 0.15
+		
 		var rad = health_dot_size * sc
 		var col = health_color_full if is_full else health_color_empty
+		col.a *= _health_alpha
+		
 		draw_circle(pos, rad, col)
-		draw_arc(pos, rad, 0, TAU, 24, col.darkened(0.3), 1.5)
+		
+		var border_col = col.darkened(0.3)
+		border_col.a = col.a
+		draw_arc(pos, rad, 0, TAU, 24, border_col, 1.5)
+		
 		if is_full:
-			draw_circle(pos + Vector2(-rad * 0.25, -rad * 0.25), rad * 0.25, Color(1, 1, 1, 0.3))
+			var highlight = Color(1, 1, 1, 0.3 * _health_alpha)
+			draw_circle(pos + Vector2(-rad * 0.25, -rad * 0.25), rad * 0.25, highlight)
 
 func _input(event):
+	# Ignora input se morto
+	if is_dead:
+		return
+	
 	if event.is_action_pressed("change_hook"):
 		using_fishing_hook = !using_fishing_hook
 		return
+	
 	if event.is_action_pressed("grab"):
 		if line_extended and hook_instance and line_mode == LineMode.GRAB:
 			detach_grab_anchor()
 			return
+	
 	if event.is_action_pressed("cast"):
 		if not line_extended and hook_instance == null:
 			line_mode = LineMode.FISHING
 			is_charging = true
 			current_charge_time = 0.0
+	
 	if event.is_action_pressed("grab"):
 		if not line_extended and hook_instance == null:
 			if using_fishing_hook:
@@ -237,31 +340,48 @@ func _input(event):
 					line_mode = LineMode.GRAB
 					is_charging = true
 					current_charge_time = 0.0
+	
 	if event.is_action_released("cast") or event.is_action_released("grab"):
 		if is_charging:
 			is_charging = false
 			cast_hook_charged()
+	
 	if event.is_action_pressed("reel"):
 		if line_extended and hook_instance:
 			if fish_hooked and fish_struggle_active:
 				_stop_fish_struggle()
 			is_reeling = true
+	
 	if event.is_action_released("reel"):
 		is_reeling = false
 
 func _physics_process(delta: float):
+	# Non processare se morto
+	if is_dead:
+		return
+	
 	_update_dash_timers(delta)
 	_check_dash_input()
 	_update_invincibility(delta)
 	_update_health_anims(delta)
+	_update_health_visibility(delta)
+	
 	if _process_dash(delta):
 		return
+	
 	_apply_gravity(delta)
 	horizontal_movement()
 	flip_logic()
+	
 	if is_charging:
 		current_charge_time = min(current_charge_time + delta, max_charge_time)
+	
 	move_and_slide()
+	
+	# Aggiorna l'ultima posizione sicura sul terreno
+	if is_on_floor():
+		last_safe_ground_position = global_position
+	
 	set_animation()
 	jump_logic()
 	_process_fishing(delta)
@@ -444,47 +564,183 @@ func jump_logic():
 		if particles_on_jump and black_particle_scene:
 			_spawn_particles(global_position, Vector2.DOWN, 0.2)
 
-# ===== HEALTH =====
+# ===========================================
+# HEALTH & DEATH SYSTEM
+# ===========================================
 func take_damage(amount: int = 1):
-	if is_invincible:
+	if is_invincible or is_dead:
 		return
-	var old = current_health
+	
 	current_health = max(0, current_health - amount)
+	
 	for i in range(max_health):
 		var was = _health_states[i]
 		_health_states[i] = i < current_health
 		if was and not _health_states[i]:
 			_health_scales[i] = 0.3
 			_health_pulse[i] = 0.0
+	
+	_show_health_ui()
+	
 	is_invincible = true
 	invincibility_timer = invincibility_time
 	blink_timer = 0.0
+	
 	print("💔 Danno! Vita: ", current_health)
+	
 	if current_health <= 0:
 		_on_death()
 
 func heal(amount: int = 1):
 	var old = current_health
 	current_health = min(max_health, current_health + amount)
+	
 	for i in range(max_health):
 		var was = _health_states[i]
 		_health_states[i] = i < current_health
 		if not was and _health_states[i]:
 			_health_scales[i] = 1.5
 			_health_pulse[i] = 0.01
+	
 	if current_health > old:
+		_show_health_ui()
 		print("💚 Curato! Vita: ", current_health)
 
 func _on_death():
-	print("☠️ GAME OVER!")
-	await get_tree().create_timer(1.0).timeout
+	if is_dead:
+		return
+	
+	is_dead = true
+	velocity = Vector2.ZERO
+	
+	print("☠️ MORTE!")
+	
+	# Ferma l'animazione sull'ultimo frame
+	if anim:
+		anim.pause()
+	
+	# Trova il punto di respawn
+	var respawn_pos = _find_respawn_position()
+	
+	# Usa il TransitionManager se disponibile
+	if transition_manager and transition_manager.has_method("play_death_sequence"):
+		transition_manager.call("play_death_sequence", self, respawn_pos)
+	else:
+		# Fallback: morte semplice
+		await _simple_death_sequence(respawn_pos)
+
+func _simple_death_sequence(respawn_pos: Vector2):
+	# Spawn particelle di morte
+	_spawn_death_particles()
+	
+	# Slow-mo breve
+	Engine.time_scale = 0.2
+	await get_tree().create_timer(0.1).timeout  # 0.5 * 0.2 = 0.1 real time
+	Engine.time_scale = 1.0
+	
+	# Fade out
+	var fade_rect = _get_or_create_fade_rect()
+	if fade_rect:
+		var tween = create_tween()
+		tween.tween_property(fade_rect, "color:a", 1.0, 0.5)
+		await tween.finished
+	
+	# Respawn
+	global_position = respawn_pos
+	_on_respawn()
+	
+	# Pausa al nero
+	await get_tree().create_timer(0.3).timeout
+	
+	# Fade in
+	if fade_rect:
+		var tween = create_tween()
+		tween.tween_property(fade_rect, "color:a", 0.0, 0.8)
+		await tween.finished
+
+func _get_or_create_fade_rect() -> ColorRect:
+	if transition_manager:
+		var rect = transition_manager.get_node_or_null("FadeRect")
+		if rect:
+			rect.visible = true
+			return rect
+	return null
+
+func _spawn_death_particles():
+	if black_particle_scene == null:
+		return
+	
+	var count = 12
+	for i in range(count):
+		var p = black_particle_scene.instantiate()
+		get_tree().current_scene.add_child(p)
+		p.global_position = global_position
+		
+		var angle = (float(i) / count) * TAU
+		var dir = Vector2(cos(angle), sin(angle))
+		
+		if p.has_method("set_direction"):
+			p.call("set_direction", dir)
+		if p.has_method("play"):
+			p.call("play")
+
+func _find_respawn_position() -> Vector2:
+	# 1. Cerca spawn point nella scena
+	var spawn_points = get_tree().get_nodes_in_group(spawn_point_group)
+	if spawn_points.size() > 0:
+		# Trova lo spawn point più vicino
+		var closest: Node2D = null
+		var closest_dist = INF
+		for sp in spawn_points:
+			if sp is Node2D:
+				var dist = global_position.distance_to(sp.global_position)
+				if dist < closest_dist:
+					closest_dist = dist
+					closest = sp
+		if closest:
+			return closest.global_position + Vector2(0, respawn_y_offset)
+	
+	# 2. Usa l'ultima posizione sicura sul terreno
+	if use_last_ground_as_respawn and last_safe_ground_position != Vector2.ZERO:
+		return last_safe_ground_position + Vector2(0, respawn_y_offset)
+	
+	# 3. Fallback: posizione iniziale
+	return initial_spawn_position
+
+func _on_respawn():
+	# Reset dello stato
+	is_dead = false
 	current_health = max_health
+	velocity = Vector2.ZERO
+	is_invincible = true
+	invincibility_timer = invincibility_time
+	blink_timer = 0.0
+	
+	# Reset vita UI
 	for i in range(max_health):
 		_health_states[i] = true
 		_health_scales[i] = 1.0
 		_health_pulse[i] = 0.0
+	
+	# Reset fishing
+	if line_extended:
+		_destroy_hook()
+	
+	# Riprendi animazione
+	if anim:
+		anim.play("Idle")
+	
+	# Reset sprite
+	if sprite_node:
+		sprite_node.modulate.a = 1.0
+	
+	_show_health_ui()
+	
+	print("🔄 Respawn!")
 
-# ===== OFFSETS =====
+# ===========================================
+# OFFSETS
+# ===========================================
 func get_base_axis_position() -> Vector2:
 	return to_global(base_axis_offset)
 
@@ -523,7 +779,9 @@ func get_fish_center_position(fish: Node2D) -> Vector2:
 		spr = fish.find_child("Fishes", true, false)
 	return spr.global_position if spr else fish.global_position
 
-# ===== GRAB ANCHORS =====
+# ===========================================
+# GRAB ANCHORS
+# ===========================================
 func cleanup_grab_anchors():
 	for i in range(grab_anchors.size() - 1, -1, -1):
 		if grab_anchors[i] == null or not is_instance_valid(grab_anchors[i]):
@@ -575,7 +833,9 @@ func detach_grab_anchor():
 		hook_instance.call("anchorize")
 	_reset_line_state()
 
-# ===== CAST =====
+# ===========================================
+# CAST
+# ===========================================
 func cast_hook_charged():
 	var scene = fishing_hook_scene if using_fishing_hook and fishing_hook_scene else hook_scene
 	if scene == null:
@@ -623,7 +883,9 @@ func _cast_pastura():
 		p.call("set_player_reference", self)
 	active_pastura = p
 
-# ===== ROPE =====
+# ===========================================
+# ROPE
+# ===========================================
 func _init_rope_points(start: Vector2):
 	points.clear()
 	old_points.clear()
@@ -791,6 +1053,9 @@ func _reel_fishing_target(rod: Vector2):
 	elif target is RigidBody2D:
 		target.apply_central_force(dir * reel_pull_force)
 
+# ===========================================
+# FISH SYSTEM
+# ===========================================
 func on_fish_hooked(fish: Node2D):
 	if fish == null or fish_hooked:
 		return
@@ -845,8 +1110,10 @@ func _stop_fish_struggle():
 		current_fish.call("stop_struggle")
 
 func _on_fish_escaped():
-	if is_instance_valid(current_fish):
-		current_fish.queue_free()
+	print("💨 Pesce scappato!")
+	if current_fish and is_instance_valid(current_fish):
+		if current_fish.has_method("release_from_hook"):
+			current_fish.call("release_from_hook")
 	_on_fish_lost(true)
 
 func _on_fish_lost(_escaped: bool):
@@ -866,6 +1133,7 @@ func _reel_fish_to_player():
 		_destroy_hook()
 		return
 	if global_position.distance_to(current_fish.global_position) < fish_reel_distance:
+		print("🏆 Pesce catturato!")
 		heal(1)
 		current_fish.queue_free()
 		fish_hooked = false
@@ -911,7 +1179,7 @@ func _update_line_visual():
 	for p in points:
 		fishing_line.add_point(p)
 
-func _spawn_particles(pos: Vector2, direction: Vector2, duration: float = 0.3):
+func _spawn_particles(pos: Vector2, direction: Vector2, _duration: float = 0.3):
 	if black_particle_scene == null:
 		return
 	var p = black_particle_scene.instantiate()
@@ -928,7 +1196,9 @@ func _spawn_particles(pos: Vector2, direction: Vector2, duration: float = 0.3):
 	if p.has_method("play"):
 		p.call("play")
 
-# ===== WATER =====
+# ===========================================
+# WATER
+# ===========================================
 func set_in_water(in_w: bool, grav_red: float = 0.3):
 	var was = is_in_water
 	is_in_water = in_w
@@ -942,24 +1212,39 @@ func in_water():
 func exit_water():
 	set_in_water(false)
 
-# ===== API =====
+# ===========================================
+# API
+# ===========================================
 func has_fish_hooked() -> bool:
 	return fish_hooked and current_fish != null and is_instance_valid(current_fish)
+
 func is_line_extended() -> bool:
 	return line_extended
+
 func is_fish_struggling() -> bool:
 	return fish_struggle_active
+
 func get_current_health() -> int:
 	return current_health
+
 func get_max_health() -> int:
 	return max_health
+
+func is_player_dead() -> bool:
+	return is_dead
+
 func release_fish():
 	if fish_hooked and current_fish:
-		if is_instance_valid(current_fish):
-			current_fish.queue_free()
+		if is_instance_valid(current_fish) and current_fish.has_method("release_from_hook"):
+			current_fish.call("release_from_hook")
 		_on_fish_lost(false)
+
 func retract_line():
 	if line_extended:
 		if fish_hooked:
 			release_fish()
 		_destroy_hook()
+
+# Imposta un checkpoint manuale
+func set_checkpoint(pos: Vector2):
+	last_safe_ground_position = pos

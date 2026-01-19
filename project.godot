@@ -15,6 +15,14 @@ run/main_scene="uid://6hqecihao0iv"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="res://icon.svg"
 
+[autoload]
+
+autoload_transition="*res://TransitionManager.gd"
+
+[editor]
+
+version_control/autoload_on_startup=true
+
 [input]
 
 ui_accept={

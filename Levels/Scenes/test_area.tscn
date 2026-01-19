@@ -15,7 +15,7 @@
 [ext_resource type="Texture2D" uid="uid://fk4utfnm3udn" path="res://Player/Sprites/Solid_white.svg.png" id="8_xauc6"]
 [ext_resource type="Script" uid="uid://bxmnjnyy4ciro" path="res://water_body.gd" id="10_water"]
 [ext_resource type="Script" uid="uid://bmnixai4nxvwy" path="res://erbetta.gd" id="11_bbl5d"]
-[ext_resource type="PackedScene" path="res://Fx/ambient_particle.tscn" id="12_irbbh"]
+[ext_resource type="PackedScene" uid="uid://o7x1gjykk2h6" path="res://Fx/ambient_particle.tscn" id="12_irbbh"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_urx6c"]
 size = Vector2(58, 15.75)
