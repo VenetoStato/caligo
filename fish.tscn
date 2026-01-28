@@ -48,7 +48,7 @@ _data = {
 script = ExtResource("2_fish")
 
 [node name="Fishes" type="Sprite2D" parent="."]
-z_index = 5
+z_index = 0
 texture = ExtResource("1_xu20i")
 hframes = 3
 vframes = 2

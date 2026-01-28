@@ -101,7 +101,8 @@ func _ready():
 	# Crea Water_Polygon (come nel tutorial)
 	water_polygon = Polygon2D.new()
 	water_polygon.color = Color(0.2, 0.5, 0.8, 0.7)  # Più visibile
-	water_polygon.z_index = 0  # Cambiato da -1 a 0 per essere visibile
+	# Sopra a pesci e barca (barca deve stare dietro l'acqua)
+	water_polygon.z_index = 10
 	add_child(water_polygon)
 	
 	# Crea Water_Border (come nel tutorial)
@@ -353,26 +354,27 @@ func apply_buoyancy(delta: float):
 			if char_body.has_method("set_in_water"):
 				char_body.call("set_in_water", true, player_gravity_reduction)
 		
-		# RigidBody2D (Pastura, etc.) - riduci gravità
+		# RigidBody2D (Pesci, Pastura, etc.) - riduci gravità
 		elif body is RigidBody2D:
 			var rigid_body = body as RigidBody2D
 			
-			# Riduci la gravità applicata
-			# In Godot 4, la gravità viene applicata automaticamente, quindi dobbiamo applicare una forza contraria
-			var gravity_scale = rigid_body.gravity_scale
-			var gravity_force = ProjectSettings.get_setting("physics/2d/default_gravity", 980.0) * gravity_scale
-			var reduced_gravity = gravity_force * rigidbody_gravity_reduction
+			# Comunica direttamente al RigidBody2D che è in acqua (se ha il metodo)
+			# Questo è importante per i pesci che sono direttamente RigidBody2D
+			if rigid_body.has_method("set_in_water"):
+				rigid_body.call("set_in_water", true)
 			
-			# Applica una forza verso l'alto per compensare la gravità (90% di riduzione)
-			rigid_body.apply_central_force(Vector2(0, -gravity_force * 0.9))
+			# Riduci la gravità applicata solo se non è un pesce (i pesci hanno gravity_scale = 0)
+			if rigid_body.gravity_scale > 0:
+				# In Godot 4, la gravità viene applicata automaticamente, quindi dobbiamo applicare una forza contraria
+				var gravity_scale = rigid_body.gravity_scale
+				var gravity_force = ProjectSettings.get_setting("physics/2d/default_gravity", 980.0) * gravity_scale
+				var reduced_gravity = gravity_force * rigidbody_gravity_reduction
+				
+				# Applica una forza verso l'alto per compensare la gravità (90% di riduzione)
+				rigid_body.apply_central_force(Vector2(0, -gravity_force * 0.9))
 			
 			# Aggiungi resistenza all'acqua
 			rigid_body.linear_velocity *= 0.98
-			
-			# Comunica al parent Node2D che è in acqua (se esiste)
-			var parent = rigid_body.get_parent()
-			if parent != null and parent.has_method("set_in_water"):
-				parent.call("set_in_water", true)
 
 func spawn_fish_in_water():
 	# Verifica che collision_polygon sia stato inizializzato

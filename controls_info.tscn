@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=4 uid="uid://controls_info_001"]
+
+[ext_resource type="Script" path="res://controls_info.gd" id="1_controls"]
+
+[node name="ControlsInfo" type="CanvasLayer"]
+script = ExtResource("1_controls")
+
+[node name="Background" parent="." index="0"]
+[node name="MainContainer" parent="." index="1"]
+[node name="ControlsContainer" parent="MainContainer" index="0"]

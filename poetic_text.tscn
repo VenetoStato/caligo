@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=4 uid="uid://poetic_text_001"]
+
+[ext_resource type="Script" path="res://poetic_text.gd" id="1_poetic"]
+
+[node name="PoeticText" type="CanvasLayer"]
+script = ExtResource("1_poetic")
+
+[node name="Background" parent="." index="0"]
+[node name="MainContainer" parent="." index="1"]
+[node name="TextContainer" parent="MainContainer" index="0"]

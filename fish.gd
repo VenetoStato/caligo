@@ -1,4 +1,4 @@
-extends Node2D
+extends RigidBody2D
 
 # ===========================================
 # FISH - Pesce che nuota e può essere pescato
@@ -20,6 +20,8 @@ extends Node2D
 @export var swim_bounds_y: float = 60.0
 ## Offset della casa rispetto allo spawn (Y negativo = più su)
 @export var home_offset: Vector2 = Vector2(0, -50)
+## Profondità massima dal fondale (i pesci Go' stanno sul fondale)
+@export var max_depth_from_bottom: float = 80.0
 
 @export_category("Physics")
 @export var swim_response: float = 3.0
@@ -43,6 +45,7 @@ extends Node2D
 var player_ref: Node = null
 var target_hook: Node = null
 var sprite: Node2D = null
+var _underwater_material: ShaderMaterial = null
 
 # Stato movimento
 var velocity: Vector2 = Vector2.ZERO
@@ -76,11 +79,25 @@ var hook_cooldown_time: float = 3.0
 
 func _ready():
 	add_to_group("fish")
+	# Configurazione RigidBody2D per pesci
+	lock_rotation = true
+	rotation = 0.0
+	gravity_scale = 0.0  # I pesci non cadono, nuotano
+	
 	spawn_position = global_position
 	home_position = global_position + home_offset
 	_find_sprite()
+	_setup_underwater_shader()
 	_setup_detection_area()
 	_pick_new_swim_direction()
+
+func _setup_underwater_shader():
+	# Applica distorsione leggera ai pesci quando sono in acqua
+	if sprite is CanvasItem:
+		var sh = load("res://fish_underwater_distort.gdshader") as Shader
+		if sh != null:
+			_underwater_material = ShaderMaterial.new()
+			_underwater_material.shader = sh
 
 func _find_sprite():
 	sprite = get_node_or_null("Fishes")
@@ -118,6 +135,14 @@ func _physics_process(delta: float):
 	if hook_cooldown > 0:
 		hook_cooldown -= delta
 	
+	# FORZA: blocca sempre la rotazione
+	lock_rotation = true
+	rotation = 0.0
+	
+	# Assicura che lo sprite non ruoti mai
+	if sprite != null:
+		sprite.rotation = 0.0
+	
 	if in_water:
 		if is_escaping:
 			_process_escaping(delta)
@@ -126,9 +151,13 @@ func _physics_process(delta: float):
 	else:
 		_process_falling(delta)
 
-	global_position += velocity * delta
+	# Usa linear_velocity invece di modificare global_position direttamente
+	linear_velocity = velocity
 	_update_sprite_direction()
 	_update_sprite_color()
+	
+	# Mantieni i pesci vicini al fondale
+	_keep_near_bottom()
 
 func _process_swimming(delta: float):
 	var desired = Vector2.ZERO
@@ -148,6 +177,7 @@ func _process_swimming(delta: float):
 				is_struggling = false
 
 	elif is_attracted and attraction_target != Vector2.ZERO:
+		# Attrazione verso il target (movimento libero)
 		var dir = (attraction_target - global_position).normalized()
 		desired = dir * attraction_speed
 
@@ -156,7 +186,7 @@ func _process_swimming(delta: float):
 			_try_hook_to_player()
 
 	else:
-		# Nuoto normale
+		# Nuoto normale (movimento libero)
 		swim_timer += delta
 		if swim_timer >= swim_change_interval:
 			swim_timer = 0.0
@@ -171,7 +201,8 @@ func _process_swimming(delta: float):
 		desired.x -= boundary_push
 	elif offset.x < -swim_bounds_x:
 		desired.x += boundary_push
-
+	
+	# Boundary verticale (mantieni nella zona di nuoto)
 	if offset.y > swim_bounds_y:
 		desired.y -= boundary_push
 	elif offset.y < -swim_bounds_y:
@@ -198,28 +229,47 @@ func _process_escaping(delta: float):
 		# Aggiorna la home position alla nuova posizione
 		home_position = global_position
 		_pick_new_swim_direction()
-		print("🐟 Pesce tornato a nuotare normalmente")
 
 func _process_falling(delta: float):
 	velocity.y += 980.0 * delta
 	velocity.x *= 0.98
 
 func _pick_new_swim_direction():
+	# Movimento libero (non solo orizzontale)
+	# I pesci Go' si muovono poco dal fondale, quindi preferiscono movimento orizzontale
+	# ma possono anche muoversi leggermente in verticale
 	var angle = randf() * TAU
-	swim_direction = Vector2(cos(angle), sin(angle) * 0.35).normalized()
+	# Preferisci angoli più orizzontali (pesci sul fondale)
+	var horizontal_bias = 0.3  # 0.3 = più orizzontale, 1.0 = completamente random
+	var adjusted_angle = angle * horizontal_bias + (PI/2) * (1.0 - horizontal_bias)
+	swim_direction = Vector2(cos(adjusted_angle), sin(adjusted_angle) * 0.5).normalized()
 
 func _update_sprite_direction():
 	if sprite == null:
 		return
+	
+	# FORZA: lo sprite non deve mai ruotare
+	sprite.rotation = 0.0
 
+	# CORREZIONE: i pesci devono guardare nella direzione di movimento (testa avanti, non culo)
+	# Se si muovono a destra (velocity.x > 0), lo sprite deve guardare a destra
+	# Se si muovono a sinistra (velocity.x < 0), lo sprite deve guardare a sinistra
+	# INVERTITO: lo sprite originale guarda a sinistra quando scale.x è positivo
+	# Quindi quando si muove a destra, serve scale.x negativo (flip) per guardare a destra
 	if velocity.x > 1.0:
-		sprite.scale.x = abs(sprite.scale.x)
-	elif velocity.x < -1.0:
+		# Si muove a destra -> sprite guarda a destra (scale.x negativo = flip)
 		sprite.scale.x = -abs(sprite.scale.x)
+	elif velocity.x < -1.0:
+		# Si muove a sinistra -> sprite guarda a sinistra (scale.x positivo = normale)
+		sprite.scale.x = abs(sprite.scale.x)
 
 func _update_sprite_color():
 	if sprite == null:
 		return
+	
+	# Shader distorsione solo quando in acqua
+	if sprite is CanvasItem and _underwater_material != null:
+		(sprite as CanvasItem).material = _underwater_material if in_water else null
 	
 	var target_color = normal_color
 	
@@ -314,10 +364,9 @@ func release_from_hook():
 		escape_direction = (global_position - player_ref.global_position).normalized()
 	else:
 		var angle = randf() * TAU
+		# Preferisci fuga orizzontale (pesci sul fondale)
 		escape_direction = Vector2(cos(angle), sin(angle) * 0.5).normalized()
 	
-	# Aggiungi una componente verticale casuale
-	escape_direction.y += randf_range(-0.3, 0.3)
 	escape_direction = escape_direction.normalized()
 	
 	# Imposta cooldown per non essere ri-agganciato subito
@@ -371,6 +420,50 @@ func set_in_water(water: bool):
 
 func is_available_for_hook() -> bool:
 	return not is_hooked_to_player and not is_escaping and hook_cooldown <= 0
+
+# ===========================================
+# FONDALE - Mantieni i pesci vicini al fondale
+# ===========================================
+func _keep_near_bottom():
+	if not in_water:
+		return
+	
+	# Trova l'acqua più vicina
+	var water_area = _find_water_area()
+	if water_area == null:
+		return
+	
+	# Ottieni la profondità dell'acqua
+	# target_height è relativo alla posizione locale dell'Area2D
+	var water_surface_y = water_area.global_position.y + water_area.target_height
+	var water_bottom = water_surface_y + water_area.depth
+	var current_depth_from_bottom = water_bottom - global_position.y
+	
+	# Se il pesce è troppo lontano dal fondale, spingilo verso il basso
+	if current_depth_from_bottom > max_depth_from_bottom:
+		var push_down = (current_depth_from_bottom - max_depth_from_bottom) * 5.0
+		velocity.y += push_down
+	elif current_depth_from_bottom < max_depth_from_bottom * 0.5:
+		# Se è troppo vicino al fondale, spingilo leggermente verso l'alto
+		var push_up = (max_depth_from_bottom * 0.5 - current_depth_from_bottom) * 3.0
+		velocity.y -= push_up
+
+func _find_water_area():
+	var water_nodes = get_tree().get_nodes_in_group("water")
+	if water_nodes.size() == 0:
+		return null
+	
+	# Trova l'acqua più vicina
+	var closest = water_nodes[0]
+	var min_dist = global_position.distance_to(closest.global_position)
+	
+	for water in water_nodes:
+		var dist = global_position.distance_to(water.global_position)
+		if dist < min_dist:
+			min_dist = dist
+			closest = water
+	
+	return closest
 
 # ===========================================
 # DEBUG

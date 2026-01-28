@@ -1,4 +1,4 @@
-[gd_scene load_steps=29 format=4 uid="uid://6hqecihao0iv"]
+[gd_scene load_steps=32 format=4 uid="uid://6hqecihao0iv"]
 
 [ext_resource type="PackedScene" uid="uid://c064mwp5bwak4" path="res://Player/Scene/Player.tscn" id="1_ssp8o"]
 [ext_resource type="Texture2D" uid="uid://sls06hof060t" path="res://Landscape/Sprites/montagna.png" id="2_qpuyf"]
@@ -15,7 +15,12 @@
 [ext_resource type="Texture2D" uid="uid://fk4utfnm3udn" path="res://Player/Sprites/Solid_white.svg.png" id="8_xauc6"]
 [ext_resource type="Script" uid="uid://bxmnjnyy4ciro" path="res://water_body.gd" id="10_water"]
 [ext_resource type="Script" uid="uid://bmnixai4nxvwy" path="res://erbetta.gd" id="11_bbl5d"]
+[ext_resource type="Texture2D" uid="uid://b2x7waa8ah8hf" path="res://Landscape/Sprites/barca.png" id="11_yn5ey"]
 [ext_resource type="PackedScene" uid="uid://o7x1gjykk2h6" path="res://Fx/ambient_particle.tscn" id="12_irbbh"]
+[ext_resource type="Script" uid="uid://cewkb6nn6rvnx" path="res://boat_controller.gd" id="13_boat"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_yn5ey"]
+size = Vector2(48, 27)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_urx6c"]
 size = Vector2(58, 15.75)
@@ -278,6 +283,20 @@ frame = 5
 layer = -1
 follow_viewport_enabled = true
 
+[node name="Barca" type="RigidBody2D" parent="Ambiance/-1" groups=["ship"]]
+position = Vector2(-2163, 22.99997)
+scale = Vector2(0.9999999, 0.9999999)
+script = ExtResource("13_boat")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Ambiance/-1/Barca"]
+scale = Vector2(0.99999994, 0.99999994)
+shape = SubResource("RectangleShape2D_yn5ey")
+
+[node name="Barca" type="Sprite2D" parent="Ambiance/-1/Barca"]
+position = Vector2(-4, -13.999954)
+scale = Vector2(0.10000001, 0.10000001)
+texture = ExtResource("11_yn5ey")
+
 [node name="Casa" type="Sprite2D" parent="Ambiance/-1"]
 position = Vector2(512.7778, -273.38892)
 scale = Vector2(0.23491755, 0.29074436)
@@ -288,7 +307,7 @@ modulate = Color(0.74644464, 0.7636256, 0.86290884, 0.32700002)
 light_mask = 2
 visibility_layer = 2
 z_index = -2
-position = Vector2(-226, -513.00006)
+position = Vector2(-221, -347.00006)
 scale = Vector2(5.2000003, 1.4538126)
 texture = ExtResource("8_xauc6")
 
@@ -310,7 +329,7 @@ script = ExtResource("10_water")
 [node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Ambiance/-1/Water"]
 position = Vector2(-663.5159, 123.2538)
 scale = Vector2(0.71037185, 0.54616)
-polygon = PackedVector2Array(-1295.7781, -256.79987, 1066.3652, -189.05414, 1169.1284, 171.64603, -1311.263, 155.16736)
+polygon = PackedVector2Array(-1314.0784, -205.53284, 1148.0127, -190.8851, 1169.1284, 171.64603, -1311.263, 155.16736)
 
 [node name="Water2" type="Area2D" parent="Ambiance/-1"]
 position = Vector2(2523, 47)
