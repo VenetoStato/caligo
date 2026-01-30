@@ -37,6 +37,7 @@ signal death_sequence_completed
 
 func _ready():
 	instance = self
+	add_to_group("transition_manager")
 	layer = 100  # Sopra tutto
 	_create_fade_rect()
 	

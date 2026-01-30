@@ -1,7 +1,7 @@
-[gd_scene load_steps=8 format=3 uid="uid://5rpbdixr224q"]
+[gd_scene load_steps=9 format=3 uid="uid://5rpbdixr224q"]
 
-[ext_resource type="Script" path="res://character_beginning.gd" id="1_beginning"]
-[ext_resource type="Texture2D" uid="uid://d3oicsx8lp473" path="res://Player/Sprites/sprite_sheet.png" id="2_sprite"]
+[ext_resource type="Script" uid="uid://goxf534aa7bv" path="res://character_beginning.gd" id="1_beginning"]
+[ext_resource type="Texture2D" uid="uid://coqf2xafxk1tv" path="res://Spritesbarcaerisveglio.png" id="2_sprite"]
 [ext_resource type="PackedScene" uid="uid://c064mwp5bwak4" path="res://Player/Scene/Player.tscn" id="3_player"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_begin"]
@@ -26,7 +26,7 @@ tracks/0/keys = {
 
 [sub_resource type="Animation" id="Animation_intro"]
 resource_name = "intro"
-length = 2.0
+length = 3.8
 step = 0.2
 tracks/0/type = "value"
 tracks/0/imported = false
@@ -35,14 +35,30 @@ tracks/0/path = NodePath("Sprite2D:frame")
 tracks/0/interp = 1
 tracks/0/loop_wrap = true
 tracks/0/keys = {
-"times": PackedFloat32Array(0, 0.4, 0.8, 1.2, 1.6),
-"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"times": PackedFloat32Array(0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
 "update": 1,
-"values": [0, 1, 0, 1, 2]
+"values": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+}
+
+[sub_resource type="Animation" id="Animation_3j3g6"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Sprite2D:frame")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [6]
 }
 
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_begin"]
 _data = {
+&"RESET": SubResource("Animation_3j3g6"),
 &"idle": SubResource("Animation_idle"),
 &"intro": SubResource("Animation_intro")
 }
@@ -50,13 +66,15 @@ _data = {
 [node name="CharacterBeginning" type="CharacterBody2D"]
 script = ExtResource("1_beginning")
 player_scene = ExtResource("3_player")
+player_spawn_offset_y = 18.0
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 position = Vector2(3, -19)
 scale = Vector2(0.1, 0.1)
 texture = ExtResource("2_sprite")
-hframes = 5
-vframes = 8
+hframes = 6
+vframes = 5
+frame = 6
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, -5)

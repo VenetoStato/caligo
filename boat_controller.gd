@@ -18,6 +18,8 @@ extends RigidBody2D
 var _cached_water: Node = null
 var _nearby_player: Node2D = null
 var _is_active: bool = true
+var _pending_exit_player: Node2D = null
+var _pending_exit_pos: Vector2 = Vector2.ZERO
 
 func _ready():
 	add_to_group("ship")
@@ -96,18 +98,11 @@ func _enter_ship(player: Node2D):
 	sleeping = true
 
 func exit_from_moving(player: Node2D, at_pos: Vector2):
-	# Chiamato dalla ship_moving_controller quando si esce
-	global_position = at_pos
-	visible = true
-	sleeping = false
-	_is_active = true
-
-	if player != null:
-		# Spawn sopra la barca
-		player.global_position = global_position + player_exit_offset
-		player.visible = true
-		player.set_process_input(true)
-		player.set_physics_process(true)
+	# Barca still e player rispawanno esattamente dove era la moving ship (stesso punto)
+	# Usiamo call_deferred così le posizioni si applicano dopo che la moving ship è stata rimossa
+	_pending_exit_player = player
+	_pending_exit_pos = at_pos
+	call_deferred("_apply_exit_positions")
 
 func _setup_detection_area():
 	var area = get_node_or_null("PlayerDetectionArea") as Area2D
@@ -129,6 +124,29 @@ func _setup_detection_area():
 		area.body_entered.connect(_on_area_body_entered)
 	if not area.body_exited.is_connected(_on_area_body_exited):
 		area.body_exited.connect(_on_area_body_exited)
+
+func _apply_exit_positions():
+	# Eseguito in deferred: barca e player nella posizione esatta della moving ship
+	var at_pos := _pending_exit_pos
+	var player := _pending_exit_player
+	_pending_exit_player = null
+	_pending_exit_pos = Vector2.ZERO
+
+	global_position = at_pos
+	linear_velocity = Vector2.ZERO
+	angular_velocity = 0.0
+	visible = true
+	sleeping = false
+	_is_active = true
+
+	if player != null and is_instance_valid(player):
+		# Player nello stesso punto della barca (leggermente sopra per non sovrapporsi)
+		player.global_position = at_pos + player_exit_offset
+		if player is CharacterBody2D:
+			player.velocity = Vector2.ZERO
+		player.visible = true
+		player.set_process_input(true)
+		player.set_physics_process(true)
 
 func _on_area_body_entered(body: Node2D):
 	if body != null and body.is_in_group("player"):

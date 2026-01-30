@@ -29,9 +29,15 @@ extends RigidBody2D
 @export var boundary_push: float = 80.0
 
 @export_category("Struggle")
-@export var struggle_strength: float = 200.0
-@export var struggle_duration: float = 1.0
-@export var reel_resistance: float = 0.7
+@export var struggle_strength: float = 280.0
+@export var struggle_duration: float = 1.2
+@export var reel_resistance: float = 0.38
+## Resistenza costante verso l'amo quando agganciato (nuota via)
+@export var hooked_resist_strength: float = 32.0
+## Velocità max quando agganciato (evita tremolio)
+@export var hooked_max_speed: float = 58.0
+## Damping più forte quando agganciato (movimento più fluido)
+@export var hooked_damping: float = 0.92
 
 @export_category("Visual")
 ## Colore normale del pesce
@@ -72,10 +78,17 @@ var escape_direction: Vector2 = Vector2.ZERO
 
 # Forze esterne
 var reel_force: Vector2 = Vector2.ZERO
+var _reel_force_smoothed: Vector2 = Vector2.ZERO  # per ridurre tremolio
+const REEL_FORCE_SMOOTH: float = 4.0
 
 # Cooldown per essere ri-agganciato
 var hook_cooldown: float = 0.0
 var hook_cooldown_time: float = 3.0
+
+# Evitare flip casuali: soglia velocità e cooldown tra un flip e l'altro
+var _flip_cooldown: float = 0.0
+const FLIP_VELOCITY_THRESHOLD: float = 10.0   # flip solo se |velocity.x| > questa soglia
+const FLIP_COOLDOWN_TIME: float = 0.35       # secondi tra un flip e l'altro
 
 func _ready():
 	add_to_group("fish")
@@ -134,6 +147,8 @@ func _physics_process(delta: float):
 	# Aggiorna cooldown
 	if hook_cooldown > 0:
 		hook_cooldown -= delta
+	if _flip_cooldown > 0:
+		_flip_cooldown -= delta
 	
 	# FORZA: blocca sempre la rotazione
 	lock_rotation = true
@@ -163,12 +178,20 @@ func _process_swimming(delta: float):
 	var desired = Vector2.ZERO
 
 	if is_hooked_to_player:
-		# Reel force (resistenza)
-		if reel_force.length() > 0.0:
-			desired += reel_force * reel_resistance
-			reel_force = reel_force.lerp(Vector2.ZERO, delta * 3.0)
+		# Reel force: smooth per evitare tremolio (direzione non salta frame a frame)
+		if reel_force.length_squared() > 0.01:
+			_reel_force_smoothed = _reel_force_smoothed.lerp(reel_force, delta * REEL_FORCE_SMOOTH)
+			desired += _reel_force_smoothed * reel_resistance
+		else:
+			_reel_force_smoothed = _reel_force_smoothed.lerp(Vector2.ZERO, delta * 5.0)
+		reel_force = reel_force.lerp(Vector2.ZERO, delta * 3.0)
 
-		# Struggle
+		# Resistenza costante: nuota via dall'amo (più sfida)
+		if target_hook != null and is_instance_valid(target_hook):
+			var away = (global_position - target_hook.global_position).normalized()
+			desired += away * hooked_resist_strength
+
+		# Struggle: lotta via dal player
 		if is_struggling:
 			struggle_timer -= delta
 			if struggle_timer > 0.0:
@@ -209,7 +232,13 @@ func _process_swimming(delta: float):
 		desired.y += boundary_push
 
 	velocity = velocity.lerp(desired, delta * swim_response)
-	velocity *= water_damping
+	# Quando agganciato: damping più forte e cap velocità per evitare tremolio
+	if is_hooked_to_player:
+		velocity *= hooked_damping
+		if velocity.length() > hooked_max_speed:
+			velocity = velocity.normalized() * hooked_max_speed
+	else:
+		velocity *= water_damping
 
 func _process_escaping(delta: float):
 	# Nuota velocemente nella direzione di fuga
@@ -251,17 +280,15 @@ func _update_sprite_direction():
 	# FORZA: lo sprite non deve mai ruotare
 	sprite.rotation = 0.0
 
-	# CORREZIONE: i pesci devono guardare nella direzione di movimento (testa avanti, non culo)
-	# Se si muovono a destra (velocity.x > 0), lo sprite deve guardare a destra
-	# Se si muovono a sinistra (velocity.x < 0), lo sprite deve guardare a sinistra
-	# INVERTITO: lo sprite originale guarda a sinistra quando scale.x è positivo
-	# Quindi quando si muove a destra, serve scale.x negativo (flip) per guardare a destra
-	if velocity.x > 1.0:
-		# Si muove a destra -> sprite guarda a destra (scale.x negativo = flip)
+	# Flip solo se la velocità è chiara e non siamo in cooldown (evita "impazzire" a destra/sinistra)
+	if _flip_cooldown > 0:
+		return
+	if velocity.x > FLIP_VELOCITY_THRESHOLD:
 		sprite.scale.x = -abs(sprite.scale.x)
-	elif velocity.x < -1.0:
-		# Si muove a sinistra -> sprite guarda a sinistra (scale.x positivo = normale)
+		_flip_cooldown = FLIP_COOLDOWN_TIME
+	elif velocity.x < -FLIP_VELOCITY_THRESHOLD:
 		sprite.scale.x = abs(sprite.scale.x)
+		_flip_cooldown = FLIP_COOLDOWN_TIME
 
 func _update_sprite_color():
 	if sprite == null:
@@ -383,6 +410,7 @@ func set_player_reference(player: Node):
 	is_hooked_to_player = true
 	is_attracted = false
 	is_escaping = false
+	_reel_force_smoothed = Vector2.ZERO  # reset smooth quando si aggancia
 
 func attract_to(target_pos: Vector2):
 	if hook_cooldown > 0 or is_escaping:
@@ -391,19 +419,25 @@ func attract_to(target_pos: Vector2):
 	is_attracted = true
 
 func apply_reel_force(force: Vector2):
+	# Non sovrascrivere bruscamente: il smoothing è in _process_swimming
 	reel_force = force
 
 func apply_struggle_force(force: Vector2):
-	# Forza applicata dal player durante lo struggle
+	# Forza applicata dal player durante lo struggle (cap per evitare spike)
 	if is_hooked_to_player:
 		velocity += force
+		if velocity.length() > hooked_max_speed:
+			velocity = velocity.normalized() * hooked_max_speed
 
 func start_struggle():
 	is_struggling = true
 	struggle_timer = struggle_duration
-	var angle = randf() * TAU
-	struggle_direction = Vector2(cos(angle), sin(angle)).normalized()
-	print("🐟 Il pesce lotta!")
+	# Lotta via dal player (non direzione random = più sfida)
+	if player_ref != null and is_instance_valid(player_ref):
+		struggle_direction = (global_position - player_ref.global_position).normalized()
+	else:
+		var angle = randf() * TAU
+		struggle_direction = Vector2(cos(angle), sin(angle)).normalized()
 
 func stop_struggle():
 	is_struggling = false

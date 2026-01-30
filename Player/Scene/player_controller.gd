@@ -73,6 +73,7 @@ extends CharacterBody2D
 
 @export_category("Particles")
 @export var black_particle_scene: PackedScene
+@export var ambient_trail_scene: PackedScene  # Scia solo su salto/dash (ambient particle)
 @export var particles_on_dash: bool = true
 @export var particles_on_jump: bool = true
 @export var particles_on_attack: bool = true
@@ -80,10 +81,10 @@ extends CharacterBody2D
 @export var move_particle_interval: float = 0.03
 
 @export_category("Fish Struggle")
-@export var fish_struggle_interval: float = 2.0
-@export var fish_escape_time: float = 1.5
+@export var fish_struggle_interval: float = 1.2
+@export var fish_escape_time: float = 1.0
 @export var fish_reel_distance: float = 30.0
-@export var fish_pull_strength: float = 150.0
+@export var fish_pull_strength: float = 220.0
 
 @export_category("Health")
 @export var max_health: int = 5
@@ -248,8 +249,11 @@ func _create_simple_transition_manager():
 	get_tree().root.add_child(canvas)
 	transition_manager = canvas
 	
-	# Fade in iniziale
-	_simple_fade_in(rect)
+	# Salta il fade in se siamo appena passati da Character Beginning (stessa scena)
+	if get_meta("skip_initial_fade", false):
+		rect.color.a = 0.0
+	else:
+		_simple_fade_in(rect)
 
 func _simple_fade_in(rect: ColorRect):
 	var tween = create_tween()
@@ -458,7 +462,9 @@ func _start_dash(direction: Vector2):
 	facing_right = direction.x > 0
 	velocity.y = 0
 	if particles_on_dash and black_particle_scene:
-		_spawn_particles(global_position, -direction, 0.3)
+		_spawn_particles(global_position, -direction, 0.3, 2)
+	if particles_on_dash and ambient_trail_scene:
+		_spawn_trail(global_position, -direction)
 
 func _process_dash(delta: float) -> bool:
 	if not is_dashing:
@@ -467,7 +473,9 @@ func _process_dash(delta: float) -> bool:
 	dash_particle_timer -= delta
 	if particles_on_dash and black_particle_scene and dash_particle_timer <= 0:
 		dash_particle_timer = 0.015
-		_spawn_particles(global_position, -dash_direction, 0.4)
+		_spawn_particles(global_position, -dash_direction, 0.4, 2)
+	if particles_on_dash and ambient_trail_scene and dash_particle_timer <= 0:
+		_spawn_trail(global_position, -dash_direction)
 	if dash_timer <= 0:
 		is_dashing = false
 		dash_cooldown_timer = dash_cooldown
@@ -558,11 +566,15 @@ func jump_logic():
 			velocity.y -= lerp(jump_speed, jump_acceleration, 0.1)
 			if particles_on_jump and black_particle_scene:
 				_spawn_particles(global_position, Vector2.DOWN, 0.2)
+			if particles_on_jump and ambient_trail_scene:
+				_spawn_trail(global_position, Vector2.DOWN)
 	elif jump_amount > 0 and Input.is_action_just_pressed("ui_accept"):
 		jump_amount -= 1
 		velocity.y -= lerp(jump_speed, jump_acceleration, 1.0)
 		if particles_on_jump and black_particle_scene:
 			_spawn_particles(global_position, Vector2.DOWN, 0.2)
+		if particles_on_jump and ambient_trail_scene:
+			_spawn_trail(global_position, Vector2.DOWN)
 
 # ===========================================
 # HEALTH & DEATH SYSTEM
@@ -1179,13 +1191,32 @@ func _update_line_visual():
 	for p in points:
 		fishing_line.add_point(p)
 
-func _spawn_particles(pos: Vector2, direction: Vector2, _duration: float = 0.3):
+func _spawn_particles(pos: Vector2, direction: Vector2, _duration: float = 0.3, amount_override: int = -1):
 	if black_particle_scene == null:
 		return
 	var p = black_particle_scene.instantiate()
 	if p == null:
 		return
 	p.use_player_layer = true
+	if amount_override > 0 and p.has_method("set_amount"):
+		p.set_amount(amount_override)
+	var scene = get_tree().current_scene
+	if scene == null:
+		scene = get_tree().root.get_child(get_tree().root.get_child_count() - 1)
+	scene.add_child(p)
+	p.global_position = pos
+	if p.has_method("set_direction"):
+		p.call("set_direction", direction)
+	if p.has_method("play"):
+		p.call("play")
+
+func _spawn_trail(pos: Vector2, direction: Vector2):
+	"""Scia ambient particle solo su salto/dash"""
+	if ambient_trail_scene == null:
+		return
+	var p = ambient_trail_scene.instantiate()
+	if p == null:
+		return
 	var scene = get_tree().current_scene
 	if scene == null:
 		scene = get_tree().root.get_child(get_tree().root.get_child_count() - 1)
