@@ -119,6 +119,21 @@ func _find_sprite():
 	if sprite == null:
 		sprite = get_node_or_null("Sprite")
 
+## Chiamato dall'acqua per usare uno sprite diverso (livrea). scale_sprite = stessa dimensione degli altri = 0.1
+func set_fish_texture(tex: Texture2D, scale_sprite: float = 0.1) -> void:
+	if tex == null:
+		return
+	_find_sprite()
+	if sprite == null:
+		return
+	if sprite is Sprite2D:
+		var s = sprite as Sprite2D
+		s.texture = tex
+		s.hframes = 1
+		s.vframes = 1
+		s.frame = 0
+		s.scale = Vector2(scale_sprite, scale_sprite)
+
 func _setup_detection_area():
 	var existing_area = get_node_or_null("Area2D")
 	var area: Area2D

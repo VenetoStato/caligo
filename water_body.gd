@@ -30,6 +30,14 @@ var bodies_in_water: Array[Node2D] = []
 # Fish spawning
 @export var fish_scene: PackedScene = null
 @export var fish_count: int = 5  # Numero di pesci da spawnare
+var _fish_variant_paths: PackedStringArray = [
+	"res://Landscape/Sprites/fish_boops1.png",
+	"res://Landscape/Sprites/fish_boops2.png",
+	"res://Landscape/Sprites/fish_boops3.png",
+	"res://Landscape/Sprites/fish_sarago1.png",
+	"res://Landscape/Sprites/fish_sarago2.png",
+	"res://Landscape/Sprites/fish_sarago3.png"
+]
 
 func _ready():
 	# Trova CollisionPolygon2D
@@ -453,6 +461,17 @@ func spawn_fish_in_water():
 		if fish == null:
 			continue
 		
+		# Parte dei pesci usa sprite varianti (stessa dimensione 0.1)
+		var variants: Array[Texture2D] = []
+		for path in _fish_variant_paths:
+			var tex = load(path) as Texture2D
+			if tex != null:
+				variants.append(tex)
+		var use_variant = variants.size() > 0 and randf() < 0.5 and fish.has_method("set_fish_texture")
+		if use_variant:
+			var tex = variants[randi() % variants.size()]
+			fish.set_fish_texture(tex, 0.1)
+		
 		# Calcola posizione casuale dentro l'area dell'acqua
 		var fish_pos: Vector2
 		
@@ -484,17 +503,16 @@ func spawn_fish_in_water():
 			fish_pos.x += randf_range(-100, 100)
 			fish_pos.y += randf_range(-50, 50)
 		
-		# Riduci molto la scala dei pesci (più piccoli)
 		fish.scale = Vector2(0.1, 0.1)
-		
-		# Riduci anche la scala dello sprite direttamente
-		var sprite = fish.get_node_or_null("Fishes")
-		if sprite == null:
-			sprite = fish.get_node_or_null("Sprite2D")
-		if sprite == null:
-			sprite = fish.get_node_or_null("Sprite")
-		if sprite != null:
-			sprite.scale = Vector2(0.1, 0.1)
+		# Scala sprite: 0.1 per tutti (variante già impostata in set_fish_texture se use_variant)
+		if not use_variant:
+			var sprite = fish.get_node_or_null("Fishes")
+			if sprite == null:
+				sprite = fish.get_node_or_null("Sprite2D")
+			if sprite == null:
+				sprite = fish.get_node_or_null("Sprite")
+			if sprite != null:
+				sprite.scale = Vector2(0.1, 0.1)
 		
 		# Riduci anche la scala del CollisionShape2D
 		var collision = fish.get_node_or_null("CollisionShape2D")
