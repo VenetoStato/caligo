@@ -18,17 +18,17 @@ var controls_container: VBoxContainer
 var background: ColorRect
 var skip_timer: float = 0.0
 
-# Lista dei comandi: [azione, tasto, descrizione, path_immagine_opzionale]
+# Lista dei comandi: [azione, tasto, descrizione] — senza sprite/icone
 var commands: Array = [
-	["Movimento", "A / D", "Muovi il personaggio", ""],
-	["Salto", "SPAZIO", "Salta (doppio salto disponibile)", ""],
-	["Dash", "SHIFT", "Scatto veloce", ""],
-	["Attacco", "Z", "Attacco base", ""],
-	["Attacco Forte", "Click Destro", "Attacco potente", ""],
-	["Lancia Lenza", "F", "Lancia la lenza da pesca", "res://fishinghook.tscn"],
-	["Tira Lenza", "R", "Tira la lenza verso di te", ""],
-	["Afferra", "G", "Afferra oggetti/ancoraggi", "res://hook.tscn"],
-	["Cambia Amo", "C", "Cambia tipo di amo", ""],
+	["Movimento", "A / D", "Muovi il personaggio"],
+	["Salto", "SPAZIO", "Salta (doppio salto disponibile)"],
+	["Dash", "SHIFT", "Scatto veloce"],
+	["Attacco", "Z", "Attacco base"],
+	["Attacco Forte", "Click Destro", "Attacco potente"],
+	["Lancia Lenza", "F", "Lancia la lenza da pesca"],
+	["Tira Lenza", "R", "Tira la lenza verso di te"],
+	["Afferra", "G", "Afferra oggetti/ancoraggi"],
+	["Cambia Amo", "C", "Cambia tipo di amo"],
 ]
 
 func _ready():
@@ -92,12 +92,12 @@ func _create_controls_display():
 	spacer1.custom_minimum_size = Vector2(0, 30)
 	controls_container.add_child(spacer1)
 	
-	# Aggiungi ogni comando
+	# Aggiungi ogni comando (solo testo, senza sprite)
 	for cmd in commands:
-		var image_path = ""
-		if cmd.size() > 3:
-			image_path = cmd[3]
-		_create_command_row(cmd[0], cmd[1], cmd[2], image_path)
+		var action = cmd[0]
+		var key = cmd[1]
+		var desc = cmd[2] if cmd.size() > 2 else ""
+		_create_command_row(action, key, desc)
 	
 	# Spaziatura finale
 	var spacer2 = Control.new()
@@ -116,44 +116,37 @@ func _create_controls_display():
 	# Inizia invisibile per fade in
 	controls_container.modulate.a = 0.0
 
-func _create_command_row(action: String, key: String, description: String, image_path: String = ""):
-	# Container orizzontale per ogni comando - layout semplice e pulito
+func _create_command_row(action: String, key: String, description: String):
+	# Riga allineata: Azione (larghezza fissa) | Tasto (box fisso) | Descrizione (larghezza fissa)
 	var row = HBoxContainer.new()
 	row.name = "CommandRow_" + action
-	row.add_theme_constant_override("separation", 20)
+	row.add_theme_constant_override("separation", 24)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	controls_container.add_child(row)
 	
-	# Label azione (a sinistra)
+	# Colonna azione (larghezza fissa, allineata a destra)
 	var action_label = Label.new()
 	action_label.name = "ActionLabel"
 	action_label.text = action + ":"
 	action_label.add_theme_font_size_override("font_size", 24)
 	action_label.add_theme_color_override("font_color", text_color)
-	action_label.custom_minimum_size = Vector2(180, 0)
+	action_label.custom_minimum_size = Vector2(200, 0)
 	action_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	action_label.size_flags_horizontal = Control.SIZE_SHRINK_END
 	row.add_child(action_label)
 	
-	# Box per il tasto (centro)
+	# Box tasto (larghezza fissa)
 	var key_box = Panel.new()
 	key_box.name = "KeyBox"
-	key_box.custom_minimum_size = Vector2(160, 42)
+	key_box.custom_minimum_size = Vector2(180, 40)
 	
-	# Stile del box pulito
 	var style = StyleBoxFlat.new()
 	style.bg_color = key_color
 	style.border_color = Color(key_color.r * 0.6, key_color.g * 0.6, key_color.b * 0.6, 1.0)
-	style.border_width_left = 2
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 2
-	style.corner_radius_top_left = 5
-	style.corner_radius_top_right = 5
-	style.corner_radius_bottom_left = 5
-	style.corner_radius_bottom_right = 5
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(5)
 	key_box.add_theme_stylebox_override("panel", style)
 	
-	# Label del tasto dentro il box
 	var key_label = Label.new()
 	key_label.name = "KeyLabel"
 	key_label.text = key
@@ -165,25 +158,14 @@ func _create_command_row(action: String, key: String, description: String, image
 	
 	row.add_child(key_box)
 	
-	# Immagine dell'oggetto (se disponibile) - dopo il tasto
-	if image_path != "":
-		var image_texture = _load_image_from_path(image_path)
-		if image_texture != null:
-			var image_rect = TextureRect.new()
-			image_rect.name = "ObjectImage"
-			image_rect.texture = image_texture
-			image_rect.custom_minimum_size = Vector2(36, 36)
-			image_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			image_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-			row.add_child(image_rect)
-	
-	# Label descrizione (a destra)
+	# Colonna descrizione (larghezza fissa, allineata a sinistra)
 	var desc_label = Label.new()
 	desc_label.name = "DescLabel"
 	desc_label.text = description
 	desc_label.add_theme_font_size_override("font_size", 20)
 	desc_label.add_theme_color_override("font_color", Color(text_color.r, text_color.g, text_color.b, 0.85))
-	desc_label.custom_minimum_size = Vector2(320, 0)
+	desc_label.custom_minimum_size = Vector2(340, 0)
+	desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	row.add_child(desc_label)
 
 func _load_image_from_path(path: String) -> Texture2D:

@@ -70,6 +70,11 @@ func _switch_to_player():
 		remove_child(node)
 		player.add_child(node)
 	
+	# Fix telecamera: aggiorna il target e attiva smooth per i primi frame (transizione morbida al passaggio)
+	var cam = player.get_node_or_null("Camera2D")
+	if cam != null and cam.has_method("set_camera_target"):
+		cam.call("set_camera_target", player, 50)  # 50 frame di follow più lento = ~0.8 s smooth
+	
 	parent.remove_child(self)
 	parent.add_child(player)
 	parent.move_child(player, my_index)
