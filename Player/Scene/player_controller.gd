@@ -176,6 +176,11 @@ var move_particle_timer: float = 0.0
 
 func _ready():
 	add_to_group("player")
+	# Fallback: se i particle (assegnati in editor) sono null, caricali da path
+	if black_particle_scene == null:
+		black_particle_scene = load("res://Fx/black_particle.tscn") as PackedScene
+	if ambient_trail_scene == null:
+		ambient_trail_scene = load("res://Fx/ambient_particle.tscn") as PackedScene
 	_setup_sprite()
 	_setup_fishing_line()
 	_setup_health()
@@ -683,9 +688,10 @@ func _spawn_death_particles():
 		return
 	
 	var count = 12
+	var container = get_parent() if get_parent() else get_tree().current_scene
 	for i in range(count):
 		var p = black_particle_scene.instantiate()
-		get_tree().current_scene.add_child(p)
+		container.add_child(p)
 		p.global_position = global_position
 		
 		var angle = (float(i) / count) * TAU
@@ -1200,10 +1206,13 @@ func _spawn_particles(pos: Vector2, direction: Vector2, _duration: float = 0.3, 
 	p.use_player_layer = true
 	if amount_override > 0 and p.has_method("set_amount"):
 		p.set_amount(amount_override)
-	var scene = get_tree().current_scene
-	if scene == null:
-		scene = get_tree().root.get_child(get_tree().root.get_child_count() - 1)
-	scene.add_child(p)
+	# Aggiungi come sibling del player (stesso parent) così z/draw order è corretto
+	var container = get_parent()
+	if container == null:
+		container = get_tree().current_scene
+	if container == null:
+		container = get_tree().root.get_child(get_tree().root.get_child_count() - 1)
+	container.add_child(p)
 	p.global_position = pos
 	if p.has_method("set_direction"):
 		p.call("set_direction", direction)
@@ -1217,10 +1226,12 @@ func _spawn_trail(pos: Vector2, direction: Vector2):
 	var p = ambient_trail_scene.instantiate()
 	if p == null:
 		return
-	var scene = get_tree().current_scene
-	if scene == null:
-		scene = get_tree().root.get_child(get_tree().root.get_child_count() - 1)
-	scene.add_child(p)
+	var container = get_parent()
+	if container == null:
+		container = get_tree().current_scene
+	if container == null:
+		container = get_tree().root.get_child(get_tree().root.get_child_count() - 1)
+	container.add_child(p)
 	p.global_position = pos
 	if p.has_method("set_direction"):
 		p.call("set_direction", direction)

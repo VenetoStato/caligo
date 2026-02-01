@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3 uid="uid://b8k2m3n4p5q6r"]
 
 [ext_resource type="Script" uid="uid://p5l33i0jfy6v" path="res://Fx/black_particle.gd" id="1_black"]
-[ext_resource type="Texture2D" uid="uid://xiv1tvulqj0b" path="res://Landscape/Sprites/erbettechevolano.png" id="2_5yj7y"]
+[ext_resource type="Texture2D" uid="uid://dow2ddo0rrni2" path="res://Landscape/Sprites/erbettechevolano.png" id="2_5yj7y"]
 
 [node name="BlackParticle" type="Node2D"]
 script = ExtResource("1_black")

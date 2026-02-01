@@ -461,7 +461,7 @@ func spawn_fish_in_water():
 		if fish == null:
 			continue
 		
-		# Parte dei pesci usa sprite varianti (stessa dimensione 0.1)
+		# Parte dei pesci usa sprite varianti (40% più piccoli: 0.06 invece di 0.1)
 		var variants: Array[Texture2D] = []
 		for path in _fish_variant_paths:
 			var tex = load(path) as Texture2D
@@ -470,7 +470,7 @@ func spawn_fish_in_water():
 		var use_variant = variants.size() > 0 and randf() < 0.5 and fish.has_method("set_fish_texture")
 		if use_variant:
 			var tex = variants[randi() % variants.size()]
-			fish.set_fish_texture(tex, 0.1)
+			fish.set_fish_texture(tex, 0.06)
 		
 		# Calcola posizione casuale dentro l'area dell'acqua
 		var fish_pos: Vector2
@@ -493,9 +493,9 @@ func spawn_fish_in_water():
 				min_y = min(min_y, global_point.y)
 				max_y = max(max_y, global_point.y)
 			
-			# Spawna casualmente dentro l'area (più in basso, non in superficie)
+			# Spawna in tutta la colonna d'acqua (10%–90% altezza), non tutti sul fondale
 			var random_x = randf_range(min_x + 20, max_x - 20)
-			var random_y = randf_range(min_y + (max_y - min_y) * 0.3, max_y - 20)
+			var random_y = randf_range(min_y + (max_y - min_y) * 0.1, min_y + (max_y - min_y) * 0.9)
 			fish_pos = Vector2(random_x, random_y)
 		else:
 			# Fallback: spawna vicino al player
@@ -503,8 +503,11 @@ func spawn_fish_in_water():
 			fish_pos.x += randf_range(-100, 100)
 			fish_pos.y += randf_range(-50, 50)
 		
-		fish.scale = Vector2(0.1, 0.1)
-		# Scala sprite: 0.1 per tutti (variante già impostata in set_fish_texture se use_variant)
+		# Scala nodo: varianti 40% più piccole (0.06), originali 0.1
+		var fish_scale := 0.1
+		if use_variant:
+			fish_scale = 0.06
+		fish.scale = Vector2(fish_scale, fish_scale)
 		if not use_variant:
 			var sprite = fish.get_node_or_null("Fishes")
 			if sprite == null:
@@ -514,12 +517,11 @@ func spawn_fish_in_water():
 			if sprite != null:
 				sprite.scale = Vector2(0.1, 0.1)
 		
-		# Riduci anche la scala del CollisionShape2D
 		var collision = fish.get_node_or_null("CollisionShape2D")
 		if collision == null:
 			collision = fish.get_node_or_null("Area2D/CollisionShape2D")
 		if collision != null:
-			collision.scale = Vector2(0.1, 0.1)
+			collision.scale = Vector2(fish_scale, fish_scale)
 		
 		fish.global_position = fish_pos
 		# Usa call_deferred per aggiungere il pesce dopo che il setup è completato

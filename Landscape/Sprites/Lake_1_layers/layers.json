@@ -1,0 +1,132 @@
+{
+"layers": [
+{
+"path": "Lake_1_new_sky.png",
+"left": 0,
+"top": 0,
+"width": 2732,
+"height": 2048,
+"name": "new_sky"
+},
+{
+"path": "Lake_1_new_sky overlay.png",
+"left": 0,
+"top": 0,
+"width": 2732,
+"height": 1606,
+"name": "new_sky overlay"
+},
+{
+"path": "Lake_1_new_clouds_cloud2_cloud2-base.png",
+"left": 539,
+"top": 446,
+"width": 947,
+"height": 612,
+"name": "new_clouds_cloud2_cloud2-base"
+},
+{
+"path": "Lake_1_new_clouds_cloud2_cloud2-shadows.png",
+"left": 539,
+"top": 605,
+"width": 942,
+"height": 445,
+"name": "new_clouds_cloud2_cloud2-shadows"
+},
+{
+"path": "Lake_1_new_clouds_cloud2_cloud2-yellow.png",
+"left": 571,
+"top": 512,
+"width": 827,
+"height": 494,
+"name": "new_clouds_cloud2_cloud2-yellow"
+},
+{
+"path": "Lake_1_new_clouds_cloud2_cloud2-lines.png",
+"left": 542,
+"top": 456,
+"width": 943,
+"height": 594,
+"name": "new_clouds_cloud2_cloud2-lines"
+},
+{
+"path": "Lake_1_new_clouds_cloud1_cloud1-base.png",
+"left": 1329,
+"top": 248,
+"width": 1346,
+"height": 782,
+"name": "new_clouds_cloud1_cloud1-base"
+},
+{
+"path": "Lake_1_new_clouds_cloud1_cloud1-shadows.png",
+"left": 1328,
+"top": 370,
+"width": 1347,
+"height": 661,
+"name": "new_clouds_cloud1_cloud1-shadows"
+},
+{
+"path": "Lake_1_new_clouds_cloud1_cloud1-yellow.png",
+"left": 1478,
+"top": 279,
+"width": 1104,
+"height": 709,
+"name": "new_clouds_cloud1_cloud1-yellow"
+},
+{
+"path": "Lake_1_new_clouds_cloud1_cloud1-texture.png",
+"left": 1329,
+"top": 248,
+"width": 1346,
+"height": 782,
+"name": "new_clouds_cloud1_cloud1-texture"
+},
+{
+"path": "Lake_1_new_clouds_cloud1_cloud1-lines.png",
+"left": 979,
+"top": 245,
+"width": 2029,
+"height": 1545,
+"name": "new_clouds_cloud1_cloud1-lines"
+},
+{
+"path": "Lake_1_new_water_level.png",
+"left": 0,
+"top": 1278,
+"width": 2732,
+"height": 768,
+"name": "new_water_level"
+},
+{
+"path": "Lake_1_new_water ripples.png",
+"left": 0,
+"top": 1404,
+"width": 2732,
+"height": 551,
+"name": "new_water ripples"
+},
+{
+"path": "Lake_1_new_underwater_rocks_underwater_rocks_base.png",
+"left": 0,
+"top": 1555,
+"width": 2732,
+"height": 493,
+"name": "new_underwater_rocks_underwater_rocks_base"
+},
+{
+"path": "Lake_1_new_underwater_rocks_underwater_rocks.png",
+"left": 0,
+"top": 1579,
+"width": 2732,
+"height": 469,
+"name": "new_underwater_rocks_underwater_rocks"
+},
+{
+"path": "Lake_1_new_swatches.png",
+"left": -38,
+"top": 7,
+"width": 304,
+"height": 318,
+"name": "new_swatches"
+}
+]
+}

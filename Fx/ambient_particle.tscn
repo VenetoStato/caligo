@@ -1,7 +1,7 @@
 [gd_scene load_steps=4 format=3 uid="uid://o7x1gjykk2h6"]
 
 [ext_resource type="Script" uid="uid://cmrtql4wm748d" path="res://Fx/ambient_particle.gd" id="1_ambient"]
-[ext_resource type="Texture2D" uid="uid://xiv1tvulqj0b" path="res://Landscape/Sprites/erbettechevolano.png" id="2_8e8py"]
+[ext_resource type="Texture2D" uid="uid://dow2ddo0rrni2" path="res://Landscape/Sprites/erbettechevolano.png" id="2_8e8py"]
 
 [sub_resource type="Gradient" id="Gradient_ambient"]
 offsets = PackedFloat32Array(0, 0, 1)

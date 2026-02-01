@@ -1,0 +1,115 @@
+[gd_scene load_steps=17 format=3 uid="uid://dnlyn8hwpc1qi"]
+
+[ext_resource type="Texture2D" uid="uid://kmj7mw3sqbyv" path="res://Landscape/Sprites/Lake_1_layers/Lake_1_new_clouds_cloud2_cloud2-base.png" id="tex_3"]
+[ext_resource type="Texture2D" uid="uid://bwwhymqol6vd3" path="res://Landscape/Sprites/Lake_1_layers/Lake_1_new_clouds_cloud2_cloud2-shadows.png" id="tex_4"]
+[ext_resource type="Texture2D" uid="uid://8slplc4u5fx1" path="res://Landscape/Sprites/Lake_1_layers/Lake_1_new_clouds_cloud2_cloud2-yellow.png" id="tex_5"]
+[ext_resource type="Texture2D" uid="uid://umelo0kxacdj" path="res://Landscape/Sprites/Lake_1_layers/Lake_1_new_clouds_cloud2_cloud2-lines.png" id="tex_6"]
+[ext_resource type="Texture2D" uid="uid://c4t1m0n3xogj7" path="res://Landscape/Sprites/Lake_1_layers/Lake_1_new_clouds_cloud1_cloud1-base.png" id="tex_7"]
+[ext_resource type="Texture2D" uid="uid://cerrgnrdynv48" path="res://Landscape/Sprites/Lake_1_layers/Lake_1_new_clouds_cloud1_cloud1-shadows.png" id="tex_8"]
+[ext_resource type="Texture2D" uid="uid://c1x504l86c4pv" path="res://Landscape/Sprites/Lake_1_layers/Lake_1_new_clouds_cloud1_cloud1-yellow.png" id="tex_9"]
+[ext_resource type="Texture2D" uid="uid://dhbkcem5aggah" path="res://Landscape/Sprites/Lake_1_layers/Lake_1_new_clouds_cloud1_cloud1-texture.png" id="tex_10"]
+[ext_resource type="Texture2D" uid="uid://0twxvhbgva2f" path="res://Landscape/Sprites/Lake_1_layers/Lake_1_new_clouds_cloud1_cloud1-lines.png" id="tex_11"]
+[ext_resource type="Texture2D" uid="uid://fpgg1s3sah8g" path="res://Landscape/Sprites/Lake_1_layers/Lake_1_new_water ripples.png" id="tex_13"]
+[ext_resource type="Texture2D" uid="uid://c4srdo8rjngf5" path="res://Landscape/Sprites/Lake_1_layers/Lake_1_new_underwater_rocks_underwater_rocks_base.png" id="tex_14"]
+[ext_resource type="Texture2D" uid="uid://se1jr01ltexh" path="res://Landscape/Sprites/Lake_1_layers/Lake_1_new_underwater_rocks_underwater_rocks.png" id="tex_15"]
+[ext_resource type="Texture2D" uid="uid://b66rvpbigeb48" path="res://Landscape/Sprites/Lake_1_layers/Lake_1_new_swatches.png" id="tex_16"]
+
+[sub_resource type="Animation" id="Animation_uoexu"]
+resource_name = "Cloud_moving"
+length = 25.0
+loop_mode = 2
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("..:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 24.766666),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector2(0, 0), Vector2(-316, 47)]
+}
+
+[sub_resource type="Animation" id="Animation_5aboh"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("..:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(0, 0)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_oxioj"]
+_data = {
+&"Cloud_moving": SubResource("Animation_uoexu"),
+&"RESET": SubResource("Animation_5aboh")
+}
+
+[node name="Lake_1" type="Node2D"]
+
+[node name="Clouds" type="Node2D" parent="."]
+
+[node name="new_clouds_cloud2_cloud2-base" type="Sprite2D" parent="Clouds"]
+position = Vector2(-472.5, -272)
+texture = ExtResource("tex_3")
+
+[node name="new_clouds_cloud2_cloud2-shadows" type="Sprite2D" parent="Clouds"]
+position = Vector2(-475, -196.5)
+texture = ExtResource("tex_4")
+
+[node name="new_clouds_cloud2_cloud2-yellow" type="Sprite2D" parent="Clouds"]
+position = Vector2(-500.5, -265)
+texture = ExtResource("tex_5")
+
+[node name="new_clouds_cloud2_cloud2-lines" type="Sprite2D" parent="Clouds"]
+position = Vector2(-471.5, -271)
+texture = ExtResource("tex_6")
+
+[node name="new_clouds_cloud1_cloud1-base" type="Sprite2D" parent="Clouds"]
+position = Vector2(517, -385)
+texture = ExtResource("tex_7")
+
+[node name="new_clouds_cloud1_cloud1-shadows" type="Sprite2D" parent="Clouds"]
+position = Vector2(516.5, -323.5)
+texture = ExtResource("tex_8")
+
+[node name="new_clouds_cloud1_cloud1-yellow" type="Sprite2D" parent="Clouds"]
+position = Vector2(545, -390.5)
+texture = ExtResource("tex_9")
+
+[node name="new_clouds_cloud1_cloud1-texture" type="Sprite2D" parent="Clouds"]
+position = Vector2(517, -385)
+texture = ExtResource("tex_10")
+
+[node name="new_clouds_cloud1_cloud1-lines" type="Sprite2D" parent="Clouds"]
+position = Vector2(508.5, -6.5)
+texture = ExtResource("tex_11")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="Clouds"]
+root_node = NodePath("../new_clouds_cloud2_cloud2-base")
+libraries = {
+&"": SubResource("AnimationLibrary_oxioj")
+}
+
+[node name="new_water_ripples" type="Sprite2D" parent="."]
+position = Vector2(-119, 655.5)
+texture = ExtResource("tex_13")
+
+[node name="new_underwater_rocks_underwater_rocks_base" type="Sprite2D" parent="."]
+position = Vector2(-119, 777.5)
+texture = ExtResource("tex_14")
+
+[node name="new_underwater_rocks_underwater_rocks" type="Sprite2D" parent="."]
+position = Vector2(-119, 789.5)
+texture = ExtResource("tex_15")
+
+[node name="new_swatches" type="Sprite2D" parent="."]
+position = Vector2(-1371, -858)
+texture = ExtResource("tex_16")

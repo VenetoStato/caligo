@@ -20,8 +20,8 @@ extends RigidBody2D
 @export var swim_bounds_y: float = 60.0
 ## Offset della casa rispetto allo spawn (Y negativo = più su)
 @export var home_offset: Vector2 = Vector2(0, -50)
-## Profondità massima dal fondale (i pesci Go' stanno sul fondale)
-@export var max_depth_from_bottom: float = 80.0
+## Quanto possono stare sopra il fondale (più alto = nuotano più in alto nella colonna d'acqua)
+@export var max_depth_from_bottom: float = 200.0
 
 @export_category("Physics")
 @export var swim_response: float = 3.0
@@ -90,6 +90,9 @@ var _flip_cooldown: float = 0.0
 const FLIP_VELOCITY_THRESHOLD: float = 10.0   # flip solo se |velocity.x| > questa soglia
 const FLIP_COOLDOWN_TIME: float = 0.35       # secondi tra un flip e l'altro
 
+# Sprite variante (boops/sarago): disegnati con la testa dall'altra parte, serve invertire il flip
+var _variant_sprite: bool = false
+
 func _ready():
 	add_to_group("fish")
 	# Configurazione RigidBody2D per pesci
@@ -123,6 +126,7 @@ func _find_sprite():
 func set_fish_texture(tex: Texture2D, scale_sprite: float = 0.1) -> void:
 	if tex == null:
 		return
+	_variant_sprite = true  # le varianti hanno la testa dall'altra parte, _update_sprite_direction inverte il flip
 	_find_sprite()
 	if sprite == null:
 		return
@@ -298,11 +302,17 @@ func _update_sprite_direction():
 	# Flip solo se la velocità è chiara e non siamo in cooldown (evita "impazzire" a destra/sinistra)
 	if _flip_cooldown > 0:
 		return
+	# Sprite varianti (boops/sarago) sono disegnati con la testa dall'altra parte: inverti il flip
+	var flip_right: float = -abs(sprite.scale.x)
+	var flip_left: float = abs(sprite.scale.x)
+	if _variant_sprite:
+		flip_right = abs(sprite.scale.x)
+		flip_left = -abs(sprite.scale.x)
 	if velocity.x > FLIP_VELOCITY_THRESHOLD:
-		sprite.scale.x = -abs(sprite.scale.x)
+		sprite.scale.x = flip_right
 		_flip_cooldown = FLIP_COOLDOWN_TIME
 	elif velocity.x < -FLIP_VELOCITY_THRESHOLD:
-		sprite.scale.x = abs(sprite.scale.x)
+		sprite.scale.x = flip_left
 		_flip_cooldown = FLIP_COOLDOWN_TIME
 
 func _update_sprite_color():
@@ -488,13 +498,13 @@ func _keep_near_bottom():
 	var water_bottom = water_surface_y + water_area.depth
 	var current_depth_from_bottom = water_bottom - global_position.y
 	
-	# Se il pesce è troppo lontano dal fondale, spingilo verso il basso
-	if current_depth_from_bottom > max_depth_from_bottom:
-		var push_down = (current_depth_from_bottom - max_depth_from_bottom) * 5.0
+	# Zona comoda: tra 30% e 150% di max_depth dal fondale (così nuotano anche più in alto)
+	if current_depth_from_bottom > max_depth_from_bottom * 1.5:
+		var push_down = (current_depth_from_bottom - max_depth_from_bottom * 1.5) * 2.0
 		velocity.y += push_down
-	elif current_depth_from_bottom < max_depth_from_bottom * 0.5:
-		# Se è troppo vicino al fondale, spingilo leggermente verso l'alto
-		var push_up = (max_depth_from_bottom * 0.5 - current_depth_from_bottom) * 3.0
+	elif current_depth_from_bottom < max_depth_from_bottom * 0.3:
+		# Troppo vicino al fondale: spingi leggermente verso l'alto
+		var push_up = (max_depth_from_bottom * 0.3 - current_depth_from_bottom) * 2.0
 		velocity.y -= push_up
 
 func _find_water_area():
