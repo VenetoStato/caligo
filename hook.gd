@@ -69,6 +69,27 @@ func _ready():
 	
 	contact_monitor = true
 	max_contacts_reported = 4
+	body_entered.connect(_on_body_entered)
+
+func _on_body_entered(body: Node2D) -> void:
+	# Hook (grab) fa danno ai nemici e spinge il dead gamberetto
+	if body.is_in_group("enemy"):
+		if body.has_method("take_damage") and player_ref != null:
+			var src: Vector2 = player_ref.global_position if player_ref is Node2D else global_position
+			body.take_damage(1, src)
+	elif body.is_in_group("dead_enemy") and body is RigidBody2D:
+		if player_ref is Node2D:
+			var dir: Vector2 = (body.global_position - player_ref.global_position).normalized()
+			dir.y = min(dir.y, -0.55)  # parabola: più verso l'alto
+			dir = dir.normalized()
+			body.apply_central_impulse(dir * 520.0)
+			body.apply_torque_impulse(sign(dir.x) * 220.0)
+		else:
+			var dir: Vector2 = (body.global_position - global_position).normalized()
+			dir.y = min(dir.y, -0.55)
+			dir = dir.normalized()
+			body.apply_central_impulse(dir * 520.0)
+			body.apply_torque_impulse(sign(dir.x) * 220.0)
 
 func _find_sprite():
 	if sprite_node_name != "":

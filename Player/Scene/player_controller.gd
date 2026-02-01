@@ -105,12 +105,16 @@ extends CharacterBody2D
 @export var use_last_ground_as_respawn: bool = true
 ## Offset Y dal punto di respawn (per non spawnare nel terreno)
 @export var respawn_y_offset: float = -20.0
+## Frame preciso dello sprite da mostrare alla morte (indice del frame nello sprite sheet, es. 0-39 se 5x8)
+@export var death_frame: int = 0
 
 # Nodi
 @onready var anim: AnimationPlayer = $anim
 var fishing_line: Line2D = null
 var transition_manager: Node = null
-var _attack_hitbox: Area2D = null  # Area per colpire nemici (abilitata durante Attack_fast / Attack_strong)
+var _attack_hitbox: Area2D = null  # Area per colpire nemici (abilitata solo durante Attack_fast / Attack_strong)
+var _attack_hit_enemies: Array[Node] = []  # nemici già colpiti in questo attacco (evita doppio danno)
+var _current_attack_damage: int = 1  # 1 = attacco normale, 2 = attacco forte
 
 # Health UI
 var _health_states: Array[bool] = []
@@ -224,7 +228,7 @@ func _setup_attack_hitbox():
 	_attack_hitbox.name = "AttackHitbox"
 	_attack_hitbox.collision_layer = 4
 	_attack_hitbox.collision_mask = 2
-	_attack_hitbox.monitorable = false
+	_attack_hitbox.monitorable = true   # deve essere true così l'Hurtbox del nemico può rilevarla
 	_attack_hitbox.monitoring = true
 	_attack_hitbox.add_to_group("player_attack")
 	var shape = RectangleShape2D.new()
@@ -234,9 +238,14 @@ func _setup_attack_hitbox():
 	col.position = Vector2(25, -10)
 	_attack_hitbox.add_child(col)
 	add_child(_attack_hitbox)
+	_attack_hitbox.area_entered.connect(_on_attack_hitbox_area_entered)
+	_attack_hitbox.body_entered.connect(_on_attack_hitbox_body_entered)
 	_attack_hitbox.visible = false
 	_update_attack_hitbox_position()
-	_attack_hitbox.monitoring = false
+	_disable_attack_hitbox()
+	# Player su layer 2, collide solo con layer 1 (terreno) così non si blocca col nemico
+	collision_layer = 2
+	collision_mask = 1
 
 func _update_attack_hitbox_position():
 	if _attack_hitbox == null:
@@ -246,10 +255,37 @@ func _update_attack_hitbox_position():
 	if col:
 		col.position = Vector2(offset_x, -10)
 
-func _enable_attack_hitbox():
+func _enable_attack_hitbox(damage: int = 1):
 	_update_attack_hitbox_position()
+	_attack_hit_enemies.clear()
+	_current_attack_damage = damage
 	if _attack_hitbox:
+		_attack_hitbox.collision_layer = 4
+		_attack_hitbox.collision_mask = 2
 		_attack_hitbox.monitoring = true
+
+func _disable_attack_hitbox():
+	if _attack_hitbox:
+		_attack_hitbox.collision_layer = 0
+		_attack_hitbox.collision_mask = 0
+		_attack_hitbox.monitoring = false
+
+func _on_attack_hitbox_area_entered(area: Area2D) -> void:
+	# Solo quando stiamo attaccando: la nostra area tocca la Hurtbox del nemico → danno (1 o 2)
+	var parent: Node = area.get_parent()
+	if parent.is_in_group("enemy") and parent not in _attack_hit_enemies:
+		_attack_hit_enemies.append(parent)
+		if parent.has_method("take_damage"):
+			parent.take_damage(_current_attack_damage, global_position)
+
+func _on_attack_hitbox_body_entered(body: Node2D) -> void:
+	# Colpire il dead gamberetto: rinculo forte a parabola (molto verso l'alto)
+	if body.is_in_group("dead_enemy") and body is RigidBody2D:
+		var dir: Vector2 = (body.global_position - global_position).normalized()
+		dir.y = min(dir.y, -0.55)  # componente verso l'alto per parabola
+		dir = dir.normalized()
+		body.apply_central_impulse(dir * 520.0)
+		body.apply_torque_impulse(sign(dir.x) * 220.0)
 
 func _setup_health():
 	_health_states.clear()
@@ -306,8 +342,8 @@ func _on_anim_finished(anim_name: String):
 	if anim_name == "Fishing":
 		fishing_anim_finished = true
 	if anim_name == "Attack_fast" or anim_name == "Attack_strong":
-		if _attack_hitbox:
-			_attack_hitbox.monitoring = false
+		_disable_attack_hitbox()
+		_attack_hit_enemies.clear()
 
 # ===========================================
 # HEALTH UI
@@ -455,11 +491,13 @@ func _update_invincibility(delta: float):
 		invincibility_timer -= delta
 		blink_timer += delta
 		if sprite_node:
-			sprite_node.modulate.a = 0.5 + 0.5 * sin(blink_timer * 15.0)
+			# Lampeggio leggero: alterna tra colore normale e lieve flash bianco/rosso
+			var t: float = 0.5 + 0.5 * sin(blink_timer * 14.0)
+			sprite_node.modulate = Color(lerp(0.85, 1.35, t), lerp(0.75, 1.0, t), lerp(0.75, 1.0, t), lerp(0.55, 1.0, t))
 		if invincibility_timer <= 0:
 			is_invincible = false
 			if sprite_node:
-				sprite_node.modulate.a = 1.0
+				sprite_node.modulate = Color(1.0, 1.0, 1.0, 1.0)
 
 func _update_dash_timers(delta: float):
 	if dash_cooldown_timer > 0:
@@ -565,18 +603,20 @@ func set_animation():
 	if Input.is_action_just_pressed("ui_attack_strong") and not line_extended:
 		if anim.has_animation("Attack_strong"):
 			anim.play("Attack_strong")
-			_enable_attack_hitbox()
+			_enable_attack_hitbox(2)
 			if particles_on_attack and black_particle_scene:
 				_spawn_particles(global_position, Vector2.RIGHT if facing_right else Vector2.LEFT, 0.25)
 		return
 	if Input.is_action_just_pressed("ui_attack") and not line_extended:
 		anim.play("Attack_fast")
-		_enable_attack_hitbox()
+		_enable_attack_hitbox(1)
 		if particles_on_attack and black_particle_scene:
 			_spawn_particles(global_position, Vector2.RIGHT if facing_right else Vector2.LEFT, 0.2)
 		return
 	if (anim.current_animation == "Attack_fast" or anim.current_animation == "Attack_strong") and anim.is_playing():
 		return
+	# Non siamo in attacco: hitbox disabilitata così il nemico non prende danno solo avvicinandosi
+	_disable_attack_hitbox()
 	if is_charging:
 		anim.play("Idle")
 		return
@@ -696,9 +736,12 @@ func _on_death():
 	
 	print("☠️ MORTE!")
 	
-	# Ferma l'animazione sull'ultimo frame
+	# Mostra il frame di morte scelto (configurabile nell'Inspector)
+	if sprite_node != null:
+		if "frame" in sprite_node:
+			sprite_node.frame = death_frame
 	if anim:
-		anim.pause()
+		anim.stop()
 	
 	# Trova il punto di respawn
 	var respawn_pos = _find_respawn_position()
@@ -812,9 +855,9 @@ func _on_respawn():
 	if anim:
 		anim.play("Idle")
 	
-	# Reset sprite
+	# Reset sprite (colore normale; il lampeggio invincibilità parte subito dopo)
 	if sprite_node:
-		sprite_node.modulate.a = 1.0
+		sprite_node.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	
 	_show_health_ui()
 	

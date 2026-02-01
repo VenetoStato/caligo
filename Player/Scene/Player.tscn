@@ -166,6 +166,7 @@ fishing_hook_scene = ExtResource("3_p0c61")
 pastura_scene = ExtResource("4_2qgpt")
 black_particle_scene = ExtResource("5_black")
 ambient_trail_scene = ExtResource("6_ambient")
+death_frame = 36
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 position = Vector2(3, -19)
