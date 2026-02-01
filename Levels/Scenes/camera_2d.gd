@@ -48,6 +48,10 @@ func _ready() -> void:
 		return
 
 	# We control smoothing manually
+
+func set_camera_target(node: Node2D):
+	"""Imposta il target da seguire (es. quando passi dalla barca)"""
+	_target = node
 	position_smoothing_enabled = false
 
 	# Hook PostFX

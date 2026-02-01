@@ -3,12 +3,12 @@ extends RigidBody2D
 # Entità "ship moving" (pilotabile) - premendo E esci e torni alla barca still + player.
 
 @export_category("Movement")
-@export var move_force: float = 1200.0
-@export var max_speed: float = 180.0
-@export var drag: float = 0.96
+@export var move_force: float = 3500.0
+@export var max_speed: float = 220.0
+@export var drag: float = 0.98
 
 @export_category("Buoyancy")
-@export var float_offset: float = 8.0
+@export var float_offset: float = 85.0
 @export var buoyancy_strength: float = 35.0
 @export var max_up_force: float = 2500.0
 @export var water_drag: float = 0.96
@@ -20,21 +20,22 @@ extends RigidBody2D
 var _cached_water: Node = null
 var _player: Node2D = null
 var _boat_still: Node = null
+var _water_particles: CPUParticles2D = null
 
 func _ready():
 	add_to_group("ship_moving")
 	add_to_group("player") # così i sistemi che cercano il player lo trovano comunque
 	lock_rotation = true
 	gravity_scale = 1.0
-
-	# prova ad avviare animazione
+	# Animazione: parte solo quando ci si muove (vedi _physics_process)
 	var ap: AnimationPlayer = get_node_or_null("ShipMoving/AnimationPlayer")
-	if ap != null and ap.has_animation("moving"):
-		ap.play("moving")
+	if ap != null and ap.has_animation("RESET"):
+		ap.play("RESET")
 	# Dietro l'acqua
 	var spr := get_node_or_null("ShipMoving") as Sprite2D
 	if spr != null:
 		spr.z_index = 0
+	_water_particles = get_node_or_null("WaterParticles") as CPUParticles2D
 
 func setup(player: Node2D, boat_still: Node):
 	_player = player
@@ -44,18 +45,23 @@ func _unhandled_input(event):
 	if event.is_action_pressed(interaction_action):
 		_exit_ship()
 
-func _physics_process(_delta: float):
+func _physics_process(delta: float):
 	lock_rotation = true
 	rotation = 0.0
 	_apply_buoyancy()
-	_apply_movement()
+	_apply_movement(delta)
 	_update_sprite_direction()
+	_update_animation()
+	_update_water_particles()
 
-func _apply_movement():
-	var axis = Input.get_axis("ui_left", "ui_right")
+func _apply_movement(delta: float):
+	var axis = 0.0
+	if Input.is_action_pressed("ui_left"):
+		axis -= 1.0
+	if Input.is_action_pressed("ui_right"):
+		axis += 1.0
 	if axis != 0.0:
-		apply_central_force(Vector2(axis * move_force, 0))
-	# clamp speed
+		linear_velocity.x += axis * move_force * delta
 	if linear_velocity.length() > max_speed:
 		linear_velocity = linear_velocity.normalized() * max_speed
 	linear_velocity *= drag
@@ -72,6 +78,33 @@ func _update_sprite_direction():
 	elif linear_velocity.x < -1.0:
 		# Si muove a sinistra -> flip dello sprite (scale.x negativo)
 		spr.scale.x = -abs(spr.scale.x)
+
+func _update_animation():
+	var ap: AnimationPlayer = get_node_or_null("ShipMoving/AnimationPlayer")
+	if ap == null:
+		return
+	var speed = abs(linear_velocity.x)
+	if speed > 12.0:
+		if ap.current_animation != "moving":
+			ap.play("moving")
+	else:
+		if ap.current_animation != "RESET":
+			ap.play("RESET")
+
+func _update_water_particles():
+	if _water_particles == null:
+		return
+	var speed = linear_velocity.length()
+	if speed > 6.0:
+		_water_particles.emitting = true
+		# Direzione particelle: dietro la barca (opposta al movimento)
+		var dir = -linear_velocity.normalized()
+		_water_particles.direction = dir if dir.length() > 0.1 else Vector2.LEFT
+		_water_particles.spread = 45.0
+		_water_particles.initial_velocity_min = speed * 0.15
+		_water_particles.initial_velocity_max = speed * 0.35
+	else:
+		_water_particles.emitting = false
 
 func _apply_buoyancy():
 	var water = _get_water()
@@ -90,6 +123,13 @@ func _apply_buoyancy():
 	linear_velocity *= water_drag
 
 func _exit_ship():
+	# Ripristina Camera2D, PostFX, ecc. al player PRIMA di queue_free (altrimenti vengono distrutti)
+	if _player != null and is_instance_valid(_player):
+		for c in get_children():
+			var name_lower = c.name.to_lower()
+			if name_lower == "camera2d" or name_lower == "postfx" or "pointlight" in name_lower or name_lower == "overlay":
+				remove_child(c)
+				_player.add_child(c)
 	var pos = global_position
 	if _boat_still != null and is_instance_valid(_boat_still) and _boat_still.has_method("exit_from_moving"):
 		_boat_still.call("exit_from_moving", _player, pos)

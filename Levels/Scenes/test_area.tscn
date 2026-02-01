@@ -17,6 +17,7 @@
 [ext_resource type="Texture2D" uid="uid://b2x7waa8ah8hf" path="res://Landscape/Sprites/barca.png" id="11_yn5ey"]
 [ext_resource type="Script" uid="uid://cewkb6nn6rvnx" path="res://boat_controller.gd" id="13_boat"]
 [ext_resource type="PackedScene" uid="uid://5rpbdixr224q" path="res://character_beginning.tscn" id="14_begin"]
+[ext_resource type="PackedScene" uid="uid://game_menu_001" path="res://game_menu.tscn" id="15_menu"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_yn5ey"]
 size = Vector2(54, 15.4999695)
@@ -222,6 +223,8 @@ shader_parameter/u_tint = Color(1, 1, 1, 1)
 
 [node name="Test_Area" type="Node2D"]
 
+[node name="GameMenu" parent="." instance=ExtResource("15_menu")]
+
 [node name="Ambiance" type="Node" parent="."]
 
 [node name="Shadow" type="Sprite2D" parent="Ambiance"]
@@ -294,7 +297,7 @@ shape = SubResource("RectangleShape2D_yn5ey")
 
 [node name="Barca" type="Sprite2D" parent="Ambiance/-1/Barca"]
 position = Vector2(-4, -13.999954)
-scale = Vector2(0.10000001, 0.10000001)
+scale = Vector2(0.11, 0.11)
 texture = ExtResource("11_yn5ey")
 
 [node name="Casa" type="Sprite2D" parent="Ambiance/-1"]

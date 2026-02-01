@@ -4,7 +4,7 @@ extends RigidBody2D
 # Quando entri: nasconde Player e Barca, spawna la scena ship_movig.tscn controllabile.
 
 @export_category("Buoyancy")
-@export var float_offset: float = 8.0
+@export var float_offset: float = 38.0
 @export var buoyancy_strength: float = 35.0
 @export var max_up_force: float = 2500.0
 @export var water_drag: float = 0.96
@@ -82,6 +82,15 @@ func _enter_ship(player: Node2D):
 		moving_body.global_position = global_position
 		if moving_body.has_method("setup"):
 			moving_body.call("setup", player, self)
+		# Riparenta Camera2D, PostFX, PointLight, Overlay dal player alla barca così la camera segue la barca
+		for c in player.get_children():
+			var name_lower = c.name.to_lower()
+			if name_lower == "camera2d" or name_lower == "postfx" or "pointlight" in name_lower or name_lower == "overlay":
+				player.remove_child(c)
+				moving_body.add_child(c)
+				# La camera deve seguire la barca, non il player nascosto
+				if name_lower == "camera2d" and c.has_method("set_camera_target"):
+					c.call("set_camera_target", moving_body)
 	else:
 		moving_root.global_position = global_position
 
@@ -140,6 +149,11 @@ func _apply_exit_positions():
 	_is_active = true
 
 	if player != null and is_instance_valid(player):
+		# Camera2D/PostFX vengono ripristinati da ship_moving_controller prima del queue_free
+		# Ripristina il target della camera sul player
+		var cam = player.get_node_or_null("Camera2D")
+		if cam != null and cam.has_method("set_camera_target"):
+			cam.call("set_camera_target", player)
 		# Player nello stesso punto della barca (leggermente sopra per non sovrapporsi)
 		player.global_position = at_pos + player_exit_offset
 		if player is CharacterBody2D:

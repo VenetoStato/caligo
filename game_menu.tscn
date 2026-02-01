@@ -1,0 +1,156 @@
+[gd_scene load_steps=2 format=3 uid="uid://game_menu_001"]
+
+[ext_resource type="Script" path="res://game_menu.gd" id="1_menu"]
+
+[node name="GameMenu" type="CanvasLayer"]
+layer = 100
+script = ExtResource("1_menu")
+
+[node name="HookIndicator" type="Label" parent="."]
+anchors_preset = 0
+offset_left = 12.0
+offset_top = 8.0
+offset_right = 200.0
+offset_bottom = 36.0
+text = "Amo: Pesca [C]"
+
+[node name="MenuButton" type="Button" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -120.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = 42.0
+text = "Menu (ESC)"
+
+[node name="Panel" type="Panel" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -180.0
+offset_top = -160.0
+offset_right = 180.0
+offset_bottom = 160.0
+
+[node name="MarginContainer" type="MarginContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="VBox" type="VBoxContainer" parent="Panel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Panel/MarginContainer/VBox"]
+layout_mode = 2
+text = "Menu"
+horizontal_alignment = 1
+
+[node name="BtnClose" type="Button" parent="Panel/MarginContainer/VBox"]
+layout_mode = 2
+text = "Chiudi (ESC)"
+
+[node name="BtnControls" type="Button" parent="Panel/MarginContainer/VBox"]
+layout_mode = 2
+text = "Controlli"
+
+[node name="BtnCamera" type="Button" parent="Panel/MarginContainer/VBox"]
+layout_mode = 2
+text = "Impostazioni Camera"
+
+[node name="HookLabel" type="Label" parent="Panel/MarginContainer/VBox"]
+layout_mode = 2
+text = "Amo: —  [C per cambiare]"
+horizontal_alignment = 1
+
+[node name="ControlsPanel" type="PanelContainer" parent="Panel/MarginContainer/VBox"]
+layout_mode = 2
+visible = false
+
+[node name="MarginContainer" type="MarginContainer" parent="Panel/MarginContainer/VBox/ControlsPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="Panel/MarginContainer/VBox/ControlsPanel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/VBox/ControlsPanel/MarginContainer/VBox"]
+layout_mode = 2
+text = "WASD/Left Right: Muovi
+Space: Salta
+F: Lancia amo
+G: Afferra / Pastura
+C: Cambia amo (Pesca/Lancio)
+R: Molla
+Z: Attacco rapido
+Shift: Dash
+E: Interagisci"
+
+[node name="CameraPanel" type="PanelContainer" parent="Panel/MarginContainer/VBox"]
+layout_mode = 2
+visible = false
+
+[node name="MarginContainer" type="MarginContainer" parent="Panel/MarginContainer/VBox/CameraPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="Panel/MarginContainer/VBox/CameraPanel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="FollowSpeedLabel" type="Label" parent="Panel/MarginContainer/VBox/CameraPanel/MarginContainer/VBox"]
+layout_mode = 2
+text = "Velocità inseguimento:"
+
+[node name="FollowSpeedSlider" type="HSlider" parent="Panel/MarginContainer/VBox/CameraPanel/MarginContainer/VBox"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+min_value = 2.0
+max_value = 25.0
+step = 0.5
+value = 10.0
+
+[node name="LookAheadXLabel" type="Label" parent="Panel/MarginContainer/VBox/CameraPanel/MarginContainer/VBox"]
+layout_mode = 2
+text = "Anticipo X (vicinanza):"
+
+[node name="LookAheadXSlider" type="HSlider" parent="Panel/MarginContainer/VBox/CameraPanel/MarginContainer/VBox"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+min_value = 0.0
+max_value = 250.0
+step = 5.0
+value = 120.0
+
+[node name="LookAheadYLabel" type="Label" parent="Panel/MarginContainer/VBox/CameraPanel/MarginContainer/VBox"]
+layout_mode = 2
+text = "Anticipo Y:"
+
+[node name="LookAheadYSlider" type="HSlider" parent="Panel/MarginContainer/VBox/CameraPanel/MarginContainer/VBox"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+min_value = 0.0
+max_value = 100.0
+step = 5.0
+value = 40.0
+
+[node name="BtnQuit" type="Button" parent="Panel/MarginContainer/VBox"]
+layout_mode = 2
+text = "Esci dal gioco"
