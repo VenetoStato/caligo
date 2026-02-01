@@ -66,14 +66,21 @@ func _switch_to_player():
 	# Qualche pixel più in basso rispetto al character beginning
 	player.global_position = pos + Vector2(0, player_spawn_offset_y)
 	
+	# Salva posizione globale della camera prima del reparent (evita scatto)
+	var cam: Node = null
+	var cam_global_pos: Vector2 = Vector2.ZERO
 	for node in to_reparent:
+		if node.name.to_lower() == "camera2d":
+			cam = node
+			cam_global_pos = node.global_position
 		remove_child(node)
 		player.add_child(node)
 	
-	# Fix telecamera: aggiorna il target e attiva smooth per i primi frame (transizione morbida al passaggio)
-	var cam = player.get_node_or_null("Camera2D")
-	if cam != null and cam.has_method("set_camera_target"):
-		cam.call("set_camera_target", player, 50)  # 50 frame di follow più lento = ~0.8 s smooth
+	# Ripristina la posizione globale della camera così la vista non salta
+	if cam != null:
+		cam.global_position = cam_global_pos
+		if cam.has_method("set_camera_target"):
+			cam.call("set_camera_target", player, 90)  # 90 frame di follow morbido (~1.5 s)
 	
 	parent.remove_child(self)
 	# Player è già figlio di parent (add_child a riga 65): solo spostiamo l'indice

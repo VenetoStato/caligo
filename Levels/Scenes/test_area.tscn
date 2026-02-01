@@ -23,6 +23,7 @@
 [ext_resource type="PackedScene" path="res://game_menu.tscn" id="15_menu"]
 [ext_resource type="PackedScene" uid="uid://k3aff18qvqir" path="res://Enemies/enemy.tscn" id="16_yi2tr"]
 [ext_resource type="PackedScene" path="res://UI/AchievementsUI.tscn" id="17_achievements"]
+[ext_resource type="PackedScene" uid="uid://tutorial_hints_001" path="res://UI/TutorialHints.tscn" id="18_tutorial"]
 [ext_resource type="PackedScene" uid="uid://bruwmq46fel7d" path="res://Collectibles/LeoneSanMarco.tscn" id="22_u4w8e"]
 [ext_resource type="PackedScene" uid="uid://cxd421d2orwl1" path="res://Interactables/Tomba.tscn" id="23_aymj8"]
 
@@ -232,6 +233,8 @@ shader_parameter/u_tint = Color(1, 1, 1, 1)
 [node name="GameMenu" parent="." instance=ExtResource("15_menu")]
 
 [node name="AchievementsUI" parent="." instance=ExtResource("17_achievements")]
+
+[node name="TutorialHints" parent="." instance=ExtResource("18_tutorial")]
 
 [node name="Ambiance" type="Node" parent="."]
 
@@ -1186,6 +1189,26 @@ frame = 10
 position = Vector2(350.99997, -76.99999)
 scale = Vector2(0.05, 0.05)
 
+[node name="Enemy4" parent="." instance=ExtResource("16_yi2tr")]
+position = Vector2(-3574, -66)
+scale = Vector2(0.05, 0.05)
+
+[node name="Enemy5" parent="." instance=ExtResource("16_yi2tr")]
+position = Vector2(-3696, -67)
+scale = Vector2(0.05, 0.05)
+
+[node name="Enemy6" parent="." instance=ExtResource("16_yi2tr")]
+position = Vector2(-3685, -196.99998)
+scale = Vector2(0.05, 0.05)
+
+[node name="Enemy7" parent="." instance=ExtResource("16_yi2tr")]
+position = Vector2(-3691, -324)
+scale = Vector2(0.05, 0.05)
+
+[node name="Enemy8" parent="." instance=ExtResource("16_yi2tr")]
+position = Vector2(-3922, -11.0000305)
+scale = Vector2(0.05, 0.05)
+
 [node name="Enemy2" parent="." instance=ExtResource("16_yi2tr")]
 position = Vector2(676, -203)
 scale = Vector2(0.05, 0.05)
@@ -1239,6 +1262,15 @@ position = Vector2(-282, -107)
 
 [node name="Tomba2" parent="." instance=ExtResource("23_aymj8")]
 position = Vector2(-206, -109)
+
+[node name="Tomba6" parent="." instance=ExtResource("23_aymj8")]
+position = Vector2(-159, 150)
+
+[node name="Tomba7" parent="." instance=ExtResource("23_aymj8")]
+position = Vector2(-266, 149)
+
+[node name="Tomba8" parent="." instance=ExtResource("23_aymj8")]
+position = Vector2(740, 153)
 
 [node name="Tomba3" parent="." instance=ExtResource("23_aymj8")]
 position = Vector2(1013, 18)

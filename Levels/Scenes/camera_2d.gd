@@ -35,7 +35,7 @@ var _look_vec: Vector2 = Vector2.ZERO
 
 # Smooth al passaggio target (es. character_beginning -> Player): per N frame usa follow più lento
 var _smooth_attach_frames: int = 0
-const _smooth_attach_follow_speed: float = 2.5  # più basso = transizione più morbida
+const _smooth_attach_follow_speed: float = 1.8  # più basso = transizione più morbida (evita scatto)
 
 var _post_rect: ColorRect
 var _post_mat: ShaderMaterial
@@ -146,11 +146,14 @@ func _process(delta: float) -> void:
 	# Apply look-ahead
 	desired_cam += _look_vec
 
-	# --- Smooth follow (più lento i primi frame dopo cambio target) ---
+	# --- Smooth follow (più lento i primi frame dopo cambio target: transizione fluida) ---
 	var effective_speed := follow_speed
 	if _smooth_attach_frames > 0:
 		effective_speed = _smooth_attach_follow_speed
 		_smooth_attach_frames -= 1
+		# Primi frame ancora più morbidi: riduci il delta effettivo per evitare scatto
+		if _smooth_attach_frames > 70:
+			effective_speed *= 0.5
 	var t := 1.0 - exp(-effective_speed * delta)
 	global_position = global_position.lerp(desired_cam, t)
 
