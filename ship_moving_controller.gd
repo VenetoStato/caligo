@@ -55,6 +55,10 @@ func _physics_process(delta: float):
 	_update_water_particles()
 
 func _apply_movement(delta: float):
+	# Muove solo se è in acqua
+	if not _is_in_water():
+		linear_velocity *= drag
+		return
 	var axis = 0.0
 	if Input.is_action_pressed("ui_left"):
 		axis -= 1.0
@@ -65,6 +69,13 @@ func _apply_movement(delta: float):
 	if linear_velocity.length() > max_speed:
 		linear_velocity = linear_velocity.normalized() * max_speed
 	linear_velocity *= drag
+
+func _is_in_water() -> bool:
+	var waters = get_tree().get_nodes_in_group("water")
+	for w in waters:
+		if "bodies_in_water" in w and self in w.bodies_in_water:
+			return true
+	return false
 
 func _update_sprite_direction():
 	var spr := get_node_or_null("ShipMoving") as Sprite2D

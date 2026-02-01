@@ -32,6 +32,7 @@ var bodies_in_water: Array[Node2D] = []
 @export var fish_count: int = 5  # Numero di pesci da spawnare
 
 func _ready():
+	add_to_group("water")
 	# Trova CollisionPolygon2D
 	collision_polygon = get_node_or_null("CollisionPolygon2D")
 	if collision_polygon == null:
