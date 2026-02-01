@@ -14,6 +14,8 @@ extends RigidBody2D
 @export var interaction_action: StringName = &"interact" # tasto E
 @export var player_exit_offset: Vector2 = Vector2(0, -60)
 @export var ship_moving_scene: PackedScene
+@export var clamp_to_water_bounds: bool = true  # barca resta sull'orlo dell'acqua (entro X)
+@export var water_bounds_margin: float = 40.0
 
 var _cached_water: Node = null
 var _nearby_player: Node2D = null
@@ -62,6 +64,20 @@ func _apply_buoyancy():
 	var force = clamp(dy * buoyancy_strength, -max_up_force, max_up_force)
 	apply_central_force(Vector2(0, -force))
 	linear_velocity *= water_drag
+
+	# Barca sull'orlo dell'acqua: resta entro i limiti X dell'acqua
+	if clamp_to_water_bounds and water.has_method("get_water_bounds_global_x"):
+		var bounds: Vector2 = water.call("get_water_bounds_global_x")
+		var min_x: float = bounds.x + water_bounds_margin
+		var max_x: float = bounds.y - water_bounds_margin
+		if max_x > min_x:
+			var px = global_position.x
+			if px < min_x:
+				global_position.x = min_x
+				linear_velocity.x = 0.0
+			elif px > max_x:
+				global_position.x = max_x
+				linear_velocity.x = 0.0
 
 func _enter_ship(player: Node2D):
 	if ship_moving_scene == null:
@@ -120,6 +136,7 @@ func _setup_detection_area():
 		area.name = "PlayerDetectionArea"
 		area.monitoring = true
 		area.monitorable = true
+		area.collision_mask = 2  # player è su layer 2
 		add_child(area)
 		
 		var cs = CollisionShape2D.new()
@@ -128,6 +145,8 @@ func _setup_detection_area():
 		cs.shape = r
 		cs.position = Vector2(0, -10)
 		area.add_child(cs)
+	else:
+		area.collision_mask |= 2
 
 	if not area.body_entered.is_connected(_on_area_body_entered):
 		area.body_entered.connect(_on_area_body_entered)

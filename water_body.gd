@@ -40,8 +40,9 @@ var _fish_variant_paths: PackedStringArray = [
 ]
 
 func _ready():
-	# Player e altri corpi da rilevare: layer 2 = player, layer 1 = eventuali altri
-	# Assicurati che l'acqua rilevi il player (CharacterBody2D su layer 2)
+	# Barca e pesci trovano quest'acqua tramite get_nodes_in_group("water")
+	add_to_group("water")
+	# Player e altri corpi: layer 2 = player
 	collision_mask |= 2
 	monitoring = true
 
@@ -317,6 +318,22 @@ func _on_body_exited(body: Node2D):
 	# Chiama exit_water() se il body ha questo metodo
 	if body.has_method("exit_water"):
 		body.call("exit_water")
+
+## Restituisce (min_x, max_x) in coordinate globali dell'area acqua (per barca sull'orlo)
+func get_water_bounds_global_x() -> Vector2:
+	if collision_polygon == null:
+		return Vector2(INF, -INF)
+	var points: PackedVector2Array = collision_polygon.polygon
+	if points.size() == 0:
+		return Vector2(INF, -INF)
+	var min_x: float = INF
+	var max_x: float = -INF
+	for p in points:
+		var local_pt: Vector2 = collision_polygon.position + p * collision_polygon.scale
+		var gp: Vector2 = to_global(local_pt)
+		min_x = min(min_x, gp.x)
+		max_x = max(max_x, gp.x)
+	return Vector2(min_x, max_x)
 
 func apply_buoyancy(delta: float):
 	# Rimuovi corpi non validi
