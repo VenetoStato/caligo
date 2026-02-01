@@ -8,7 +8,7 @@ extends RigidBody2D
 @export var drag: float = 0.98
 
 @export_category("Buoyancy")
-@export var float_offset: float = 85.0
+@export var float_offset: float = 52.0
 @export var buoyancy_strength: float = 35.0
 @export var max_up_force: float = 2500.0
 @export var water_drag: float = 0.96
@@ -71,11 +71,16 @@ func _apply_movement(delta: float):
 	linear_velocity *= drag
 
 func _is_in_water() -> bool:
-	var waters = get_tree().get_nodes_in_group("water")
-	for w in waters:
-		if "bodies_in_water" in w and self in w.bodies_in_water:
-			return true
-	return false
+	var water = _get_water()
+	if water == null:
+		return false
+	var surface_y_v = _get_water_surface_y(water)
+	if surface_y_v == null:
+		return true
+	var surface_y: float = float(surface_y_v)
+	# Considera "in acqua" se siamo vicini alla superficie (non serve essere in bodies_in_water)
+	var dy = global_position.y - surface_y
+	return dy >= -surface_margin and dy <= 800.0
 
 func _update_sprite_direction():
 	var spr := get_node_or_null("ShipMoving") as Sprite2D
@@ -147,18 +152,40 @@ func _exit_ship():
 	queue_free()
 
 func _get_water() -> Node:
-	if _cached_water != null and is_instance_valid(_cached_water):
-		return _cached_water
 	var waters = get_tree().get_nodes_in_group("water")
-	if waters.size() > 0:
-		_cached_water = waters[0]
-		return _cached_water
-	var scene = get_tree().current_scene
-	if scene == null:
-		return null
-	var found = _find_water_recursive(scene)
-	_cached_water = found
-	return found
+	if waters.size() == 0:
+		var scene = get_tree().current_scene
+		if scene == null:
+			return null
+		var found = _find_water_recursive(scene)
+		return found
+	# Scegli l'acqua in cui siamo (bounds X contengono la barca), altrimenti la più vicina
+	var my_x: float = global_position.x
+	for w in waters:
+		if w == null or not is_instance_valid(w):
+			continue
+		if not w.has_method("get_water_bounds_global_x"):
+			continue
+		var bounds: Vector2 = w.call("get_water_bounds_global_x")
+		if my_x >= bounds.x and my_x <= bounds.y:
+			_cached_water = w
+			return w
+	# Nessuna acqua ci contiene: usa la più vicina per X (evita blocchi quando ti sposti)
+	var best: Node = null
+	var best_dist: float = INF
+	for w in waters:
+		if w == null or not is_instance_valid(w):
+			continue
+		if not w.has_method("get_water_bounds_global_x"):
+			continue
+		var bounds: Vector2 = w.call("get_water_bounds_global_x")
+		var mid: float = (bounds.x + bounds.y) * 0.5
+		var d: float = abs(my_x - mid)
+		if d < best_dist:
+			best_dist = d
+			best = w
+	_cached_water = best
+	return best
 
 func _find_water_recursive(n: Node) -> Node:
 	if n is Area2D and "water" in n.name.to_lower():
