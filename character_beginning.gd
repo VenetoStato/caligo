@@ -76,7 +76,7 @@ func _switch_to_player():
 		cam.call("set_camera_target", player, 50)  # 50 frame di follow più lento = ~0.8 s smooth
 	
 	parent.remove_child(self)
-	parent.add_child(player)
+	# Player è già figlio di parent (add_child a riga 65): solo spostiamo l'indice
 	parent.move_child(player, my_index)
 	
 	queue_free()

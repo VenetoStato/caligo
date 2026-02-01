@@ -20,6 +20,7 @@
 [ext_resource type="PackedScene" uid="uid://5rpbdixr224q" path="res://character_beginning.tscn" id="14_begin"]
 [ext_resource type="PackedScene" path="res://game_menu.tscn" id="15_menu"]
 [ext_resource type="PackedScene" uid="uid://k3aff18qvqir" path="res://Enemies/enemy.tscn" id="16_yi2tr"]
+[ext_resource type="PackedScene" uid="uid://achievements_ui_001" path="res://UI/AchievementsUI.tscn" id="17_achievements"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_yn5ey"]
 size = Vector2(54, 15.4999695)
@@ -225,6 +226,7 @@ shader_parameter/u_tint = Color(1, 1, 1, 1)
 [node name="Test_Area" type="Node2D"]
 
 [node name="GameMenu" parent="." instance=ExtResource("15_menu")]
+[node name="AchievementsUI" parent="." instance=ExtResource("17_achievements")]
 
 [node name="Ambiance" type="Node" parent="."]
 

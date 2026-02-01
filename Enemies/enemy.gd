@@ -239,21 +239,21 @@ func _spawn_hit_particles(source_position: Vector2) -> void:
 func _die() -> void:
 	state = State.DEAD
 	# Crea un RigidBody2D "Dead Gamberetto" spostabile (attacco e hook possono spingerlo)
+	# Aggiungilo in deferred per evitare "Can't change this state while flushing queries"
 	var parent_node: Node = get_parent()
-	var pos: Vector2 = global_position
+	var pos_global: Vector2 = global_position
 	const DEAD_GAMBERETTO_PATH := "res://Landscape/Sprites/dead gamberetto.png"
 	var tex: Texture2D = load(DEAD_GAMBERETTO_PATH) as Texture2D
 	var dead_scale: Vector2 = Vector2(0.08, 0.08)
 
 	var rb: RigidBody2D = RigidBody2D.new()
 	rb.name = "Dead Gamberetto"
-	rb.global_position = pos
 	rb.collision_layer = 2
 	rb.collision_mask = 1
 	rb.gravity_scale = 1.0
 	rb.mass = 1.0
 	rb.linear_damp = 2.0
-	rb.angular_damp = 3.0  # rallenta la rotazione dopo un po'
+	rb.angular_damp = 3.0
 	rb.add_to_group("dead_enemy")
 
 	var col_shape: RectangleShape2D = RectangleShape2D.new()
@@ -268,8 +268,10 @@ func _die() -> void:
 		spr.scale = dead_scale
 		rb.add_child(spr)
 
-	parent_node.add_child(rb)
 	rb.z_index = -1
+	# Posizione in coordinate locali del parent, così quando viene aggiunto è già al posto giusto
+	rb.position = parent_node.to_local(pos_global)
+	parent_node.call_deferred("add_child", rb)
 	queue_free()
 
 func _on_attack_hit_body(body: Node2D) -> void:

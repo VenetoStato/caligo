@@ -107,6 +107,12 @@ extends CharacterBody2D
 @export var respawn_y_offset: float = -20.0
 ## Frame preciso dello sprite da mostrare alla morte (indice del frame nello sprite sheet, es. 0-39 se 5x8)
 @export var death_frame: int = 0
+## Se true, alla morte il mondo si resetta (reload scena) e riparti dall'inizio (character_beginning + player)
+@export var reload_scene_on_death: bool = true
+## Percorso scena da ricaricare alla morte. Vuoto = usa scena corrente.
+@export var reload_scene_path: String = "res://Levels/Scenes/test_area.tscn"
+## Oltre questa Y (sotto questa altezza) il player muore (caduta nel vuoto). Più basso = più in alto sullo schermo.
+@export var fall_death_y: float = 750.0
 
 # Nodi
 @onready var anim: AnimationPlayer = $anim
@@ -470,6 +476,11 @@ func _physics_process(delta: float):
 	if is_charging:
 		current_charge_time = min(current_charge_time + delta, max_charge_time)
 	
+	# Caduta oltre fall_death_y = morte (non cadere all'infinito)
+	if global_position.y > fall_death_y:
+		_on_death()
+		return
+	
 	move_and_slide()
 	
 	# Aggiorna l'ultima posizione sicura sul terreno
@@ -746,15 +757,39 @@ func _on_death():
 	if anim:
 		anim.stop()
 	
-	# Trova il punto di respawn
-	var respawn_pos = _find_respawn_position()
+	# Reset mondo: reload scena e riparti dall'inizio
+	if reload_scene_on_death:
+		_run_death_then_reload_scene()
+		return
 	
-	# Usa il TransitionManager se disponibile
+	# Respawn nel mondo (checkpoint / ultimo terreno)
+	var respawn_pos = _find_respawn_position()
 	if transition_manager and transition_manager.has_method("play_death_sequence"):
 		transition_manager.call("play_death_sequence", self, respawn_pos)
 	else:
-		# Fallback: morte semplice
 		await _simple_death_sequence(respawn_pos)
+
+func _run_death_then_reload_scene():
+	# Morte → particelle → fade out → reload scena (mondo resetta, riparti dall'inizio)
+	_spawn_death_particles()
+	Engine.time_scale = 0.25
+	await get_tree().create_timer(0.15).timeout
+	Engine.time_scale = 1.0
+	var fade_rect = _get_or_create_fade_rect()
+	if fade_rect:
+		var tween = create_tween()
+		tween.tween_property(fade_rect, "color:a", 1.0, 0.6)
+		await tween.finished
+	await get_tree().create_timer(0.2).timeout
+	# Reload scena: tutto torna com'era all'inizio (character_beginning + player dopo intro)
+	var tree := get_tree()
+	var path: String = reload_scene_path
+	if path.is_empty() and tree.current_scene != null:
+		path = tree.current_scene.scene_file_path
+	if not path.is_empty():
+		tree.call_deferred("change_scene_to_file", path)
+	else:
+		tree.call_deferred("reload_current_scene")
 
 func _simple_death_sequence(respawn_pos: Vector2):
 	# Spawn particelle di morte
@@ -1263,6 +1298,8 @@ func _reel_fish_to_player():
 	if global_position.distance_to(current_fish.global_position) < fish_reel_distance:
 		print("🏆 Pesce catturato!")
 		heal(1)
+		if AchievementManager:
+			AchievementManager.add_fish_caught()
 		current_fish.queue_free()
 		fish_hooked = false
 		current_fish = null

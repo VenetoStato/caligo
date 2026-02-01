@@ -17,6 +17,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+AchievementManager="*res://AchievementManager.gd"
 autoload_transition="*res://TransitionManager.gd"
 
 [editor]
