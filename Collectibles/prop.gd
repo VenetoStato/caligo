@@ -39,8 +39,9 @@ func _on_body_entered(body: Node2D) -> void:
 		asp.play()
 		asp.finished.connect(asp.queue_free)
 	# Achievement: se è un leone di San Marco
-	if AchievementManager:
-		AchievementManager.add_leone_found(prop_id)
+	var am = get_node_or_null("/root/AchievementManager")
+	if am != null and am.has_method("add_leone_found"):
+		am.add_leone_found(prop_id)
 	# Nascondi il prop (preso)
 	visible = false
 	set_deferred("monitoring", false)

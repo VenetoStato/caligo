@@ -313,7 +313,6 @@ func _on_body_exited(body: Node2D):
 	var index = bodies_in_water.find(body)
 	if index >= 0:
 		bodies_in_water.remove_at(index)
-		print("Water_Body: Body uscito dall'acqua: ", body.name)
 	
 	# Chiama exit_water() se il body ha questo metodo
 	if body.has_method("exit_water"):

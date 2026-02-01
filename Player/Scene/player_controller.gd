@@ -176,7 +176,7 @@ var fishing_anim_finished: bool = false
 var is_charging: bool = false
 var current_charge_time: float = 0.0
 var grab_anchors: Array[RigidBody2D] = []
-var using_fishing_hook: bool = false
+var using_fishing_hook: bool = true  # Default: amo da pesca + pastura; C = altro (amo da lancio)
 var current_fish: Node2D = null
 var fish_hooked: bool = false
 var fish_struggle_timer: float = 0.0
@@ -1231,6 +1231,8 @@ func on_fish_hooked(fish: Node2D):
 		fish.call("set_player_reference", self)
 	_update_effective_tension()
 	if hook_instance and is_instance_valid(hook_instance):
+		if hook_instance.has_method("set_hooked_fish"):
+			hook_instance.call("set_hooked_fish", fish)
 		var hide = false
 		if hook_instance.has_method("get_hook_type"):
 			hide = str(hook_instance.call("get_hook_type")) == "fishing"
@@ -1286,8 +1288,11 @@ func _on_fish_lost(_escaped: bool):
 	fish_escape_timer = 0.0
 	fish_struggle_timer = 0.0
 	_update_effective_tension()
-	if hook_instance and is_instance_valid(hook_instance) and hook_instance.has_method("show_hook"):
-		hook_instance.call("show_hook")
+	if hook_instance and is_instance_valid(hook_instance):
+		if hook_instance.has_method("set_hooked_fish"):
+			hook_instance.call("set_hooked_fish", null)
+		if hook_instance.has_method("show_hook"):
+			hook_instance.call("show_hook")
 
 func _reel_fish_to_player():
 	if not is_instance_valid(current_fish):
@@ -1298,8 +1303,9 @@ func _reel_fish_to_player():
 	if global_position.distance_to(current_fish.global_position) < fish_reel_distance:
 		print("🏆 Pesce catturato!")
 		heal(1)
-		if AchievementManager:
-			AchievementManager.add_fish_caught()
+		var am = get_node_or_null("/root/AchievementManager")
+		if am != null and am.has_method("add_fish_caught"):
+			am.add_fish_caught()
 		current_fish.queue_free()
 		fish_hooked = false
 		current_fish = null

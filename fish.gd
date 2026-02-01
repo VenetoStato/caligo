@@ -99,7 +99,9 @@ func _ready():
 	lock_rotation = true
 	rotation = 0.0
 	gravity_scale = 0.0  # I pesci non cadono, nuotano
-	
+	# Nessuna risposta fisica alle collisioni: evita tremolio/glitch quando toccano qualcosa
+	collision_mask = 0
+
 	spawn_position = global_position
 	home_position = global_position + home_offset
 	_find_sprite()
@@ -219,7 +221,9 @@ func _process_swimming(delta: float):
 				is_struggling = false
 
 	elif is_attracted and attraction_target != Vector2.ZERO:
-		# Attrazione verso il target (movimento libero)
+		# Aggiorna il target ogni frame se è un hook (così il pesce segue l'amo in movimento)
+		if target_hook != null and is_instance_valid(target_hook):
+			attraction_target = target_hook.global_position
 		var dir = (attraction_target - global_position).normalized()
 		desired = dir * attraction_speed
 

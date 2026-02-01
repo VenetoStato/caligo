@@ -205,6 +205,10 @@ func show_hook():
 	if sprite != null:
 		sprite.visible = true
 
+## Chiamato dal player quando un pesce abbocca (così l'hook sa chi ha agganciato)
+func set_hooked_fish(fish: Node2D):
+	hooked_fish = fish
+
 # ===========================================
 # FISH DETECTION
 # ===========================================
@@ -217,6 +221,7 @@ func _on_fish_area_entered(area: Area2D):
 		_check_if_fish(parent)
 
 func _check_if_fish(node: Node):
+	# Non agganciare subito: il pesce deve andare verso l'amo e abboccare quando è vicino (logica in fish.gd)
 	if hooked_fish != null:
 		return
 	if node == null or node == self:
@@ -234,8 +239,9 @@ func _check_if_fish(node: Node):
 	elif "fish" in node.name.to_lower():
 		is_fish = true
 
-	if is_fish:
-		_hook_fish(node as Node2D)
+	# Non chiamare _hook_fish: il pesce rileva l'amo (area/body), va verso, e abbocca a distanza < 30
+	# if is_fish:
+	# 	_hook_fish(node as Node2D)
 
 func _hook_fish(fish: Node2D):
 	if fish == null:

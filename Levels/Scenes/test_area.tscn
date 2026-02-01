@@ -1,4 +1,4 @@
-[gd_scene load_steps=34 format=4 uid="uid://6hqecihao0iv"]
+[gd_scene load_steps=37 format=4 uid="uid://6hqecihao0iv"]
 
 [ext_resource type="Texture2D" uid="uid://sls06hof060t" path="res://Landscape/Sprites/montagna.png" id="2_qpuyf"]
 [ext_resource type="PackedScene" uid="uid://pmd73v6vpofj" path="res://Landscape/Scenes_Prefabs/erba.tscn" id="2_tuhxq"]
@@ -20,7 +20,9 @@
 [ext_resource type="PackedScene" uid="uid://5rpbdixr224q" path="res://character_beginning.tscn" id="14_begin"]
 [ext_resource type="PackedScene" path="res://game_menu.tscn" id="15_menu"]
 [ext_resource type="PackedScene" uid="uid://k3aff18qvqir" path="res://Enemies/enemy.tscn" id="16_yi2tr"]
-[ext_resource type="PackedScene" uid="uid://achievements_ui_001" path="res://UI/AchievementsUI.tscn" id="17_achievements"]
+[ext_resource type="PackedScene" path="res://UI/AchievementsUI.tscn" id="17_achievements"]
+[ext_resource type="PackedScene" uid="uid://bruwmq46fel7d" path="res://Collectibles/LeoneSanMarco.tscn" id="22_u4w8e"]
+[ext_resource type="PackedScene" uid="uid://cxd421d2orwl1" path="res://Interactables/Tomba.tscn" id="23_aymj8"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_yn5ey"]
 size = Vector2(54, 15.4999695)
@@ -226,6 +228,7 @@ shader_parameter/u_tint = Color(1, 1, 1, 1)
 [node name="Test_Area" type="Node2D"]
 
 [node name="GameMenu" parent="." instance=ExtResource("15_menu")]
+
 [node name="AchievementsUI" parent="." instance=ExtResource("17_achievements")]
 
 [node name="Ambiance" type="Node" parent="."]
@@ -1217,6 +1220,30 @@ texture = ExtResource("5_fkuta")
 
 [node name="FishingLine" type="Line2D" parent="."]
 position = Vector2(15, -22)
+
+[node name="LeoneSanMarco" parent="." instance=ExtResource("22_u4w8e")]
+position = Vector2(-750, 4)
+
+[node name="LeoneSanMarco2" parent="." instance=ExtResource("22_u4w8e")]
+position = Vector2(-3820, -4)
+
+[node name="LeoneSanMarco3" parent="." instance=ExtResource("22_u4w8e")]
+position = Vector2(945, -1)
+
+[node name="Tomba" parent="." instance=ExtResource("23_aymj8")]
+position = Vector2(-282, -107)
+
+[node name="Tomba2" parent="." instance=ExtResource("23_aymj8")]
+position = Vector2(-206, -109)
+
+[node name="Tomba3" parent="." instance=ExtResource("23_aymj8")]
+position = Vector2(1013, 18)
+
+[node name="Tomba4" parent="." instance=ExtResource("23_aymj8")]
+position = Vector2(-1347, 17)
+
+[node name="Tomba5" parent="." instance=ExtResource("23_aymj8")]
+position = Vector2(-3188, 26)
 
 [connection signal="body_entered" from="Ambiance/0/Grass/erba" to="Ambiance/0/Grass/erba/Erba" method="_on_area_2d_body_entered"]
 [connection signal="body_entered" from="Ambiance/0/Grass/erba2" to="Ambiance/0/Grass/erba2/Erba" method="_on_area_2d_body_entered"]
