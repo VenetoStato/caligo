@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3 uid="uid://c064mwp5bwak4"]
+[gd_scene load_steps=19 format=3 uid="uid://c064mwp5bwak4"]
 
 [ext_resource type="Texture2D" uid="uid://d3oicsx8lp473" path="res://Player/Sprites/sprite_sheet.png" id="1_gqxai"]
 [ext_resource type="Script" uid="uid://c14so0210pd47" path="res://Player/Scene/player_controller.gd" id="1_qfdc6"]
@@ -158,6 +158,9 @@ _data = {
 &"Walking": SubResource("Animation_44cfe")
 }
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_p0c61"]
+size = Vector2(151, 136.375)
+
 [node name="CharacterBody2D" type="CharacterBody2D"]
 script = ExtResource("1_qfdc6")
 move_speed = 150.0
@@ -189,3 +192,12 @@ libraries = {
 
 [node name="RodTip" type="Marker2D" parent="FishingRod"]
 position = Vector2(-1, -5)
+
+[node name="FishArea" type="Area2D" parent="."]
+position = Vector2(2, -3)
+collision_layer = 0
+collision_mask = 128
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="FishArea"]
+shape = SubResource("RectangleShape2D_p0c61")

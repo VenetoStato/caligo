@@ -334,6 +334,26 @@ func get_water_bounds_global_x() -> Vector2:
 		max_x = max(max_x, gp.x)
 	return Vector2(min_x, max_x)
 
+## Restituisce il rettangolo globale (AABB) dell'acqua per tenere i pesci dentro i limiti
+func get_water_bounds_global_rect() -> Rect2:
+	if collision_polygon == null:
+		return Rect2(-10000, -10000, 20000, 20000)
+	var points: PackedVector2Array = collision_polygon.polygon
+	if points.size() == 0:
+		return Rect2(-10000, -10000, 20000, 20000)
+	var min_x: float = INF
+	var max_x: float = -INF
+	var min_y: float = INF
+	var max_y: float = -INF
+	for p in points:
+		var local_pt: Vector2 = collision_polygon.position + p * collision_polygon.scale
+		var gp: Vector2 = to_global(local_pt)
+		min_x = min(min_x, gp.x)
+		max_x = max(max_x, gp.x)
+		min_y = min(min_y, gp.y)
+		max_y = max(max_y, gp.y)
+	return Rect2(min_x, min_y, max_x - min_x, max_y - min_y)
+
 func apply_buoyancy(delta: float):
 	# Rimuovi corpi non validi
 	bodies_in_water = bodies_in_water.filter(func(b): return b != null and is_instance_valid(b))

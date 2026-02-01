@@ -48,6 +48,7 @@ extends CharacterBody2D
 @export var line_color_tension: Color = Color(0.9, 0.8, 0.1)
 @export var line_color_critical: Color = Color(0.9, 0.2, 0.1)
 @export var line_color_reeling: Color = Color(0.3, 0.7, 0.9)
+@export var line_color_wrong_reel: Color = Color(0.95, 0.2, 0.15)  # Rosso quando tiri durante la lotta
 
 @export_category("Line Tuning")
 @export var line_out_speed: float = 900.0
@@ -81,9 +82,11 @@ extends CharacterBody2D
 @export var move_particle_interval: float = 0.03
 
 @export_category("Fish Struggle")
-@export var fish_struggle_interval: float = 1.2
-@export var fish_escape_time: float = 1.0
+@export var fish_struggle_interval: float = 3.0
+@export var fish_escape_time: float = 3.0
+@export var fish_struggle_phase_duration: float = 1.8
 @export var fish_reel_distance: float = 30.0
+@export var fish_catch_jump_distance: float = 50.0
 @export var fish_pull_strength: float = 220.0
 
 @export_category("Health")
@@ -182,6 +185,8 @@ var fish_hooked: bool = false
 var fish_struggle_timer: float = 0.0
 var fish_struggle_active: bool = false
 var fish_escape_timer: float = 0.0
+var fish_struggle_phase_timer: float = 0.0
+var _fish_catch_jump_done: bool = false
 var active_pastura: Node2D = null
 var _effective_tension: float = 0.85
 var _rope_initialized: bool = false
@@ -201,6 +206,7 @@ func _ready():
 	_setup_health()
 	_setup_transition_manager()
 	_setup_attack_hitbox()
+	_setup_fish_area()
 	
 	if anim:
 		anim.animation_finished.connect(_on_anim_finished)
@@ -253,6 +259,22 @@ func _setup_attack_hitbox():
 	# Player su layer 2, collide solo con layer 1 (terreno) così non si blocca col nemico
 	collision_layer = 2
 	collision_mask = 1
+
+func _setup_fish_area():
+	# FishArea è un Area2D solo trigger: quando il pesce agganciato entra, fa lo scatto a parabola verso il player
+	var fish_area: Area2D = get_node_or_null("FishArea") as Area2D
+	if fish_area != null:
+		if not fish_area.body_entered.is_connected(_on_fish_area_body_entered):
+			fish_area.body_entered.connect(_on_fish_area_body_entered)
+
+func _on_fish_area_body_entered(body: Node2D):
+	if not fish_hooked or current_fish == null or body != current_fish:
+		return
+	if _fish_catch_jump_done:
+		return
+	if body.has_method("do_catch_jump"):
+		body.call("do_catch_jump")
+		_fish_catch_jump_done = true
 
 func _update_attack_hitbox_position():
 	if _attack_hitbox == null:
@@ -441,8 +463,7 @@ func _input(event):
 	
 	if event.is_action_pressed("reel"):
 		if line_extended and hook_instance:
-			if fish_hooked and fish_struggle_active:
-				_stop_fish_struggle()
+			# Non fermare la lotta: tirare durante la lotta = lenza e pesce rossi, poi il pesce scappa
 			is_reeling = true
 	
 	if event.is_action_released("reel"):
@@ -786,6 +807,10 @@ func _run_death_then_reload_scene():
 	var path: String = reload_scene_path
 	if path.is_empty() and tree.current_scene != null:
 		path = tree.current_scene.scene_file_path
+	# Rimuovi il fade nero dalla root, altrimenti resta lo schermo nero dopo il reload
+	var tm = transition_manager
+	if tm != null and is_instance_valid(tm) and tm.get_parent() == tree.root:
+		tm.queue_free()
 	if not path.is_empty():
 		tree.call_deferred("change_scene_to_file", path)
 	else:
@@ -1078,14 +1103,20 @@ func _update_line_length(delta: float):
 		current_line_length = min(target_line_length, current_line_length + line_out_speed * delta)
 	if is_reeling:
 		var spd = grab_reel_in_speed if line_mode == LineMode.GRAB else reel_in_speed
-		current_line_length -= spd * delta
-		if current_line_length < 20.0:
-			if line_mode == LineMode.GRAB:
-				detach_grab_anchor()
-			elif fish_hooked and current_fish:
-				_reel_fish_to_player()
-			else:
-				_destroy_hook()
+		if fish_hooked and is_instance_valid(current_fish):
+			# Pesce agganciato: la corda non può essere più corta della distanza rod–pesce, così si accorcia fino al pesce
+			var rod := get_rod_tip_position()
+			var fish_pos := get_fish_center_position(current_fish)
+			var actual_dist := rod.distance_to(fish_pos)
+			current_line_length = max(actual_dist, current_line_length - spd * delta)
+			_reel_fish_to_player()
+		else:
+			current_line_length -= spd * delta
+			if current_line_length < 20.0:
+				if line_mode == LineMode.GRAB:
+					detach_grab_anchor()
+				else:
+					_destroy_hook()
 
 func _update_line_color(delta: float):
 	if fishing_line == null:
@@ -1095,8 +1126,9 @@ func _update_line_color(delta: float):
 	if fish_hooked:
 		if fish_struggle_active:
 			if is_reeling:
-				stress = 0.3
-				col = line_color_reeling
+				# Tirare durante la lotta = lenza rossa, pesce si stacca
+				stress = 1.0
+				col = line_color_wrong_reel
 			else:
 				stress = fish_escape_timer / fish_escape_time
 				col = _get_stress_color(stress)
@@ -1200,6 +1232,9 @@ func _handle_reel(delta: float, rod: Vector2):
 		_reel_fishing_target(rod)
 
 func _reel_fishing_target(rod: Vector2):
+	# Durante la lotta non tirare: se tiri lo stesso, la lenza va rossa e il pesce scappa (gestito in _update_fish_struggle)
+	if fish_hooked and fish_struggle_active:
+		return
 	var target: Node2D = null
 	var pos: Vector2
 	if fish_hooked and current_fish and is_instance_valid(current_fish):
@@ -1227,6 +1262,7 @@ func on_fish_hooked(fish: Node2D):
 	fish_struggle_timer = 0.0
 	fish_escape_timer = 0.0
 	fish_struggle_active = false
+	_fish_catch_jump_done = false
 	if fish.has_method("set_player_reference"):
 		fish.call("set_player_reference", self)
 	_update_effective_tension()
@@ -1248,28 +1284,41 @@ func _update_fish_struggle(delta: float):
 	if not is_instance_valid(current_fish):
 		_on_fish_lost(false)
 		return
+	# Pesce rosso quando tiri durante la lotta
+	if current_fish.has_method("set_wrong_reel"):
+		current_fish.call("set_wrong_reel", fish_struggle_active and is_reeling)
 	fish_struggle_timer += delta
 	if fish_struggle_timer >= fish_struggle_interval and not fish_struggle_active:
 		fish_struggle_timer = 0.0
 		fish_struggle_active = true
 		fish_escape_timer = 0.0
+		fish_struggle_phase_timer = 0.0
 		if current_fish.has_method("start_struggle"):
 			current_fish.call("start_struggle")
 	if fish_struggle_active:
-		if not is_reeling:
-			fish_escape_timer += delta
-			if current_fish.has_method("apply_struggle_force"):
-				var rod = get_rod_tip_position()
-				var fp = get_fish_center_position(current_fish)
-				current_fish.call("apply_struggle_force", (fp - rod).normalized() * fish_pull_strength * delta)
+		if is_reeling:
+			# Tirare durante la lotta = sbagliato ma molto graduale: se tiri imperterrito il pesce scappa, ma non subito
+			fish_escape_timer += delta * 0.35
+			if fish_escape_timer >= fish_escape_time:
+				_on_fish_escaped()
 		else:
-			fish_escape_timer = max(fish_escape_timer - delta * 0.5, 0.0)
-		if fish_escape_timer >= fish_escape_time:
-			_on_fish_escaped()
+			# Non tiri: la fase di lotta dopo un po' finisce e puoi reelare di nuovo (più reel!)
+			fish_struggle_phase_timer += delta
+			if fish_struggle_phase_timer >= fish_struggle_phase_duration:
+				_stop_fish_struggle()
+			else:
+				fish_escape_timer += delta * 0.3
+				if current_fish.has_method("apply_struggle_force"):
+					var rod = get_rod_tip_position()
+					var fp = get_fish_center_position(current_fish)
+					current_fish.call("apply_struggle_force", (fp - rod).normalized() * fish_pull_strength * delta)
+				if fish_escape_timer >= fish_escape_time:
+					_on_fish_escaped()
 
 func _stop_fish_struggle():
 	fish_struggle_active = false
 	fish_escape_timer = 0.0
+	fish_struggle_phase_timer = 0.0
 	fish_struggle_timer = 0.0
 	if current_fish and is_instance_valid(current_fish) and current_fish.has_method("stop_struggle"):
 		current_fish.call("stop_struggle")
@@ -1286,6 +1335,7 @@ func _on_fish_lost(_escaped: bool):
 	current_fish = null
 	fish_struggle_active = false
 	fish_escape_timer = 0.0
+	fish_struggle_phase_timer = 0.0
 	fish_struggle_timer = 0.0
 	_update_effective_tension()
 	if hook_instance and is_instance_valid(hook_instance):
@@ -1300,7 +1350,23 @@ func _reel_fish_to_player():
 		current_fish = null
 		_destroy_hook()
 		return
-	if global_position.distance_to(current_fish.global_position) < fish_reel_distance:
+	var dist = global_position.distance_to(current_fish.global_position)
+	# Salto: quando il pesce è in FishArea, O entro fish_catch_jump_distance, O vicino al player E vicino alla superficie (può uscire anche con collider)
+	var fish_area: Area2D = get_node_or_null("FishArea") as Area2D
+	var in_area: bool = fish_area != null and current_fish in fish_area.get_overlapping_bodies()
+	var near_surface: bool = current_fish.has_method("is_near_surface") and current_fish.call("is_near_surface")
+	var reel_zone_dist: float = 100.0
+	if not _fish_catch_jump_done and current_fish.has_method("do_catch_jump"):
+		if in_area:
+			current_fish.call("do_catch_jump")
+			_fish_catch_jump_done = true
+		elif dist < fish_catch_jump_distance and dist >= fish_reel_distance:
+			current_fish.call("do_catch_jump")
+			_fish_catch_jump_done = true
+		elif dist < reel_zone_dist and near_surface:
+			current_fish.call("do_catch_jump")
+			_fish_catch_jump_done = true
+	if dist < fish_reel_distance:
 		print("🏆 Pesce catturato!")
 		heal(1)
 		var am = get_node_or_null("/root/AchievementManager")
@@ -1334,6 +1400,7 @@ func _reset_line_state():
 	current_fish = null
 	fish_struggle_active = false
 	fish_escape_timer = 0.0
+	fish_struggle_phase_timer = 0.0
 	fish_struggle_timer = 0.0
 	_rope_initialized = false
 	_effective_tension = rope_tension
