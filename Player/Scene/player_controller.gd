@@ -89,6 +89,8 @@ extends CharacterBody2D
 @export_category("Health")
 @export var max_health: int = 5
 @export var invincibility_time: float = 1.5
+@export var knockback_speed: float = 280.0
+@export var knockback_duration: float = 0.2
 @export var health_ui_offset: Vector2 = Vector2(0, -40)
 @export var health_color_full: Color = Color(0.9, 0.2, 0.3)
 @export var health_color_empty: Color = Color(0.3, 0.3, 0.3, 0.5)
@@ -108,6 +110,7 @@ extends CharacterBody2D
 @onready var anim: AnimationPlayer = $anim
 var fishing_line: Line2D = null
 var transition_manager: Node = null
+var _attack_hitbox: Area2D = null  # Area per colpire nemici (abilitata durante Attack_fast / Attack_strong)
 
 # Health UI
 var _health_states: Array[bool] = []
@@ -142,6 +145,7 @@ var is_invincible: bool = false
 var invincibility_timer: float = 0.0
 var blink_timer: float = 0.0
 var is_dead: bool = false
+var _knockback_timer: float = 0.0
 var last_safe_ground_position: Vector2 = Vector2.ZERO
 var initial_spawn_position: Vector2 = Vector2.ZERO
 
@@ -185,6 +189,7 @@ func _ready():
 	_setup_fishing_line()
 	_setup_health()
 	_setup_transition_manager()
+	_setup_attack_hitbox()
 	
 	if anim:
 		anim.animation_finished.connect(_on_anim_finished)
@@ -212,6 +217,39 @@ func _setup_fishing_line():
 		fishing_line.width = 2.0
 		fishing_line.default_color = line_color_normal
 		fishing_line.joint_mode = Line2D.LINE_JOINT_ROUND
+
+func _setup_attack_hitbox():
+	# Area che danneggia i nemici quando fai attacco (Z o click destro)
+	_attack_hitbox = Area2D.new()
+	_attack_hitbox.name = "AttackHitbox"
+	_attack_hitbox.collision_layer = 4
+	_attack_hitbox.collision_mask = 2
+	_attack_hitbox.monitorable = false
+	_attack_hitbox.monitoring = true
+	_attack_hitbox.add_to_group("player_attack")
+	var shape = RectangleShape2D.new()
+	shape.size = Vector2(40, 30)
+	var col = CollisionShape2D.new()
+	col.shape = shape
+	col.position = Vector2(25, -10)
+	_attack_hitbox.add_child(col)
+	add_child(_attack_hitbox)
+	_attack_hitbox.visible = false
+	_update_attack_hitbox_position()
+	_attack_hitbox.monitoring = false
+
+func _update_attack_hitbox_position():
+	if _attack_hitbox == null:
+		return
+	var offset_x = 25 if facing_right else -25
+	var col = _attack_hitbox.get_node_or_null("CollisionShape2D")
+	if col:
+		col.position = Vector2(offset_x, -10)
+
+func _enable_attack_hitbox():
+	_update_attack_hitbox_position()
+	if _attack_hitbox:
+		_attack_hitbox.monitoring = true
 
 func _setup_health():
 	_health_states.clear()
@@ -267,6 +305,9 @@ func _simple_fade_in(rect: ColorRect):
 func _on_anim_finished(anim_name: String):
 	if anim_name == "Fishing":
 		fishing_anim_finished = true
+	if anim_name == "Attack_fast" or anim_name == "Attack_strong":
+		if _attack_hitbox:
+			_attack_hitbox.monitoring = false
 
 # ===========================================
 # HEALTH UI
@@ -379,7 +420,12 @@ func _physics_process(delta: float):
 		return
 	
 	_apply_gravity(delta)
-	horizontal_movement()
+	# Durante il rinculo non applicare movimento orizzontale da input
+	if _knockback_timer > 0.0:
+		_knockback_timer -= delta
+		velocity.x = move_toward(velocity.x, 0.0, knockback_speed * 4.0 * delta)
+	else:
+		horizontal_movement()
 	flip_logic()
 	
 	if is_charging:
@@ -513,14 +559,23 @@ func flip_logic():
 		facing_right = false
 	if sprite_node:
 		sprite_node.flip_h = !facing_right
+	_update_attack_hitbox_position()
 
 func set_animation():
+	if Input.is_action_just_pressed("ui_attack_strong") and not line_extended:
+		if anim.has_animation("Attack_strong"):
+			anim.play("Attack_strong")
+			_enable_attack_hitbox()
+			if particles_on_attack and black_particle_scene:
+				_spawn_particles(global_position, Vector2.RIGHT if facing_right else Vector2.LEFT, 0.25)
+		return
 	if Input.is_action_just_pressed("ui_attack") and not line_extended:
 		anim.play("Attack_fast")
+		_enable_attack_hitbox()
 		if particles_on_attack and black_particle_scene:
 			_spawn_particles(global_position, Vector2.RIGHT if facing_right else Vector2.LEFT, 0.2)
 		return
-	if anim.current_animation == "Attack_fast" and anim.is_playing():
+	if (anim.current_animation == "Attack_fast" or anim.current_animation == "Attack_strong") and anim.is_playing():
 		return
 	if is_charging:
 		anim.play("Idle")
@@ -584,9 +639,18 @@ func jump_logic():
 # ===========================================
 # HEALTH & DEATH SYSTEM
 # ===========================================
-func take_damage(amount: int = 1):
+func take_damage(amount: int = 1, source_position: Vector2 = Vector2.ZERO):
 	if is_invincible or is_dead:
 		return
+	
+	# Rinculo: spinta nella direzione opposta a chi ci ha colpito
+	if source_position != Vector2.ZERO:
+		var dir := (global_position - source_position).normalized()
+		dir.x = sign(dir.x)  # orizzontale netto
+		dir.y = -0.6  # componente verso l'alto per un rinculo "rimbalzante"
+		dir = dir.normalized()
+		velocity = dir * knockback_speed
+		_knockback_timer = knockback_duration
 	
 	current_health = max(0, current_health - amount)
 	
