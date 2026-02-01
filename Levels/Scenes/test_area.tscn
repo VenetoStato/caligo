@@ -1,4 +1,4 @@
-[gd_scene load_steps=37 format=4 uid="uid://6hqecihao0iv"]
+[gd_scene load_steps=39 format=4 uid="uid://6hqecihao0iv"]
 
 [ext_resource type="Texture2D" uid="uid://sls06hof060t" path="res://Landscape/Sprites/montagna.png" id="2_qpuyf"]
 [ext_resource type="PackedScene" uid="uid://pmd73v6vpofj" path="res://Landscape/Scenes_Prefabs/erba.tscn" id="2_tuhxq"]
@@ -16,7 +16,9 @@
 [ext_resource type="Script" uid="uid://bxmnjnyy4ciro" path="res://water_body.gd" id="10_water"]
 [ext_resource type="Script" uid="uid://bmnixai4nxvwy" path="res://erbetta.gd" id="11_bbl5d"]
 [ext_resource type="Texture2D" uid="uid://b2x7waa8ah8hf" path="res://Landscape/Sprites/barca.png" id="11_yn5ey"]
+[ext_resource type="PackedScene" uid="uid://db0i8bqtauv8d" path="res://Interactables/CasoniAttackable1.tscn" id="12_xsdgt"]
 [ext_resource type="Script" uid="uid://cewkb6nn6rvnx" path="res://boat_controller.gd" id="13_boat"]
+[ext_resource type="PackedScene" uid="uid://b4td2hmibgm28" path="res://Interactables/CasoniAttackable2.tscn" id="13_u8m1j"]
 [ext_resource type="PackedScene" uid="uid://5rpbdixr224q" path="res://character_beginning.tscn" id="14_begin"]
 [ext_resource type="PackedScene" path="res://game_menu.tscn" id="15_menu"]
 [ext_resource type="PackedScene" uid="uid://k3aff18qvqir" path="res://Enemies/enemy.tscn" id="16_yi2tr"]
@@ -273,14 +275,14 @@ texture = ExtResource("8_xauc6")
 modulate = Color(1, 1, 1, 0.57000005)
 
 [node name="Casoni2" type="Sprite2D" parent="Ambiance/-2/grayening"]
-position = Vector2(160, -46.25)
+position = Vector2(163.00002, -2.7499962)
 scale = Vector2(0.4, 0.4)
 texture = ExtResource("4_qpuyf")
 hframes = 4
 vframes = 3
 
 [node name="Casoni3" type="Sprite2D" parent="Ambiance/-2/grayening"]
-position = Vector2(360, -50.000004)
+position = Vector2(363, -6.5)
 scale = Vector2(0.4, 0.4)
 texture = ExtResource("4_qpuyf")
 hframes = 4
@@ -331,13 +333,6 @@ texture = ExtResource("8_xauc6")
 [node name="grayening" type="Sprite2D" parent="Ambiance/-1"]
 modulate = Color(0.837305, 0.837305, 0.837305, 0.65800005)
 
-[node name="Casoni" type="Sprite2D" parent="Ambiance/-1/grayening"]
-position = Vector2(-635, -46)
-scale = Vector2(0.4, 0.4)
-texture = ExtResource("4_qpuyf")
-hframes = 4
-vframes = 3
-
 [node name="Water" type="Area2D" parent="Ambiance/-1"]
 position = Vector2(-879, 18)
 monitorable = false
@@ -357,6 +352,15 @@ script = ExtResource("10_water")
 position = Vector2(-663.5159, 123.2538)
 scale = Vector2(0.71037185, 0.54616)
 polygon = PackedVector2Array(-986.08105, -234.82828, 2821.7842, -260.4618, 2799.2607, 1151.2126, -1007.1968, 1195.1558)
+
+[node name="CasoniAttackable" parent="Ambiance/-1" instance=ExtResource("12_xsdgt")]
+position = Vector2(-684, -51)
+
+[node name="CasoniAttackable2" parent="Ambiance/-1" instance=ExtResource("13_u8m1j")]
+position = Vector2(992, -37)
+
+[node name="CasoniAttackable3" parent="Ambiance/-1" instance=ExtResource("13_u8m1j")]
+position = Vector2(-500, -29)
 
 [node name="0" type="CanvasLayer" parent="Ambiance"]
 follow_viewport_enabled = true

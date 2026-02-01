@@ -5,7 +5,7 @@ extends Node2D
 # ===========================================
 # Oggetto che reagisce quando il player lo colpisce (Attack_fast / Attack_strong).
 # - ANIMATE: riproduci un'animazione (es. shake sui casoni)
-# - BREAK: riproduci animazione di rottura e poi rimuovi il nodo (es. tombe)
+# - BREAK: riproduci animazione di rottura e resta lì "rotta" (es. croce/tomba)
 
 enum Behavior { ANIMATE_ONLY, BREAK_ON_HIT }
 
@@ -52,14 +52,14 @@ func _play_hit() -> void:
 
 func _play_break() -> void:
 	_broken = true
+	if _hurtbox:
+		_hurtbox.monitoring = false
 	if _anim and break_animation_name and _anim.has_animation(break_animation_name):
-		if _anim.animation_finished.is_connected(_on_break_anim_finished):
-			pass
-		else:
+		if not _anim.animation_finished.is_connected(_on_break_anim_finished):
 			_anim.animation_finished.connect(_on_break_anim_finished)
 		_anim.play(break_animation_name)
-	else:
-		queue_free()
+	# Resta lì rotta: non rimuoviamo il nodo
 
 func _on_break_anim_finished(_anim_name: String) -> void:
-	queue_free()
+	if _anim_name == break_animation_name:
+		_anim.animation_finished.disconnect(_on_break_anim_finished)

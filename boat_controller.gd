@@ -10,6 +10,9 @@ extends RigidBody2D
 @export var water_drag: float = 0.96
 @export var surface_margin: float = 30.0
 
+@export_category("Fish impact")
+@export var fish_impact_recoil: float = 380.0  # Rinculo quando la barca impatta un pesce
+
 @export_category("Interaction")
 @export var interaction_action: StringName = &"interact" # tasto E
 @export var player_exit_offset: Vector2 = Vector2(0, -60)
@@ -34,6 +37,9 @@ func _ready():
 	if ship_moving_scene == null:
 		ship_moving_scene = load("res://ship_movig.tscn") as PackedScene
 	_setup_detection_area()
+	collision_mask |= 128  # Layer 8 = pesci (per rinculo)
+	if not body_entered.is_connected(_on_body_entered):
+		body_entered.connect(_on_body_entered)
 
 func _physics_process(_delta: float):
 	lock_rotation = true
@@ -152,6 +158,14 @@ func _setup_detection_area():
 		area.body_entered.connect(_on_area_body_entered)
 	if not area.body_exited.is_connected(_on_area_body_exited):
 		area.body_exited.connect(_on_area_body_exited)
+
+func _on_body_entered(body: Node2D):
+	if body == null or not body.is_in_group("fish"):
+		return
+	var dir: Vector2 = (global_position - body.global_position).normalized()
+	dir.y = clamp(dir.y, -0.7, 0.3)
+	dir = dir.normalized()
+	apply_central_impulse(dir * fish_impact_recoil)
 
 func _apply_exit_positions():
 	# Eseguito in deferred: barca e player nella posizione esatta della moving ship

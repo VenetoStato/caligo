@@ -514,10 +514,10 @@ func spawn_fish_in_water():
 				min_y = min(min_y, global_point.y)
 				max_y = max(max_y, global_point.y)
 			
-			# Pesci vicini alla parte alta dell'acqua (primi 30% sotto la superficie)
+			# Pesci più in giù (non sul bordo: fascia 20%-65% sotto la superficie)
 			var water_height: float = max_y - min_y
 			var random_x = randf_range(min_x + 20, max_x - 20)
-			var random_y = randf_range(min_y, min_y + water_height * 0.3)
+			var random_y = randf_range(min_y + water_height * 0.2, min_y + water_height * 0.65)
 			fish_pos = Vector2(random_x, random_y)
 		else:
 			# Fallback: spawna vicino al player

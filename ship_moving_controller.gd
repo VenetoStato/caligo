@@ -14,6 +14,9 @@ extends RigidBody2D
 @export var water_drag: float = 0.96
 @export var surface_margin: float = 30.0
 
+@export_category("Fish impact")
+@export var fish_impact_recoil: float = 420.0  # Rinculo quando la barca impatta un pesce
+
 @export_category("Interaction")
 @export var interaction_action: StringName = &"interact"
 
@@ -36,6 +39,17 @@ func _ready():
 	if spr != null:
 		spr.z_index = 0
 	_water_particles = get_node_or_null("WaterParticles") as CPUParticles2D
+	collision_mask |= 128  # Layer 8 = pesci (per rinculo)
+	if not body_entered.is_connected(_on_body_entered):
+		body_entered.connect(_on_body_entered)
+
+func _on_body_entered(body: Node2D):
+	if body == null or not body.is_in_group("fish"):
+		return
+	var dir: Vector2 = (global_position - body.global_position).normalized()
+	dir.y = clamp(dir.y, -0.7, 0.3)
+	dir = dir.normalized()
+	apply_central_impulse(dir * fish_impact_recoil)
 
 func setup(player: Node2D, boat_still: Node):
 	_player = player

@@ -20,8 +20,10 @@ extends RigidBody2D
 @export var swim_bounds_y: float = 60.0
 ## Offset della casa rispetto allo spawn (Y negativo = più su)
 @export var home_offset: Vector2 = Vector2(0, -50)
-## Quanto possono stare sotto la superficie (pesci vicini alla parte alta dell'acqua)
+## Quanto possono stare sotto la superficie (limite massimo in profondità)
 @export var max_depth_from_top: float = 180.0
+## Distanza minima dalla superficie: i pesci restano più in giù, non sul bordo (px sotto superficie)
+@export var min_depth_from_top: float = 45.0
 
 @export_category("Physics")
 @export var swim_response: float = 3.0
@@ -101,6 +103,8 @@ func _ready():
 	gravity_scale = 0.0  # I pesci non cadono, nuotano
 	# Nessuna risposta fisica alle collisioni: evita tremolio/glitch quando toccano qualcosa
 	collision_mask = 0
+	# Layer 8 (bit 128): la barca può rilevarci per il rinculo quando ci impatta
+	collision_layer = 128
 
 	spawn_position = global_position
 	home_position = global_position + home_offset
@@ -498,13 +502,17 @@ func _keep_near_top():
 	var water_surface_y = water_area.global_position.y + water_area.target_height
 	var current_depth_from_surface: float = global_position.y - water_surface_y
 	
-	# Troppo in basso: spingi verso l'alto (resta nella fascia alta)
+	# Troppo in basso: spingi verso l'alto (resta entro la fascia)
 	if current_depth_from_surface > max_depth_from_top:
 		var push_up: float = (current_depth_from_surface - max_depth_from_top) * 2.0
 		velocity.y -= push_up
 	elif current_depth_from_surface < -15.0:
-		# Sopra la superficie: spingi leggermente verso il basso
+		# Sopra la superficie: spingi verso il basso
 		velocity.y += 1.5
+	elif current_depth_from_surface < min_depth_from_top:
+		# Troppo sul bordo: spingi più in giù (non restare troppo in superficie)
+		var push_down: float = (min_depth_from_top - current_depth_from_surface) * 1.2
+		velocity.y += push_down
 
 func _find_water_area():
 	var water_nodes = get_tree().get_nodes_in_group("water")
