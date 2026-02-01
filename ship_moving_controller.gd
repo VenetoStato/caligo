@@ -111,14 +111,19 @@ func _update_water_particles():
 	if _water_particles == null:
 		return
 	var speed = linear_velocity.length()
-	if speed > 6.0:
+	if speed > 5.0:
 		_water_particles.emitting = true
-		# Direzione particelle: dietro la barca (opposta al movimento)
+		# Particelle dietro la barca: direzione opposta al movimento
 		var dir = -linear_velocity.normalized()
 		_water_particles.direction = dir if dir.length() > 0.1 else Vector2.LEFT
-		_water_particles.spread = 45.0
-		_water_particles.initial_velocity_min = speed * 0.15
-		_water_particles.initial_velocity_max = speed * 0.35
+		_water_particles.spread = 65.0
+		_water_particles.initial_velocity_min = speed * 0.25
+		_water_particles.initial_velocity_max = speed * 0.55
+		# Punto di emissione dietro la barca (non davanti)
+		var behind_offset: float = 28.0
+		_water_particles.position.x = -sign(linear_velocity.x) * behind_offset if abs(linear_velocity.x) > 1.0 else -behind_offset
+		_water_particles.position.y = 14.0
+		_water_particles.z_index = -2
 	else:
 		_water_particles.emitting = false
 
