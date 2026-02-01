@@ -142,6 +142,7 @@ var facing_right: bool = true
 # Water
 var is_in_water: bool = false
 var water_gravity_multiplier: float = 1.0
+@export var water_buoyancy_force: float = 520.0  # forza verso l'alto quando in acqua (galleggiamento)
 
 # Health & Death
 var current_health: int = 5
@@ -456,6 +457,8 @@ func _physics_process(delta: float):
 		return
 	
 	_apply_gravity(delta)
+	if is_in_water:
+		velocity.y -= water_buoyancy_force * delta
 	# Durante il rinculo non applicare movimento orizzontale da input
 	if _knockback_timer > 0.0:
 		_knockback_timer -= delta

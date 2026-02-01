@@ -40,6 +40,11 @@ var _fish_variant_paths: PackedStringArray = [
 ]
 
 func _ready():
+	# Player e altri corpi da rilevare: layer 2 = player, layer 1 = eventuali altri
+	# Assicurati che l'acqua rilevi il player (CharacterBody2D su layer 2)
+	collision_mask |= 2
+	monitoring = true
+
 	# Trova CollisionPolygon2D
 	collision_polygon = get_node_or_null("CollisionPolygon2D")
 	if collision_polygon == null:
@@ -493,9 +498,10 @@ func spawn_fish_in_water():
 				min_y = min(min_y, global_point.y)
 				max_y = max(max_y, global_point.y)
 			
-			# Spawna in tutta la colonna d'acqua (10%–90% altezza), non tutti sul fondale
+			# Pesci vicini alla parte alta dell'acqua (primi 30% sotto la superficie)
+			var water_height: float = max_y - min_y
 			var random_x = randf_range(min_x + 20, max_x - 20)
-			var random_y = randf_range(min_y + (max_y - min_y) * 0.1, min_y + (max_y - min_y) * 0.9)
+			var random_y = randf_range(min_y, min_y + water_height * 0.3)
 			fish_pos = Vector2(random_x, random_y)
 		else:
 			# Fallback: spawna vicino al player

@@ -7,9 +7,9 @@ extends RigidBody2D
 # invece di sparire
 
 @export_category("Movement")
-@export var natural_swim_speed: float = 30.0
+@export var natural_swim_speed: float = 58.0
 @export var attraction_speed: float = 60.0
-@export var swim_change_interval: float = 2.0
+@export var swim_change_interval: float = 1.2
 @export var escape_speed: float = 120.0
 @export var escape_duration: float = 2.0
 
@@ -20,8 +20,8 @@ extends RigidBody2D
 @export var swim_bounds_y: float = 60.0
 ## Offset della casa rispetto allo spawn (Y negativo = più su)
 @export var home_offset: Vector2 = Vector2(0, -50)
-## Quanto possono stare sopra il fondale (più alto = nuotano più in alto nella colonna d'acqua)
-@export var max_depth_from_bottom: float = 200.0
+## Quanto possono stare sotto la superficie (pesci vicini alla parte alta dell'acqua)
+@export var max_depth_from_top: float = 180.0
 
 @export_category("Physics")
 @export var swim_response: float = 3.0
@@ -190,8 +190,8 @@ func _physics_process(delta: float):
 	_update_sprite_direction()
 	_update_sprite_color()
 	
-	# Mantieni i pesci vicini al fondale
-	_keep_near_bottom()
+	# Mantieni i pesci vicini alla parte alta dell'acqua
+	_keep_near_top()
 
 func _process_swimming(delta: float):
 	var desired = Vector2.ZERO
@@ -481,31 +481,26 @@ func is_available_for_hook() -> bool:
 	return not is_hooked_to_player and not is_escaping and hook_cooldown <= 0
 
 # ===========================================
-# FONDALE - Mantieni i pesci vicini al fondale
+# ZONA NUOTO - Mantieni i pesci vicini alla parte alta dell'acqua
 # ===========================================
-func _keep_near_bottom():
+func _keep_near_top():
 	if not in_water:
 		return
 	
-	# Trova l'acqua più vicina
 	var water_area = _find_water_area()
 	if water_area == null:
 		return
 	
-	# Ottieni la profondità dell'acqua
-	# target_height è relativo alla posizione locale dell'Area2D
 	var water_surface_y = water_area.global_position.y + water_area.target_height
-	var water_bottom = water_surface_y + water_area.depth
-	var current_depth_from_bottom = water_bottom - global_position.y
+	var current_depth_from_surface: float = global_position.y - water_surface_y
 	
-	# Zona comoda: tra 30% e 150% di max_depth dal fondale (così nuotano anche più in alto)
-	if current_depth_from_bottom > max_depth_from_bottom * 1.5:
-		var push_down = (current_depth_from_bottom - max_depth_from_bottom * 1.5) * 2.0
-		velocity.y += push_down
-	elif current_depth_from_bottom < max_depth_from_bottom * 0.3:
-		# Troppo vicino al fondale: spingi leggermente verso l'alto
-		var push_up = (max_depth_from_bottom * 0.3 - current_depth_from_bottom) * 2.0
+	# Troppo in basso: spingi verso l'alto (resta nella fascia alta)
+	if current_depth_from_surface > max_depth_from_top:
+		var push_up: float = (current_depth_from_surface - max_depth_from_top) * 2.0
 		velocity.y -= push_up
+	elif current_depth_from_surface < -15.0:
+		# Sopra la superficie: spingi leggermente verso il basso
+		velocity.y += 1.5
 
 func _find_water_area():
 	var water_nodes = get_tree().get_nodes_in_group("water")

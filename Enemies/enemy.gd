@@ -40,6 +40,8 @@ var facing_right: bool = true
 var _attack_hitbox_disable_timer: float = 0.0
 var _knockback_timer: float = 0.0
 var _hit_flash_timer: float = 0.0
+var _flip_cooldown: float = 0.0
+const FLIP_MIN_INTERVAL: float = 1.0 / 50.0  # ~50 fps minimo tra un flip e l'altro
 
 var _hurtbox: Area2D = null
 var _attack_hitbox: Area2D = null
@@ -107,16 +109,20 @@ func _physics_process(delta: float) -> void:
 	var dir_x: float = sign(to_player.x)
 	velocity.x = dir_x * move_speed
 
-	# Flip verso il player e posiziona AttackHitbox
-	if dir_x != 0:
-		facing_right = dir_x > 0
-		if sprite_node:
-			if "flip_h" in sprite_node:
-				sprite_node.flip_h = !facing_right
-			elif sprite_node is Sprite2D:
-				sprite_node.flip_h = !facing_right
-		if _attack_hitbox:
-			_attack_hitbox.position.x = 20 if facing_right else -20
+	# Flip verso il player solo ogni ~50 fps (evita cambio sprite ad ogni frame)
+	_flip_cooldown -= delta
+	if dir_x != 0 and _flip_cooldown <= 0.0:
+		var new_facing: bool = dir_x > 0
+		if new_facing != facing_right:
+			facing_right = new_facing
+			_flip_cooldown = FLIP_MIN_INTERVAL
+			if sprite_node:
+				if "flip_h" in sprite_node:
+					sprite_node.flip_h = !facing_right
+				elif sprite_node is Sprite2D:
+					sprite_node.flip_h = !facing_right
+			if _attack_hitbox:
+				_attack_hitbox.position.x = 20 if facing_right else -20
 
 	# Gravità e salto periodico
 	velocity.y += gravity * delta
