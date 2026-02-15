@@ -41,6 +41,10 @@ func _on_hurtbox_area_entered(area: Area2D) -> void:
 func _on_hit() -> void:
 	if _broken:
 		return
+	# Colpetto camera quando colpisci o rompi qualcosa
+	var cam = get_tree().get_first_node_in_group("camera")
+	if cam and cam.has_method("add_shake"):
+		cam.add_shake(0.36)
 	if behavior == Behavior.ANIMATE_ONLY:
 		_play_hit()
 	elif behavior == Behavior.BREAK_ON_HIT:

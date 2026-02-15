@@ -33,6 +33,11 @@ extends Camera2D
 var _target: Node2D
 var _look_vec: Vector2 = Vector2.ZERO
 
+# Screen shake (trauma-based: 0..1, decay per frame)
+var _shake_trauma: float = 0.0
+@export var shake_decay: float = 1.8
+@export var shake_max_offset: float = 28.0
+
 # Smooth al passaggio target (es. character_beginning -> Player): per N frame usa follow più lento
 var _smooth_attach_frames: int = 0
 const _smooth_attach_follow_speed: float = 1.8  # più basso = transizione più morbida (evita scatto)
@@ -51,7 +56,12 @@ func _ready() -> void:
 		push_error("Camera: target not found. Set target_path or parent the camera under the player.")
 		return
 
+	add_to_group("camera")
 	# We control smoothing manually
+
+## Chiama per far tremare lo schermo. intensity 0..1 (es. 0.15 = leggero, 0.4 = forte)
+func add_shake(intensity: float = 0.2) -> void:
+	_shake_trauma = min(1.0, _shake_trauma + intensity)
 
 func set_camera_target(node: Node2D, smooth_attach_frames: int = 0):
 	"""Imposta il target da seguire (es. quando passi dalla barca o character_beginning -> Player).
@@ -156,6 +166,15 @@ func _process(delta: float) -> void:
 			effective_speed *= 0.5
 	var t := 1.0 - exp(-effective_speed * delta)
 	global_position = global_position.lerp(desired_cam, t)
+	
+	# --- Screen shake ---
+	_shake_trauma = max(0.0, _shake_trauma - shake_decay * delta)
+	if _shake_trauma > 0.001:
+		var trauma2 = _shake_trauma * _shake_trauma
+		var shake_offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * shake_max_offset * trauma2
+		offset = shake_offset
+	else:
+		offset = Vector2.ZERO
 
 	# --- Room clamp (optional) ---
 	if use_room_limits:

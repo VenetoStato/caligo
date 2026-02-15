@@ -7,11 +7,11 @@ extends RigidBody2D
 # invece di sparire
 
 @export_category("Movement")
-@export var natural_swim_speed: float = 58.0
-@export var attraction_speed: float = 60.0
-@export var swim_change_interval: float = 1.2
-@export var escape_speed: float = 52.0
-@export var escape_duration: float = 2.5
+@export var natural_swim_speed: float = 85.0
+@export var attraction_speed: float = 72.0
+@export var swim_change_interval: float = 0.9
+@export var escape_speed: float = 65.0
+@export var escape_duration: float = 2.2
 
 @export_category("Swim Area")
 ## Area di nuoto orizzontale attorno alla casa
@@ -22,8 +22,8 @@ extends RigidBody2D
 @export var home_offset: Vector2 = Vector2(0, -50)
 ## Quanto possono stare sotto la superficie (limite massimo in profondità)
 @export var max_depth_from_top: float = 180.0
-## Distanza minima dalla superficie: i pesci restano più in giù, non sul bordo (px sotto superficie)
-@export var min_depth_from_top: float = 45.0
+## Distanza minima dalla superficie: i pesci restano più in giù, lontani dal bordo (px sotto superficie)
+@export var min_depth_from_top: float = 70.0
 ## Raggio della "reel zone": vicino al player il pesce ignora limiti acqua e viene solo reelato / può uscire
 @export var reel_zone_radius: float = 100.0
 ## Sotto questa profondità dalla superficie il pesce è "vicino al bordo" e può uscire (salto)
@@ -35,11 +35,11 @@ extends RigidBody2D
 @export var boundary_push: float = 80.0
 
 @export_category("Struggle")
-@export var struggle_strength: float = 200.0
-@export var struggle_duration: float = 1.2
-@export var reel_resistance: float = 0.58
+@export var struggle_strength: float = 320.0
+@export var struggle_duration: float = 1.5
+@export var reel_resistance: float = 0.78
 ## Resistenza costante verso l'amo quando agganciato (nuota via)
-@export var hooked_resist_strength: float = 20.0
+@export var hooked_resist_strength: float = 48.0
 ## Velocità max quando agganciato (evita tremolio)
 @export var hooked_max_speed: float = 58.0
 ## Damping più forte quando agganciato (movimento più fluido)
@@ -104,7 +104,9 @@ var _variant_sprite: bool = false
 var _wrong_reel: bool = false
 # Riferimento al water body per restare nei limiti dell'acqua
 var _water_body: Node = null
-const WATER_BOUNDS_MARGIN: float = 18.0
+## Margine dai bordi: i pesci restano distanti dai bordi dell'acqua
+const WATER_BOUNDS_MARGIN: float = 38.0
+var _breath_timer: float = 0.0
 
 func _ready():
 	add_to_group("fish")
@@ -214,6 +216,7 @@ func _physics_process(delta: float):
 	linear_velocity = velocity
 	_update_sprite_direction()
 	_update_sprite_color()
+	_update_breathing(delta)
 	
 	# Mantieni i pesci vicini alla parte alta dell'acqua (in reel zone non spingiamo giù)
 	_keep_near_top()
@@ -255,7 +258,9 @@ func _process_swimming(delta: float):
 
 		if global_position.distance_to(attraction_target) < 30.0:
 			is_attracted = false
-			_try_hook_to_player()
+			# Hook solo con l'amo vero (fishing hook RigidBody2D), non con la pastura
+			if target_hook is RigidBody2D and target_hook.has_method("get_hook_type") and str(target_hook.call("get_hook_type")) == "fishing":
+				_try_hook_to_player()
 
 	else:
 		# Nuoto normale (movimento libero)
@@ -389,6 +394,18 @@ func _update_sprite_direction():
 		sprite.scale.x = flip_left
 		_flip_cooldown = FLIP_COOLDOWN_TIME
 
+func _update_breathing(delta: float):
+	if sprite == null:
+		return
+	_breath_timer += delta
+	var t = sin(_breath_timer * 2.6)
+	var breath_y = 1.0 + 0.05 * t
+	var breath_x = 1.0 - 0.1 * t
+	var base = abs(sprite.scale.x)
+	var sign_x = 1.0 if sprite.scale.x >= 0 else -1.0
+	sprite.scale.x = sign_x * base * breath_x
+	sprite.scale.y = base * breath_y
+
 func _update_sprite_color():
 	if sprite == null:
 		return
@@ -475,7 +492,7 @@ func _on_hook_detected(hook: Node):
 func release_from_hook():
 	print("🐟 Pesce liberato! Scappa via...")
 	
-	# Direzione di fuga PRIMA di azzerare i ref (così resta in acqua e nuota via piano)
+	# Direzione di fuga PRIMA di azzerare i ref
 	var player_pos: Vector2 = global_position
 	if player_ref != null and is_instance_valid(player_ref):
 		player_pos = player_ref.global_position
@@ -488,7 +505,6 @@ func release_from_hook():
 	player_ref = null
 	target_hook = null
 	
-	# Inizia la fuga (resta in acqua, non sparire e non partire in quarta)
 	is_escaping = true
 	escape_timer = escape_duration
 	
@@ -500,10 +516,22 @@ func release_from_hook():
 	
 	escape_direction = escape_direction.normalized()
 	
+	# IMPORTANTE: se fuori dall'acqua (reeled out) → riposiziona in acqua e nuota via, NON cadere
+	if _water_body != null and is_instance_valid(_water_body) and _water_body.has_method("get_water_bounds_global_rect"):
+		var r: Rect2 = _water_body.call("get_water_bounds_global_rect")
+		var p := global_position
+		if p.y < r.position.y or p.x < r.position.x or p.x > r.position.x + r.size.x or p.y > r.position.y + r.size.y:
+			# Pesce fuori acqua: teleporta appena sotto superficie e nuota via
+			p.x = clampf(p.x, r.position.x + WATER_BOUNDS_MARGIN, r.position.x + r.size.x - WATER_BOUNDS_MARGIN)
+			p.y = clampf(p.y, r.position.y + WATER_BOUNDS_MARGIN, r.position.y + r.size.y - WATER_BOUNDS_MARGIN)
+			global_position = p
+		in_water = true
+	else:
+		in_water = true  # Default: assumi in acqua per evitare caduta
+	
 	hook_cooldown = hook_cooldown_time
 	
-	# Spinta iniziale moderata: nuota via piano, non schizza
-	velocity = escape_direction * escape_speed * 0.45
+	velocity = escape_direction * escape_speed * 0.5
 
 # ===========================================
 # API

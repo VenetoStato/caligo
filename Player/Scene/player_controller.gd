@@ -52,8 +52,8 @@ extends CharacterBody2D
 
 @export_category("Line Tuning")
 @export var line_out_speed: float = 900.0
-@export var reel_in_speed: float = 240.0
-@export var reel_pull_force: float = 550.0
+@export var reel_in_speed: float = 175.0
+@export var reel_pull_force: float = 420.0
 @export var min_line_length_start: float = 40.0
 @export var spawn_forward_push: float = 18.0
 @export var min_forward_aim_dot: float = 0.15
@@ -82,12 +82,16 @@ extends CharacterBody2D
 @export var move_particle_interval: float = 0.03
 
 @export_category("Fish Struggle")
-@export var fish_struggle_interval: float = 3.0
-@export var fish_escape_time: float = 3.0
-@export var fish_struggle_phase_duration: float = 1.8
+@export var fish_struggle_interval: float = 1.2
+@export var fish_escape_time: float = 1.9
+@export var fish_struggle_phase_duration: float = 2.6
+## Stress della lenza oltre cui il pesce si libera (1.0 = rossa piena). Se la lenza diventa troppo rossa durante la lotta, il pesce scappa
+@export var stress_escape_threshold: float = 0.82
+## Durata del "trascinamento" per ogni click di R (più basso = meno pull per click = serve più click)
+@export var reel_pulse_duration: float = 0.08
 @export var fish_reel_distance: float = 30.0
 @export var fish_catch_jump_distance: float = 50.0
-@export var fish_pull_strength: float = 220.0
+@export var fish_pull_strength: float = 270.0
 
 @export_category("Health")
 @export var max_health: int = 5
@@ -100,6 +104,19 @@ extends CharacterBody2D
 @export var health_dot_size: float = 6.0
 @export var health_dot_spacing: float = 14.0
 @export var health_display_time: float = 3.0
+
+@export_category("Cast UI")
+## Barra di caricamento del lancio (visibile mentre tieni premuto F)
+@export var cast_bar_offset: Vector2 = Vector2(0, -55)
+@export var cast_bar_width: float = 60.0
+@export var cast_bar_height: float = 6.0
+@export var cast_bar_color: Color = Color(0.2, 0.7, 0.9, 0.9)
+@export var cast_bar_bg_color: Color = Color(0.1, 0.1, 0.15, 0.7)
+## Indicatore direzione di mira (freccia che mostra dove lancerai)
+@export var direction_indicator_length: float = 85.0
+@export var direction_indicator_color: Color = Color(0.95, 0.88, 0.35, 0.95)
+@export var direction_indicator_outline_color: Color = Color(0.15, 0.12, 0.05, 0.9)
+@export var direction_indicator_line_width: float = 3.0
 
 @export_category("Death & Respawn")
 ## Gruppo dei nodi usati come checkpoint/spawn point
@@ -192,6 +209,9 @@ var _effective_tension: float = 0.85
 var _rope_initialized: bool = false
 var _current_line_stress: float = 0.0
 var _line_color_lerp_speed: float = 5.0
+var reel_pulse_timer: float = 0.0
+var _breath_timer: float = 0.0
+var _breath_base_scale: Vector2 = Vector2.ONE
 var move_particle_timer: float = 0.0
 
 func _ready():
@@ -223,6 +243,8 @@ func _setup_sprite():
 		sprite_node = get_node_or_null("Sprite2D")
 		if sprite_node == null:
 			sprite_node = get_node_or_null("Sprite")
+	if sprite_node:
+		_breath_base_scale = sprite_node.scale
 
 func _setup_fishing_line():
 	var p = get_parent()
@@ -300,18 +322,20 @@ func _disable_attack_hitbox():
 		_attack_hitbox.monitoring = false
 
 func _on_attack_hitbox_area_entered(area: Area2D) -> void:
-	# Solo quando stiamo attaccando: la nostra area tocca la Hurtbox del nemico → danno (1 o 2)
 	var parent: Node = area.get_parent()
 	if parent.is_in_group("enemy") and parent not in _attack_hit_enemies:
 		_attack_hit_enemies.append(parent)
 		if parent.has_method("take_damage"):
 			parent.take_damage(_current_attack_damage, global_position)
+		_request_shake(0.38)
+	elif parent.has_method("_on_hit"):
+		_request_shake(0.35)
 
 func _on_attack_hitbox_body_entered(body: Node2D) -> void:
-	# Colpire il dead gamberetto: rinculo forte a parabola (molto verso l'alto)
 	if body.is_in_group("dead_enemy") and body is RigidBody2D:
+		_request_shake(0.28)
 		var dir: Vector2 = (body.global_position - global_position).normalized()
-		dir.y = min(dir.y, -0.55)  # componente verso l'alto per parabola
+		dir.y = min(dir.y, -0.55)
 		dir = dir.normalized()
 		body.apply_central_impulse(dir * 520.0)
 		body.apply_torque_impulse(sign(dir.x) * 220.0)
@@ -375,12 +399,28 @@ func _on_anim_finished(anim_name: String):
 		_attack_hit_enemies.clear()
 
 # ===========================================
+# SCREEN SHAKE
+# ===========================================
+func _request_shake(intensity: float):
+	var cam = get_tree().get_first_node_in_group("camera")
+	if cam and cam.has_method("add_shake"):
+		cam.add_shake(intensity)
+
+# ===========================================
 # HEALTH UI
 # ===========================================
 func _show_health_ui():
 	_health_visible = true
 	_health_visible_timer = health_display_time
 	_health_alpha = 1.0
+
+func _update_breathing(delta: float):
+	if sprite_node and not is_dead:
+		_breath_timer += delta
+		var t = sin(_breath_timer * 2.4)
+		var breath_y = 1.0 + 0.09 * t
+		var breath_x = 1.0 - 0.025 * t
+		sprite_node.scale = Vector2(_breath_base_scale.x * breath_x, _breath_base_scale.y * breath_y)
 
 func _update_health_visibility(delta: float):
 	if _health_visible:
@@ -394,6 +434,11 @@ func _update_health_visibility(delta: float):
 			_health_alpha = 0.0
 
 func _draw():
+	# Barra di caricamento del lancio (visibile mentre tieni premuto F o Grab)
+	if is_charging:
+		_draw_cast_charge_bar()
+		_draw_cast_direction_indicator()
+	
 	if _health_alpha <= 0.01:
 		return
 	
@@ -422,6 +467,49 @@ func _draw():
 		if is_full:
 			var highlight = Color(1, 1, 1, 0.3 * _health_alpha)
 			draw_circle(pos + Vector2(-rad * 0.25, -rad * 0.25), rad * 0.25, highlight)
+
+# ===========================================
+# CAST UI (barra caricamento + direzione)
+# ===========================================
+func _draw_cast_charge_bar():
+	var progress = clamp(current_charge_time / max_charge_time, 0.0, 1.0)
+	var half_w = cast_bar_width / 2.0
+	var pos = cast_bar_offset
+	# Sfondo
+	draw_rect(Rect2(pos.x - half_w, pos.y - cast_bar_height / 2, cast_bar_width, cast_bar_height), cast_bar_bg_color)
+	draw_rect(Rect2(pos.x - half_w + 1, pos.y - cast_bar_height / 2 + 1, cast_bar_width - 2, cast_bar_height - 2), cast_bar_bg_color.darkened(0.2))
+	# Riempimento
+	var fill_w = (cast_bar_width - 4) * progress
+	if fill_w > 1.0:
+		draw_rect(Rect2(pos.x - half_w + 2, pos.y - cast_bar_height / 2 + 2, fill_w, cast_bar_height - 4), cast_bar_color)
+
+func _draw_cast_direction_indicator():
+	var rod_local = base_axis_offset + (line_origin_offset_right if facing_right else line_origin_offset_left) + (rod_tip_offset_right if facing_right else rod_tip_offset_left)
+	var dir = get_cast_direction()
+	var shaft_end = rod_local + dir * (direction_indicator_length - 22.0)
+	var end = rod_local + dir * direction_indicator_length
+	var perp = Vector2(-dir.y, dir.x)
+	var w = direction_indicator_line_width * 0.5
+	# Linea principale con contorno
+	draw_line(rod_local - perp * (w + 1.0), shaft_end - perp * (w + 1.0), direction_indicator_outline_color)
+	draw_line(rod_local + perp * (w + 1.0), shaft_end + perp * (w + 1.0), direction_indicator_outline_color)
+	draw_line(rod_local, shaft_end, direction_indicator_color)
+	draw_line(rod_local - perp * w, shaft_end - perp * w, direction_indicator_color)
+	draw_line(rod_local + perp * w, shaft_end + perp * w, direction_indicator_color)
+	# Freccetta (triangolo pieno con bordo)
+	var arrow_len = 22.0
+	var arrow_w = 16.0
+	var tip = end
+	var base_center = end - dir * arrow_len
+	var p1 = base_center + perp * arrow_w * 0.5
+	var p2 = base_center - perp * arrow_w * 0.5
+	var arrow_pts: PackedVector2Array = [tip, p1, p2]
+	draw_colored_polygon(arrow_pts, direction_indicator_outline_color)
+	var tip_in = end - dir * 3.0
+	var p1_in = base_center + perp * arrow_w * 0.32
+	var p2_in = base_center - perp * arrow_w * 0.32
+	var arrow_inner: PackedVector2Array = [tip_in, p1_in, p2_in]
+	draw_colored_polygon(arrow_inner, direction_indicator_color)
 
 func _input(event):
 	# Ignora input se morto
@@ -463,11 +551,17 @@ func _input(event):
 	
 	if event.is_action_pressed("reel"):
 		if line_extended and hook_instance:
-			# Non fermare la lotta: tirare durante la lotta = lenza e pesce rossi, poi il pesce scappa
-			is_reeling = true
+			if fish_hooked:
+				# Pesca: click per trascinare (non tenere premuto). Ogni click = breve impulso di reel
+				reel_pulse_timer = reel_pulse_duration
+				_request_shake(0.22)
+			else:
+				# Grab: tenere premuto per riavvolgere
+				is_reeling = true
 	
 	if event.is_action_released("reel"):
-		is_reeling = false
+		if not fish_hooked:
+			is_reeling = false
 
 func _physics_process(delta: float):
 	# Non processare se morto
@@ -479,6 +573,7 @@ func _physics_process(delta: float):
 	_update_invincibility(delta)
 	_update_health_anims(delta)
 	_update_health_visibility(delta)
+	_update_breathing(delta)
 	
 	if _process_dash(delta):
 		return
@@ -742,6 +837,7 @@ func take_damage(amount: int = 1, source_position: Vector2 = Vector2.ZERO):
 	invincibility_timer = invincibility_time
 	blink_timer = 0.0
 	
+	_request_shake(0.42)
 	print("💔 Danno! Vita: ", current_health)
 	
 	if current_health <= 0:
@@ -793,15 +889,15 @@ func _on_death():
 func _run_death_then_reload_scene():
 	# Morte → particelle → fade out → reload scena (mondo resetta, riparti dall'inizio)
 	_spawn_death_particles()
-	Engine.time_scale = 0.25
-	await get_tree().create_timer(0.15).timeout
+	Engine.time_scale = 0.2
+	await get_tree().create_timer(0.35).timeout
 	Engine.time_scale = 1.0
 	var fade_rect = _get_or_create_fade_rect()
 	if fade_rect:
 		var tween = create_tween()
-		tween.tween_property(fade_rect, "color:a", 1.0, 0.6)
+		tween.tween_property(fade_rect, "color:a", 1.0, 1.0)
 		await tween.finished
-	await get_tree().create_timer(0.2).timeout
+	await get_tree().create_timer(0.4).timeout
 	# Reload scena: tutto torna com'era all'inizio (character_beginning + player dopo intro)
 	var tree := get_tree()
 	var path: String = reload_scene_path
@@ -820,16 +916,16 @@ func _simple_death_sequence(respawn_pos: Vector2):
 	# Spawn particelle di morte
 	_spawn_death_particles()
 	
-	# Slow-mo breve
-	Engine.time_scale = 0.2
-	await get_tree().create_timer(0.1).timeout  # 0.5 * 0.2 = 0.1 real time
+	# Slow-mo death cam (più lungo)
+	Engine.time_scale = 0.18
+	await get_tree().create_timer(0.25).timeout
 	Engine.time_scale = 1.0
 	
 	# Fade out
 	var fade_rect = _get_or_create_fade_rect()
 	if fade_rect:
 		var tween = create_tween()
-		tween.tween_property(fade_rect, "color:a", 1.0, 0.5)
+		tween.tween_property(fade_rect, "color:a", 1.0, 0.9)
 		await tween.finished
 	
 	# Respawn
@@ -837,12 +933,12 @@ func _simple_death_sequence(respawn_pos: Vector2):
 	_on_respawn()
 	
 	# Pausa al nero
-	await get_tree().create_timer(0.3).timeout
+	await get_tree().create_timer(0.5).timeout
 	
 	# Fade in
 	if fade_rect:
 		var tween = create_tween()
-		tween.tween_property(fade_rect, "color:a", 0.0, 0.8)
+		tween.tween_property(fade_rect, "color:a", 0.0, 1.0)
 		await tween.finished
 
 func _get_or_create_fade_rect() -> ColorRect:
@@ -1025,7 +1121,13 @@ func detach_grab_anchor():
 # CAST
 # ===========================================
 func cast_hook_charged():
-	var scene = fishing_hook_scene if using_fishing_hook and fishing_hook_scene else hook_scene
+	# C = toggle PESCA ↔ HOOK TRASCINO. F lancia il tipo selezionato.
+	# PESCA (using_fishing_hook=true) → fishing hook | TRASCINO (false) → grab hook
+	var scene: PackedScene
+	if line_mode == LineMode.GRAB:
+		scene = hook_scene
+	else:
+		scene = fishing_hook_scene if using_fishing_hook and fishing_hook_scene else hook_scene
 	if scene == null:
 		return
 	var power = clamp(current_charge_time / max_charge_time, min_cast_power, 1.0)
@@ -1089,6 +1191,13 @@ func _update_effective_tension():
 	_effective_tension = clamp(_effective_tension, 0.0, 1.0)
 
 func _process_fishing(delta: float):
+	# Pesca: reel a click (pulse) invece di hold
+	if fish_hooked:
+		if reel_pulse_timer > 0:
+			reel_pulse_timer -= delta
+			is_reeling = reel_pulse_timer > 0
+		else:
+			is_reeling = false
 	if fish_hooked and current_fish:
 		_update_fish_struggle(delta)
 	if line_extended and hook_instance:
@@ -1141,6 +1250,9 @@ func _update_line_color(delta: float):
 	_current_line_stress = lerp(_current_line_stress, stress, delta * _line_color_lerp_speed)
 	fishing_line.default_color = fishing_line.default_color.lerp(col, delta * _line_color_lerp_speed)
 	fishing_line.width = lerp(2.0, 4.0, _current_line_stress)
+	# Se la lenza diventa troppo rossa durante la lotta, il pesce si libera
+	if fish_hooked and fish_struggle_active and _current_line_stress >= stress_escape_threshold:
+		_on_fish_escaped()
 
 func _get_stress_color(stress: float) -> Color:
 	if stress < 0.5:
@@ -1297,8 +1409,8 @@ func _update_fish_struggle(delta: float):
 			current_fish.call("start_struggle")
 	if fish_struggle_active:
 		if is_reeling:
-			# Tirare durante la lotta = sbagliato ma molto graduale: se tiri imperterrito il pesce scappa, ma non subito
-			fish_escape_timer += delta * 0.35
+			# Tirare durante la lotta = sbagliato: il pesce scappa più velocemente se tiri
+			fish_escape_timer += delta * 0.6
 			if fish_escape_timer >= fish_escape_time:
 				_on_fish_escaped()
 		else:
@@ -1307,7 +1419,7 @@ func _update_fish_struggle(delta: float):
 			if fish_struggle_phase_timer >= fish_struggle_phase_duration:
 				_stop_fish_struggle()
 			else:
-				fish_escape_timer += delta * 0.3
+				fish_escape_timer += delta * 0.5
 				if current_fish.has_method("apply_struggle_force"):
 					var rod = get_rod_tip_position()
 					var fp = get_fish_center_position(current_fish)
@@ -1337,6 +1449,8 @@ func _on_fish_lost(_escaped: bool):
 	fish_escape_timer = 0.0
 	fish_struggle_phase_timer = 0.0
 	fish_struggle_timer = 0.0
+	reel_pulse_timer = 0.0
+	is_reeling = false
 	_update_effective_tension()
 	if hook_instance and is_instance_valid(hook_instance):
 		if hook_instance.has_method("set_hooked_fish"):
