@@ -15,8 +15,8 @@ static var instance: TransitionManager
 @export var fade_color: Color = Color(0, 0, 0, 1)
 @export var fade_in_duration: float = 1.0
 @export var fade_out_duration: float = 0.8
-@export var death_freeze_time: float = 0.5
-@export var death_fade_delay: float = 0.3
+@export var death_freeze_time: float = 1.4
+@export var death_fade_delay: float = 0.5
 
 @export_category("Death Particles")
 @export var death_particle_scene: PackedScene
@@ -151,8 +151,8 @@ func play_death_sequence(player: Node2D, respawn_pos: Vector2) -> void:
 	if player.has_method("_on_respawn"):
 		player.call("_on_respawn")
 	
-	# 9. Breve pausa al nero
-	await get_tree().create_timer(0.3).timeout
+	# 9. Pausa al nero (death cam più lunga)
+	await get_tree().create_timer(0.5).timeout
 	
 	# 10. Fade in
 	await fade_in()

@@ -15,7 +15,8 @@ extends CharacterBody2D
 @export var max_health: int = 6
 
 @export_category("Aggro")
-@export var jump_interval: float = 1.2  # secondi tra un salto e l'altro in aggro
+@export var aggro_range: float = 140.0   # distanza: se il player si avvicina entro questo range, diventa aggressivo
+@export var jump_interval: float = 1.2   # secondi tra un salto e l'altro in aggro
 @export var attack_range: float = 45.0   # distanza per considerare "vicino" al player
 @export var attack_damage: int = 1
 @export var attack_cooldown: float = 0.8
@@ -41,12 +42,13 @@ var _attack_hitbox_disable_timer: float = 0.0
 var _knockback_timer: float = 0.0
 var _hit_flash_timer: float = 0.0
 var _flip_cooldown: float = 0.0
-const FLIP_MIN_INTERVAL: float = 1.0 / 50.0  # ~50 fps minimo tra un flip e l'altro
+const FLIP_MIN_INTERVAL: float = 0.45  # cooldown tra un cambio direzione e l'altro (evita glitch avanti/indietro)
 
 var _hurtbox: Area2D = null
 var _attack_hitbox: Area2D = null
 var _anim: AnimationPlayer = null
 var _original_sprite_scale: Vector2 = Vector2.ONE
+var _breath_timer: float = 0.0
 var _original_modulate: Color = Color(1.0, 1.0, 1.0, 1.0)
 
 func _ready():
@@ -74,6 +76,13 @@ func _ready():
 	play_idle()
 
 func _physics_process(delta: float) -> void:
+	# Respiro: espansione verticale leggera, poca compressione orizzontale
+	if sprite_node and state != State.DEAD:
+		_breath_timer += delta
+		var t = sin(_breath_timer * 2.4)
+		var breath_y = 1.0 + 0.09 * t
+		var breath_x = 1.0 - 0.025 * t
+		sprite_node.scale = Vector2(_original_sprite_scale.x * breath_x, _original_sprite_scale.y * breath_y)
 	# Flash colore quando colpito
 	if _hit_flash_timer > 0.0:
 		_hit_flash_timer -= delta
@@ -84,6 +93,14 @@ func _physics_process(delta: float) -> void:
 				sprite_node.modulate = hit_flash_color
 
 	if state == State.IDLE:
+		# Se il player si avvicina, diventa aggressivo
+		var p = get_tree().get_first_node_in_group("player") as Node2D
+		if p and is_instance_valid(p):
+			var d = global_position.distance_to(p.global_position)
+			if d <= aggro_range:
+				state = State.AGGRO
+				player = p
+				jump_timer = 0.0
 		velocity.x = 0.0
 		velocity.y += gravity * delta
 		move_and_slide()
@@ -109,11 +126,11 @@ func _physics_process(delta: float) -> void:
 	var dir_x: float = sign(to_player.x)
 	velocity.x = dir_x * move_speed
 
-	# Flip verso il player solo ogni ~50 fps (evita cambio sprite ad ogni frame)
+	# Flip verso il player solo dopo cooldown (evita glitch avanti/indietro)
 	_flip_cooldown -= delta
 	if dir_x != 0 and _flip_cooldown <= 0.0:
 		var new_facing: bool = dir_x > 0
-		if new_facing != facing_right:
+		if new_facing != facing_right and abs(to_player.x) > 15.0:
 			facing_right = new_facing
 			_flip_cooldown = FLIP_MIN_INTERVAL
 			if sprite_node:
@@ -180,11 +197,11 @@ func take_damage(amount: int = 1, source_position: Vector2 = Vector2.ZERO) -> vo
 		_die()
 		return
 
-	# Rinculo: spinta nella direzione opposta a chi ci ha colpito
+	# Rinculo: prevalentemente orizzontale (sinistra/destra), al massimo un lieve stacco
 	if source_position != Vector2.ZERO:
 		var dir: Vector2 = (global_position - source_position).normalized()
 		dir.x = sign(dir.x)
-		dir.y = -0.5
+		dir.y = -0.2
 		dir = dir.normalized()
 		velocity = dir * knockback_speed
 		_knockback_timer = knockback_duration
