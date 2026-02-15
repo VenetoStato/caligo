@@ -107,9 +107,12 @@ var _water_body: Node = null
 ## Margine dai bordi: i pesci restano distanti dai bordi dell'acqua
 const WATER_BOUNDS_MARGIN: float = 38.0
 var _breath_timer: float = 0.0
+var _fish_base_scale: float = 0.1  # Salvata per evitare che il respiro faccia sparire il pesce
 
 func _ready():
 	add_to_group("fish")
+	# z_index > water (10): pesci visibili sopra l'acqua
+	z_index = 15
 	# Configurazione RigidBody2D per pesci
 	lock_rotation = true
 	rotation = 0.0
@@ -119,14 +122,23 @@ func _ready():
 	# Layer 8 (bit 128): la barca può rilevarci per il rinculo quando ci impatta
 	collision_layer = 128
 
-	# Trova water body per limiti acqua (restare dentro il water body)
-	var waters = get_tree().get_nodes_in_group("water")
-	if waters.size() > 0 and waters[0].has_method("get_water_bounds_global_rect"):
-		_water_body = waters[0]
+	# Trova water body per limiti acqua (se non già assegnato da set_water_body allo spawn)
+	if _water_body == null:
+		var waters = get_tree().get_nodes_in_group("water")
+		for w in waters:
+			if w.has_method("get_water_bounds_global_rect"):
+				var r: Rect2 = w.call("get_water_bounds_global_rect")
+				if r.has_point(global_position):
+					_water_body = w
+					break
+		if _water_body == null and waters.size() > 0 and waters[0].has_method("get_water_bounds_global_rect"):
+			_water_body = waters[0]
 
 	spawn_position = global_position
 	home_position = global_position + home_offset
 	_find_sprite()
+	if sprite != null:
+		_fish_base_scale = abs(sprite.scale.x) if abs(sprite.scale.x) > 0.001 else 0.1
 	_setup_underwater_shader()
 	_setup_detection_area()
 	_pick_new_swim_direction()
@@ -146,6 +158,11 @@ func _find_sprite():
 	if sprite == null:
 		sprite = get_node_or_null("Sprite")
 
+## Chiamato dal water_body che spawna: il pesce deve restare dentro QUESTO water body
+func set_water_body(wb: Node) -> void:
+	if wb != null and wb.has_method("get_water_bounds_global_rect"):
+		_water_body = wb
+
 ## Chiamato dall'acqua per usare uno sprite diverso (livrea). scale_sprite = stessa dimensione degli altri = 0.1
 func set_fish_texture(tex: Texture2D, scale_sprite: float = 0.1) -> void:
 	if tex == null:
@@ -154,6 +171,7 @@ func set_fish_texture(tex: Texture2D, scale_sprite: float = 0.1) -> void:
 	_find_sprite()
 	if sprite == null:
 		return
+	_fish_base_scale = scale_sprite
 	if sprite is Sprite2D:
 		var s = sprite as Sprite2D
 		s.texture = tex
@@ -399,9 +417,9 @@ func _update_breathing(delta: float):
 		return
 	_breath_timer += delta
 	var t = sin(_breath_timer * 2.6)
-	var breath_y = 1.0 + 0.05 * t
-	var breath_x = 1.0 - 0.1 * t
-	var base = abs(sprite.scale.x)
+	var breath_y = 1.0 + 0.02 * t
+	var breath_x = 1.0 - 0.025 * t
+	var base = _fish_base_scale
 	var sign_x = 1.0 if sprite.scale.x >= 0 else -1.0
 	sprite.scale.x = sign_x * base * breath_x
 	sprite.scale.y = base * breath_y
