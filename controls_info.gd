@@ -18,8 +18,8 @@ var controls_container: VBoxContainer
 var background: ColorRect
 var skip_timer: float = 0.0
 
-# Lista dei comandi: [azione, tasto, descrizione] — senza sprite/icone
-var commands: Array = [
+# Comandi PC (tastiera)
+var _commands_pc: Array = [
 	["Movimento", "A / D", "Muovi il personaggio"],
 	["Salto", "SPAZIO", "Salta (doppio salto disponibile)"],
 	["Dash", "SHIFT", "Scatto veloce"],
@@ -30,6 +30,20 @@ var commands: Array = [
 	["Afferra", "G", "Afferra oggetti/ancoraggi"],
 	["Cambia Amo", "C", "Cambia tipo di amo"],
 ]
+# Comandi touch/Android (pulsanti a schermo)
+var _commands_touch: Array = [
+	["Movimento", "◀ ▶ (sinistra)", "Pulsanti in basso a sinistra"],
+	["Salto", "↑", "Pulsante freccia sopra movimento"],
+	["Attacco", "Z / Pwr", "Pulsanti in basso a destra"],
+	["Dash", "D", "Pulsante D a destra"],
+	["Lenza", "Lenza", "Lancia la lenza (pesca)"],
+	["Recupera", "Tira", "Tira la lenza verso di te"],
+	["Afferra / Pastura", "G", "Afferra oggetti o lancia pastura"],
+	["Cambia amo", "Amo", "Alterna amo da pesca / da lancio"],
+]
+
+func _is_touch_platform() -> bool:
+	return OS.get_name() == "Android" or DisplayServer.is_touchscreen_available()
 
 func _ready():
 	layer = 200  # Sopra tutto
@@ -46,7 +60,7 @@ func _ready():
 func _process(delta):
 	skip_timer -= delta
 	
-	# Skip con qualsiasi tasto o click
+	# Skip: tastiera/click su PC, qualsiasi input su touch
 	if Input.is_anything_pressed():
 		_go_to_game()
 	
@@ -92,6 +106,7 @@ func _create_controls_display():
 	spacer1.custom_minimum_size = Vector2(0, 30)
 	controls_container.add_child(spacer1)
 	
+	var commands: Array = _commands_touch if _is_touch_platform() else _commands_pc
 	# Aggiungi ogni comando (solo testo, senza sprite)
 	for cmd in commands:
 		var action = cmd[0]
@@ -107,7 +122,7 @@ func _create_controls_display():
 	# Istruzione per continuare
 	var instruction = Label.new()
 	instruction.name = "Instruction"
-	instruction.text = "Premi un tasto qualsiasi per continuare..."
+	instruction.text = "Tocca lo schermo per continuare..." if _is_touch_platform() else "Premi un tasto qualsiasi per continuare..."
 	instruction.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction.add_theme_font_size_override("font_size", 20)
 	instruction.add_theme_color_override("font_color", Color(text_color.r, text_color.g, text_color.b, 0.7))

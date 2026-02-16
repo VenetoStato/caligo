@@ -63,6 +63,10 @@ func _switch_to_player():
 			to_reparent.append(c)
 	
 	parent.add_child(player)
+	# Avvia il timer per la schermata fine gioco (3 pesci + 3 leoni)
+	var am = get_node_or_null("/root/AchievementManager")
+	if am != null and am.has_method("start_game_timer"):
+		am.start_game_timer()
 	# Qualche pixel più in basso rispetto al character beginning
 	player.global_position = pos + Vector2(0, player_spawn_offset_y)
 	

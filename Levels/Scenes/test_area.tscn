@@ -1,4 +1,4 @@
-[gd_scene load_steps=39 format=4 uid="uid://6hqecihao0iv"]
+[gd_scene load_steps=41 format=4 uid="uid://6hqecihao0iv"]
 
 [ext_resource type="Texture2D" uid="uid://sls06hof060t" path="res://Landscape/Sprites/montagna.png" id="2_qpuyf"]
 [ext_resource type="PackedScene" uid="uid://pmd73v6vpofj" path="res://Landscape/Scenes_Prefabs/erba.tscn" id="2_tuhxq"]
@@ -23,9 +23,10 @@
 [ext_resource type="PackedScene" path="res://game_menu.tscn" id="15_menu"]
 [ext_resource type="PackedScene" uid="uid://k3aff18qvqir" path="res://Enemies/enemy.tscn" id="16_yi2tr"]
 [ext_resource type="PackedScene" path="res://UI/AchievementsUI.tscn" id="17_achievements"]
-[ext_resource type="PackedScene" uid="uid://tutorial_hints_001" path="res://UI/TutorialHints.tscn" id="18_tutorial"]
+[ext_resource type="PackedScene" path="res://UI/TutorialHints.tscn" id="18_tutorial"]
 [ext_resource type="PackedScene" uid="uid://bruwmq46fel7d" path="res://Collectibles/LeoneSanMarco.tscn" id="22_u4w8e"]
 [ext_resource type="PackedScene" uid="uid://cxd421d2orwl1" path="res://Interactables/Tomba.tscn" id="23_aymj8"]
+[ext_resource type="PackedScene" path="res://UI/MobileControls.tscn" id="24_mobile"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_yn5ey"]
 size = Vector2(54, 15.4999695)
@@ -235,6 +236,8 @@ shader_parameter/u_tint = Color(1, 1, 1, 1)
 [node name="AchievementsUI" parent="." instance=ExtResource("17_achievements")]
 
 [node name="TutorialHints" parent="." instance=ExtResource("18_tutorial")]
+
+[node name="MobileControls" parent="." instance=ExtResource("24_mobile")]
 
 [node name="Ambiance" type="Node" parent="."]
 
@@ -1033,7 +1036,7 @@ follow_viewport_scale = 1.3
 
 [node name="Blackening2" type="Sprite2D" parent="Ambiance/3"]
 modulate = Color(0.17177388, 0.17177388, 0.17177388, 1)
-position = Vector2(-326.15387, 96.92308)
+position = Vector2(-347.69232, 151.53847)
 scale = Vector2(0.4, 0.4)
 
 [node name="Tree" type="Sprite2D" parent="Ambiance/3/Blackening2"]

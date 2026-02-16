@@ -65,6 +65,9 @@ func _build_style_panel(bg_alpha: float = 0.88) -> StyleBoxFlat:
 	style.set_content_margin_all(14)
 	return style
 
+func _is_touch_platform() -> bool:
+	return OS.get_name() == "Android" or DisplayServer.is_touchscreen_available()
+
 func _build_start_hint():
 	_start_panel = PanelContainer.new()
 	_start_panel.name = "StartHint"
@@ -90,7 +93,7 @@ func _build_start_hint():
 	vbox.add_child(title)
 
 	var l1 = Label.new()
-	l1.text = "Attacco: Z o Click sinistro  |  Attacco forte: Click destro"
+	l1.text = "Attacco: Z o Click sinistro  |  Attacco forte: Click destro" if not _is_touch_platform() else "Usa i pulsanti a schermo: ◀▶ movimento, ↑ salto, Z/Pwr attacco, D dash"
 	l1.add_theme_font_size_override("font_size", 18)
 	l1.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
 	l1.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
@@ -98,7 +101,7 @@ func _build_start_hint():
 	vbox.add_child(l1)
 
 	var l2 = Label.new()
-	l2.text = "Doppio salto: SPAZIO due volte"
+	l2.text = "Doppio salto: SPAZIO due volte" if not _is_touch_platform() else "Pesca: pulsanti Lenza, Tira, G, Amo in basso a destra"
 	l2.add_theme_font_size_override("font_size", 18)
 	l2.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
 	l2.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
@@ -130,7 +133,7 @@ func _build_fishing_hint():
 	vbox.add_child(title)
 
 	var l1 = Label.new()
-	l1.text = "F lancia lenza  |  R recupera  |  C cambia amo (pesca / lancio)"
+	l1.text = "F lancia lenza  |  R recupera  |  C cambia amo (pesca / lancio)" if not _is_touch_platform() else "Pulsanti Lenza, Tira, G, Amo in basso a destra"
 	l1.add_theme_font_size_override("font_size", 18)
 	l1.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
 	l1.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))

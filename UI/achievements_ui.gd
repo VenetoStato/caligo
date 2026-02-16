@@ -17,6 +17,8 @@ var _fish_label: Label = null
 var _leoni_label: Label = null
 var _container: PanelContainer = null
 var _title_label: Label = null
+var _panel_visible: bool = true
+var _show_btn: Button = null  # pulsante per riaprire quando nascosto
 
 func _ready():
 	layer = 5
@@ -27,6 +29,8 @@ func _ready():
 			am.fish_caught_count_changed.connect(_on_fish_changed)
 		if am.leoni_collected_changed.is_connected(_on_leoni_changed) == false:
 			am.leoni_collected_changed.connect(_on_leoni_changed)
+		if am.game_completed.is_connected(_on_game_completed) == false:
+			am.game_completed.connect(_on_game_completed)
 	_update_labels()
 
 func _build_ui():
@@ -51,14 +55,49 @@ func _build_ui():
 	vbox.add_theme_constant_override("separation", 12)
 	_container.add_child(vbox)
 
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 8)
+	vbox.add_child(hbox)
+
 	_title_label = Label.new()
 	_title_label.name = "Title"
 	_title_label.text = "Obiettivi"
+	_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_title_label.add_theme_font_size_override("font_size", title_font_size)
 	_title_label.add_theme_color_override("font_color", Color(0.9, 0.88, 0.8, 1))
 	_title_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 	_title_label.add_theme_constant_override("outline_size", 2)
-	vbox.add_child(_title_label)
+	hbox.add_child(_title_label)
+
+	var hide_btn := Button.new()
+	hide_btn.name = "HideBtn"
+	hide_btn.text = "−"
+	hide_btn.tooltip_text = "Nascondi obiettivi"
+	hide_btn.custom_minimum_size = Vector2(28, 28)
+	hide_btn.pressed.connect(_toggle_visibility)
+	hbox.add_child(hide_btn)
+
+	# Pulsante per riaprire (nascosto di default)
+	_show_btn = Button.new()
+	_show_btn.name = "ShowBtn"
+	_show_btn.text = "Obiettivi ▶"
+	_show_btn.tooltip_text = "Mostra obiettivi"
+	_show_btn.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_show_btn.set_anchor(SIDE_LEFT, anchor.x)
+	_show_btn.set_anchor(SIDE_TOP, anchor.y)
+	_show_btn.set_offset(SIDE_LEFT, 16)
+	_show_btn.set_offset(SIDE_TOP, 16)
+	_show_btn.custom_minimum_size = Vector2(110, 36)
+	_show_btn.visible = false
+	_show_btn.pressed.connect(_toggle_visibility)
+	var btn_style := StyleBoxFlat.new()
+	btn_style.bg_color = panel_bg
+	btn_style.border_color = panel_border
+	btn_style.set_border_width_all(2)
+	btn_style.set_corner_radius_all(8)
+	btn_style.set_content_margin_all(8)
+	_show_btn.add_theme_stylebox_override("normal", btn_style)
+	add_child(_show_btn)
 
 	_fish_label = Label.new()
 	_fish_label.name = "FishAchievement"
@@ -81,6 +120,21 @@ func _on_fish_changed(_count: int):
 
 func _on_leoni_changed(_ids: Array):
 	_update_labels()
+
+func _on_game_completed(elapsed_sec: float):
+	var scene = load("res://UI/end_game_screen.tscn") as PackedScene
+	if scene == null:
+		return
+	var end = scene.instantiate()
+	get_tree().root.add_child(end)
+	if end.has_method("show_with_result"):
+		end.call("show_with_result", elapsed_sec)
+
+func _toggle_visibility() -> void:
+	_panel_visible = not _panel_visible
+	_container.visible = _panel_visible
+	if _show_btn:
+		_show_btn.visible = not _panel_visible
 
 func _update_labels():
 	if _fish_label == null or _leoni_label == null:
