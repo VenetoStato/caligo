@@ -52,8 +52,8 @@ extends CharacterBody2D
 
 @export_category("Line Tuning")
 @export var line_out_speed: float = 900.0
-@export var reel_in_speed: float = 175.0
-@export var reel_pull_force: float = 420.0
+@export var reel_in_speed: float = 320.0
+@export var reel_pull_force: float = 780.0
 @export var min_line_length_start: float = 40.0
 @export var spawn_forward_push: float = 18.0
 @export var min_forward_aim_dot: float = 0.15
@@ -87,8 +87,8 @@ extends CharacterBody2D
 @export var fish_struggle_phase_duration: float = 2.6
 ## Stress della lenza oltre cui il pesce si libera (1.0 = rossa piena). Se la lenza diventa troppo rossa durante la lotta, il pesce scappa
 @export var stress_escape_threshold: float = 0.82
-## Durata del "trascinamento" per ogni click di R (più basso = meno pull per click = serve più click)
-@export var reel_pulse_duration: float = 0.08
+## Durata del "trascinamento" per ogni click di F (più alto = pesce si avvicina di più per click)
+@export var reel_pulse_duration: float = 0.22
 @export var fish_reel_distance: float = 30.0
 @export var fish_catch_jump_distance: float = 50.0
 @export var fish_pull_strength: float = 270.0

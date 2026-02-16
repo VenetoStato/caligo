@@ -37,11 +37,11 @@ extends RigidBody2D
 @export_category("Struggle")
 @export var struggle_strength: float = 320.0
 @export var struggle_duration: float = 1.5
-@export var reel_resistance: float = 0.78
+@export var reel_resistance: float = 0.95
 ## Resistenza costante verso l'amo quando agganciato (nuota via)
-@export var hooked_resist_strength: float = 48.0
-## Velocità max quando agganciato (evita tremolio)
-@export var hooked_max_speed: float = 58.0
+@export var hooked_resist_strength: float = 24.0
+## Velocità max quando agganciato: più alta = reel avvicina bene il pesce
+@export var hooked_max_speed: float = 130.0
 ## Damping più forte quando agganciato (movimento più fluido)
 @export var hooked_damping: float = 0.92
 
@@ -89,9 +89,9 @@ var reel_force: Vector2 = Vector2.ZERO
 var _reel_force_smoothed: Vector2 = Vector2.ZERO  # per ridurre tremolio
 const REEL_FORCE_SMOOTH: float = 4.0
 
-# Cooldown per essere ri-agganciato
+# Cooldown per essere ri-agganciato dopo aver scappato (breve: può essere ripescato)
 var hook_cooldown: float = 0.0
-var hook_cooldown_time: float = 3.0
+var hook_cooldown_time: float = 1.2
 
 # Evitare flip casuali: soglia velocità e cooldown tra un flip e l'altro
 var _flip_cooldown: float = 0.0
@@ -219,6 +219,7 @@ func _physics_process(delta: float):
 	if sprite != null:
 		sprite.rotation = 0.0
 	
+	# Pesce in acqua: nuota (mai cadere o fluttuare nel vuoto)
 	if in_water:
 		if is_escaping:
 			_process_escaping(delta)
@@ -268,17 +269,27 @@ func _process_swimming(delta: float):
 				is_struggling = false
 
 	elif is_attracted and attraction_target != Vector2.ZERO:
-		# Aggiorna il target ogni frame se è un hook (così il pesce segue l'amo in movimento)
-		if target_hook != null and is_instance_valid(target_hook):
+		# Se l'amo/pastura è stata distrutta, torna a nuotare normale (così il pesce resta pescabile)
+		if target_hook == null or not is_instance_valid(target_hook):
+			is_attracted = false
+			target_hook = null
+			attraction_target = Vector2.ZERO
+		else:
+			# Aggiorna il target ogni frame se è un hook (così il pesce segue l'amo in movimento)
 			attraction_target = target_hook.global_position
 		var dir = (attraction_target - global_position).normalized()
 		desired = dir * attraction_speed
 
-		if global_position.distance_to(attraction_target) < 30.0:
+		if attraction_target != Vector2.ZERO and global_position.distance_to(attraction_target) < 30.0:
 			is_attracted = false
 			# Hook solo con l'amo vero (fishing hook RigidBody2D), non con la pastura
-			if target_hook is RigidBody2D and target_hook.has_method("get_hook_type") and str(target_hook.call("get_hook_type")) == "fishing":
+			if target_hook != null and is_instance_valid(target_hook) and target_hook is RigidBody2D and target_hook.has_method("get_hook_type") and str(target_hook.call("get_hook_type")) == "fishing":
 				_try_hook_to_player()
+				# target_hook resta impostato: serve per la resistenza quando agganciato
+			else:
+				# Era pastura o amo distrutto: libera il ref così il pesce può abboccare a un nuovo amo
+				target_hook = null
+				attraction_target = Vector2.ZERO
 
 	else:
 		# Nuoto normale (movimento libero)
@@ -485,6 +496,9 @@ func _on_area_entered(area: Area2D):
 			_on_hook_detected(parent)
 
 func _on_area_exited(area: Area2D):
+	# Pesce che scappa: non considerarlo "uscito" dall'acqua, altrimenti cade nel vuoto
+	if is_escaping:
+		return
 	var an = area.name.to_lower()
 	var pn = area.get_parent().name.to_lower() if area.get_parent() else ""
 	if "water" in an or "water" in pn or area.is_in_group("water"):
@@ -508,12 +522,13 @@ func _on_hook_detected(hook: Node):
 # RELEASE - Chiamato quando il pesce scappa
 # ===========================================
 func release_from_hook():
-	print("🐟 Pesce liberato! Scappa via...")
+	print("🐟 Pesce liberato! Resta in acqua e nuota via...")
 	
-	# Direzione di fuga PRIMA di azzerare i ref
-	var player_pos: Vector2 = global_position
-	if player_ref != null and is_instance_valid(player_ref):
-		player_pos = player_ref.global_position
+	# SEMPRE: pesce in acqua, mai cadere o fluttuare nel vuoto
+	gravity_scale = 0.0
+	in_water = true
+	
+	# Azzera stato aggancio
 	is_hooked_to_player = false
 	is_attracted = false
 	is_struggling = false
@@ -523,33 +538,22 @@ func release_from_hook():
 	player_ref = null
 	target_hook = null
 	
-	is_escaping = true
-	escape_timer = escape_duration
-	
-	if player_pos != global_position:
-		escape_direction = (global_position - player_pos).normalized()
-	else:
-		var angle = randf() * TAU
-		escape_direction = Vector2(cos(angle), sin(angle) * 0.5).normalized()
-	
-	escape_direction = escape_direction.normalized()
-	
-	# IMPORTANTE: se fuori dall'acqua (reeled out) → riposiziona in acqua e nuota via, NON cadere
+	# Se fuori dall'acqua (reeled out): teleporta dentro l'acqua
 	if _water_body != null and is_instance_valid(_water_body) and _water_body.has_method("get_water_bounds_global_rect"):
 		var r: Rect2 = _water_body.call("get_water_bounds_global_rect")
 		var p := global_position
 		if p.y < r.position.y or p.x < r.position.x or p.x > r.position.x + r.size.x or p.y > r.position.y + r.size.y:
-			# Pesce fuori acqua: teleporta appena sotto superficie e nuota via
 			p.x = clampf(p.x, r.position.x + WATER_BOUNDS_MARGIN, r.position.x + r.size.x - WATER_BOUNDS_MARGIN)
 			p.y = clampf(p.y, r.position.y + WATER_BOUNDS_MARGIN, r.position.y + r.size.y - WATER_BOUNDS_MARGIN)
 			global_position = p
-		in_water = true
-	else:
-		in_water = true  # Default: assumi in acqua per evitare caduta
+	
+	# Resta dove si è liberato: home = posizione attuale, torna subito a nuotare normale
+	home_position = global_position + home_offset
+	velocity = Vector2.ZERO
+	is_escaping = false
+	_pick_new_swim_direction()
 	
 	hook_cooldown = hook_cooldown_time
-	
-	velocity = escape_direction * escape_speed * 0.5
 
 # ===========================================
 # API
