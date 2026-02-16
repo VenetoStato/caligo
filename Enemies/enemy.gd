@@ -215,14 +215,21 @@ func take_damage(amount: int = 1, source_position: Vector2 = Vector2.ZERO) -> vo
 		elif _anim and _anim.has_animation("Walk"):
 			_anim.play("Walk")
 
+## Raggio entro cui un nemico colpito "allerta" gli altri (solo questi vanno in aggro)
+const ALERT_NEARBY_RADIUS: float = 220.0
+
 func _alert_nearby_enemies() -> void:
 	var p: Node2D = get_tree().get_first_node_in_group("player") as Node2D
 	if p == null:
 		return
+	var my_pos: Vector2 = global_position
 	for n in get_tree().get_nodes_in_group("enemy"):
 		if n == self:
 			continue
 		if not is_instance_valid(n):
+			continue
+		var other_node = n as Node2D
+		if other_node and my_pos.distance_to(other_node.global_position) > ALERT_NEARBY_RADIUS:
 			continue
 		if "state" in n:
 			n.set("state", State.AGGRO)

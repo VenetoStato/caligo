@@ -39,3 +39,7 @@ Thumbs.db
 
 # Godot 4 specific
 .godot/
+
+# Android build output
+android/build/
+*.apk

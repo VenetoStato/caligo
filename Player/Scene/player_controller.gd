@@ -106,6 +106,12 @@ extends CharacterBody2D
 @export var health_display_time: float = 3.0
 
 @export_category("Cast UI")
+## Angolo di mira durante caricamento (radianti). Positivo = su, negativo = giù. Usato quando non c'è mouse.
+@export var cast_aim_angle_speed: float = 2.5
+## Limite massimo angolo in su (gradi)
+@export var cast_aim_max_up: float = 75.0
+## Limite massimo angolo in giù (gradi)
+@export var cast_aim_max_down: float = 45.0
 ## Barra di caricamento del lancio (visibile mentre tieni premuto F)
 @export var cast_bar_offset: Vector2 = Vector2(0, -55)
 @export var cast_bar_width: float = 60.0
@@ -114,6 +120,9 @@ extends CharacterBody2D
 @export var cast_bar_bg_color: Color = Color(0.1, 0.1, 0.15, 0.7)
 ## Indicatore direzione di mira (freccia che mostra dove lancerai)
 @export var direction_indicator_length: float = 85.0
+@export var direction_indicator_lerp_speed: float = 5.0
+## Velocità angolare max (rad/frame) - limita rotazione per evitare scatti
+@export var direction_indicator_max_angular_speed: float = 0.05
 @export var direction_indicator_color: Color = Color(0.95, 0.88, 0.35, 0.95)
 @export var direction_indicator_outline_color: Color = Color(0.15, 0.12, 0.05, 0.9)
 @export var direction_indicator_line_width: float = 3.0
@@ -212,6 +221,9 @@ var _line_color_lerp_speed: float = 5.0
 var reel_pulse_timer: float = 0.0
 var _breath_timer: float = 0.0
 var _breath_base_scale: Vector2 = Vector2.ONE
+var _cast_aim_angle: float = 0.0  # radianti, 0=orizzontale, + = su, - = giù
+var _display_cast_direction: Vector2 = Vector2.RIGHT
+var _target_cast_direction: Vector2 = Vector2.RIGHT  # target filtrato (riduce jitter input)
 var move_particle_timer: float = 0.0
 
 func _ready():
@@ -417,9 +429,10 @@ func _show_health_ui():
 func _update_breathing(delta: float):
 	if sprite_node and not is_dead:
 		_breath_timer += delta
-		var t = sin(_breath_timer * 2.4)
-		var breath_y = 1.0 + 0.09 * t
-		var breath_x = 1.0 - 0.025 * t
+		var t = sin(_breath_timer * 2.2)
+		# Respiro ridotto: solo parte alta (pivot ai piedi via offset), ampiezza minore
+		var breath_y = 1.0 + 0.035 * t
+		var breath_x = 1.0 - 0.012 * t
 		sprite_node.scale = Vector2(_breath_base_scale.x * breath_x, _breath_base_scale.y * breath_y)
 
 func _update_health_visibility(delta: float):
@@ -485,7 +498,7 @@ func _draw_cast_charge_bar():
 
 func _draw_cast_direction_indicator():
 	var rod_local = base_axis_offset + (line_origin_offset_right if facing_right else line_origin_offset_left) + (rod_tip_offset_right if facing_right else rod_tip_offset_left)
-	var dir = get_cast_direction()
+	var dir = _display_cast_direction.normalized() if _display_cast_direction.length_squared() > 0.01 else Vector2.RIGHT
 	var shaft_end = rod_local + dir * (direction_indicator_length - 22.0)
 	var end = rod_local + dir * direction_indicator_length
 	var perp = Vector2(-dir.y, dir.x)
@@ -530,6 +543,7 @@ func _input(event):
 			line_mode = LineMode.FISHING
 			is_charging = true
 			current_charge_time = 0.0
+			_reset_cast_aim_from_mouse()
 	
 	if event.is_action_pressed("grab"):
 		if not line_extended and hook_instance == null:
@@ -543,6 +557,7 @@ func _input(event):
 					line_mode = LineMode.GRAB
 					is_charging = true
 					current_charge_time = 0.0
+					_reset_cast_aim_from_mouse()
 	
 	if event.is_action_released("cast") or event.is_action_released("grab"):
 		if is_charging:
@@ -591,6 +606,7 @@ func _physics_process(delta: float):
 	
 	if is_charging:
 		current_charge_time = min(current_charge_time + delta, max_charge_time)
+		_update_cast_aim(delta)
 	
 	# Caduta oltre fall_death_y = morte (non cadere all'infinito)
 	if global_position.y > fall_death_y:
@@ -607,6 +623,24 @@ func _physics_process(delta: float):
 	jump_logic()
 	_process_fishing(delta)
 	queue_redraw()
+
+func _process(delta: float) -> void:
+	# Freccia aggiornata ogni frame (non solo physics) = più fluida
+	if is_charging:
+		var raw := get_cast_direction()
+		if raw.length_squared() > 0.01:
+			# 1) Filtra il target per ridurre jitter da joystick/touch
+			_target_cast_direction = _target_cast_direction.lerp(raw.normalized(), clampf(1.0 - exp(-12.0 * delta), 0.0, 1.0))
+			_target_cast_direction = _target_cast_direction.normalized()
+			# 2) Rotazione con cap velocità angolare (smooth, niente scatti)
+			var cur_angle := atan2(_display_cast_direction.y, _display_cast_direction.x) if _display_cast_direction.length_squared() > 0.001 else atan2(_target_cast_direction.y, _target_cast_direction.x)
+			var tar_angle := atan2(_target_cast_direction.y, _target_cast_direction.x)
+			var diff := angle_difference(cur_angle, tar_angle)
+			var max_step := direction_indicator_max_angular_speed * (delta * 60.0)  # invariante al framerate
+			var step := clampf(diff, -max_step, max_step)
+			var new_angle := cur_angle + step
+			_display_cast_direction = Vector2(cos(new_angle), sin(new_angle))
+			queue_redraw()
 
 func _update_health_anims(delta: float):
 	for i in range(_health_scales.size()):
@@ -1037,14 +1071,64 @@ func get_rod_tip_position() -> Vector2:
 func get_facing_vector() -> Vector2:
 	return Vector2.RIGHT if facing_right else Vector2.LEFT
 
-func get_cast_direction() -> Vector2:
+func _reset_cast_aim_from_mouse():
+	## Inizializza _cast_aim_angle dalla posizione mouse (o default se non disponibile)
 	var start = get_rod_tip_position()
 	var aim = get_global_mouse_position()
-	var dir = (aim - start).normalized()
+	var diff = aim - start
+	if diff.length_squared() > 400.0:  # min 20px di distanza per considerare il mouse valido
+		diff = diff.normalized()
+		var facing = get_facing_vector()
+		if diff.dot(facing) >= min_forward_aim_dot:
+			_cast_aim_angle = atan2(-diff.y, diff.x * facing.x)
+		else:
+			_cast_aim_angle = atan2(-diff.y, 0.01) * sign(facing.x)
+	else:
+		_cast_aim_angle = -deg_to_rad(25.0) * sign(get_facing_vector().x)  # default leggermente verso l'alto
+	var d := get_cast_direction()
+	_display_cast_direction = d
+	_target_cast_direction = d
+
+func _update_cast_aim(delta: float):
+	## Durante il caricamento: mouse ha priorità, altrimenti aim_up/aim_down
+	var start = get_rod_tip_position()
+	var aim = get_global_mouse_position()
+	var diff = aim - start
+	if diff.length_squared() > 400.0:
+		diff = diff.normalized()
+		var facing = get_facing_vector()
+		if diff.dot(facing) >= min_forward_aim_dot:
+			_cast_aim_angle = atan2(-diff.y, diff.x * facing.x)
+	else:
+		var max_up_rad = deg_to_rad(cast_aim_max_up)
+		var max_down_rad = deg_to_rad(cast_aim_max_down)
+		if Input.is_action_pressed("aim_up"):
+			_cast_aim_angle += cast_aim_angle_speed * delta
+		if Input.is_action_pressed("aim_down"):
+			_cast_aim_angle -= cast_aim_angle_speed * delta
+		_cast_aim_angle = clampf(_cast_aim_angle, -max_down_rad, max_up_rad)
+
+func get_cast_direction() -> Vector2:
 	var facing = get_facing_vector()
-	if dir.dot(facing) < min_forward_aim_dot:
-		dir = Vector2(facing.x, dir.y).normalized()
-	return dir
+	# Joystick mobile: usa direzione se valida (anche al release, quando active=false ma direction non ancora azzerata)
+	if MobileControlsManager.cast_joystick_direction.length_squared() > 0.01:
+		var j := MobileControlsManager.cast_joystick_direction
+		var dir := j.normalized()
+		if dir.dot(facing) < min_forward_aim_dot:
+			dir = Vector2(facing.x, dir.y).normalized()
+		return dir
+	var start = get_rod_tip_position()
+	var aim = get_global_mouse_position()
+	var diff = aim - start
+	# Mouse valido (distanza > 20px)? Usalo
+	if diff.length_squared() > 400.0:
+		var dir = diff.normalized()
+		if dir.dot(facing) < min_forward_aim_dot:
+			dir = Vector2(facing.x, dir.y).normalized()
+		return dir
+	# Altrimenti usa _cast_aim_angle (su = -y in world space)
+	var dir = Vector2(cos(_cast_aim_angle), -sin(_cast_aim_angle)) * facing.x
+	return dir.normalized()
 
 func get_hook_center_position(hook: Node) -> Vector2:
 	if hook == null:
@@ -1437,6 +1521,19 @@ func _stop_fish_struggle():
 
 func _on_fish_escaped():
 	print("💨 Pesce scappato!")
+	# L'amo resta dove il pesce si è staccato (non torna al punto del morso)
+	if current_fish and is_instance_valid(current_fish) and hook_instance and is_instance_valid(hook_instance):
+		var fish_pos: Vector2 = get_fish_center_position(current_fish)
+		if hook_instance is RigidBody2D:
+			hook_instance.global_position = fish_pos
+			hook_instance.linear_velocity = Vector2.ZERO
+		elif hook_instance is Node2D:
+			hook_instance.global_position = fish_pos
+		# Allinea la corda all'amo nella nuova posizione
+		if points.size() >= 2:
+			points[points.size() - 1] = fish_pos
+			if old_points.size() >= 2:
+				old_points[old_points.size() - 1] = fish_pos
 	if current_fish and is_instance_valid(current_fish):
 		if current_fish.has_method("release_from_hook"):
 			current_fish.call("release_from_hook")

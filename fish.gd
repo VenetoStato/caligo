@@ -219,8 +219,12 @@ func _physics_process(delta: float):
 	if sprite != null:
 		sprite.rotation = 0.0
 	
-	# Pesce in acqua: nuota (mai cadere o fluttuare nel vuoto)
-	if in_water:
+	# Se agganciato e sopra la superficie (ma non in reel zone): gravità lo riporta in acqua
+	var above_surface: bool = _is_above_water_surface()
+	var use_gravity_out_of_water: bool = is_hooked_to_player and above_surface and not _in_reel_zone()
+	var effectively_in_water: bool = in_water and not use_gravity_out_of_water
+
+	if effectively_in_water:
 		if is_escaping:
 			_process_escaping(delta)
 		else:
@@ -240,8 +244,12 @@ func _physics_process(delta: float):
 	# Mantieni i pesci vicini alla parte alta dell'acqua (in reel zone non spingiamo giù)
 	_keep_near_top()
 	# Resta dentro i limiti del water body; in reel zone vicino al player non clampare così può uscire / essere reelato
-	if in_water and not (is_hooked_to_player and _in_reel_zone()):
+	if effectively_in_water and not (is_hooked_to_player and _in_reel_zone()):
 		_clamp_to_water_bounds()
+	# Se era sopra superficie e ora è ridisceso in acqua, torna a nuotare (gravity_scale resta 0)
+	if use_gravity_out_of_water and not _is_above_water_surface() and _water_body != null:
+		in_water = true
+		gravity_scale = 0.0
 
 func _process_swimming(delta: float):
 	var desired = Vector2.ZERO
@@ -626,6 +634,16 @@ func _in_reel_zone() -> bool:
 	if player_ref == null or not is_instance_valid(player_ref):
 		return false
 	return global_position.distance_to(player_ref.global_position) <= reel_zone_radius
+
+## True se la posizione del pesce è sopra la superficie dell'acqua (Y minore = più in alto)
+func _is_above_water_surface() -> bool:
+	var water_area = _find_water_area()
+	if water_area == null:
+		return false
+	var surface_y: float = water_area.global_position.y
+	if "target_height" in water_area:
+		surface_y += water_area.target_height
+	return global_position.y < surface_y + 8.0
 
 ## True se il pesce è vicino alla superficie (può uscire / saltare anche con collider)
 func is_near_surface() -> bool:
