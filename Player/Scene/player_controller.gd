@@ -1,5 +1,7 @@
 extends CharacterBody2D
 
+const FISH_CATCH_EFFECT_SCRIPT := preload("res://Fx/fish_catch_effect.gd")
+
 # ===========================================
 # PLAYER SCRIPT - VERSIONE CON DEATH SYSTEM
 # ===========================================
@@ -13,6 +15,10 @@ extends CharacterBody2D
 @export_category("Movement")
 @export var move_speed: float = 120.0
 @export var deceleration: float = 0.1
+@export var ground_acceleration: float = 1800.0
+@export var ground_deceleration: float = 2200.0
+@export var air_acceleration: float = 900.0
+@export var air_deceleration: float = 450.0
 @export var gravity: float = 500.0
 
 @export_category("Dash")
@@ -20,11 +26,16 @@ extends CharacterBody2D
 @export var dash_duration: float = 0.15
 @export var dash_cooldown: float = 0.5
 @export var double_tap_time: float = 0.25
+@export_range(0.0, 1.0) var dash_end_speed_multiplier: float = 0.45
+@export var dash_cancel_on_wall: bool = true
 
 @export_category("Jump")
 @export var jump_speed: float = 190.0
 @export var jump_acceleration: float = 290.0
 @export var jump_amount: int = 2
+
+@export_category("Water")
+@export var water_bounce_speed: float = 190.0
 
 @export_category("Fishing")
 @export var hook_scene: PackedScene
@@ -92,6 +103,7 @@ extends CharacterBody2D
 @export var fish_reel_distance: float = 30.0
 @export var fish_catch_jump_distance: float = 50.0
 @export var fish_pull_strength: float = 270.0
+@export_range(1, 3, 1) var fish_health_reward: int = 1
 
 @export_category("Health")
 @export var max_health: int = 5
@@ -177,7 +189,7 @@ var facing_right: bool = true
 # Water
 var is_in_water: bool = false
 var water_gravity_multiplier: float = 1.0
-@export var water_buoyancy_force: float = 520.0  # forza verso l'alto quando in acqua (galleggiamento)
+var _water_owner: Node = null
 
 # Health & Death
 var current_health: int = 5
@@ -188,6 +200,8 @@ var is_dead: bool = false
 var _knockback_timer: float = 0.0
 var last_safe_ground_position: Vector2 = Vector2.ZERO
 var initial_spawn_position: Vector2 = Vector2.ZERO
+var checkpoint_spawn_position: Vector2 = Vector2.ZERO
+var has_active_checkpoint := false
 
 # Fishing
 enum LineMode { NONE, FISHING, GRAB }
@@ -594,14 +608,12 @@ func _physics_process(delta: float):
 		return
 	
 	_apply_gravity(delta)
-	if is_in_water:
-		velocity.y -= water_buoyancy_force * delta
 	# Durante il rinculo non applicare movimento orizzontale da input
 	if _knockback_timer > 0.0:
 		_knockback_timer -= delta
 		velocity.x = move_toward(velocity.x, 0.0, knockback_speed * 4.0 * delta)
 	else:
-		horizontal_movement()
+		horizontal_movement(delta)
 	flip_logic()
 	
 	if is_charging:
@@ -665,7 +677,7 @@ func _update_invincibility(delta: float):
 
 func _update_dash_timers(delta: float):
 	if dash_cooldown_timer > 0:
-		dash_cooldown_timer -= delta
+		dash_cooldown_timer = maxf(0.0, dash_cooldown_timer - delta)
 	if left_dash_timer > 0:
 		left_dash_timer -= delta
 		if left_dash_timer <= 0:
@@ -711,7 +723,9 @@ func _check_dash_input():
 func _start_dash(direction: Vector2):
 	is_dashing = true
 	dash_timer = dash_duration
-	dash_direction = direction
+	dash_cooldown_timer = dash_duration + dash_cooldown
+	dash_direction = direction.normalized()
+	dash_particle_timer = 0.0
 	facing_right = direction.x > 0
 	velocity.y = 0
 	if particles_on_dash and black_particle_scene:
@@ -724,35 +738,47 @@ func _process_dash(delta: float) -> bool:
 		return false
 	dash_timer -= delta
 	dash_particle_timer -= delta
-	if particles_on_dash and black_particle_scene and dash_particle_timer <= 0:
+	if dash_particle_timer <= 0:
 		dash_particle_timer = 0.015
-		_spawn_particles(global_position, -dash_direction, 0.4, 2)
-	if particles_on_dash and ambient_trail_scene and dash_particle_timer <= 0:
-		_spawn_trail(global_position, -dash_direction)
+		if particles_on_dash and black_particle_scene:
+			_spawn_particles(global_position, -dash_direction, 0.4, 2)
+		if particles_on_dash and ambient_trail_scene:
+			_spawn_trail(global_position, -dash_direction)
 	if dash_timer <= 0:
-		is_dashing = false
-		dash_cooldown_timer = dash_cooldown
+		_end_dash()
 		return false
 	velocity.x = dash_direction.x * dash_speed
 	velocity.y = 0
 	move_and_slide()
+	if dash_cancel_on_wall and is_on_wall():
+		_end_dash()
 	anim.play("Dash" if anim.has_animation("Dash") else "Walking")
 	return true
+
+func _end_dash():
+	if not is_dashing:
+		return
+	is_dashing = false
+	velocity.x *= dash_end_speed_multiplier
 
 func _apply_gravity(delta: float):
 	velocity.y += gravity * water_gravity_multiplier * delta
 
-func horizontal_movement():
+func horizontal_movement(delta: float):
 	if is_dashing:
 		return
 	if is_charging:
-		velocity.x = move_toward(velocity.x, 0.0, move_speed * deceleration)
+		var charge_deceleration := ground_deceleration if is_on_floor() else air_deceleration
+		velocity.x = move_toward(velocity.x, 0.0, charge_deceleration * delta)
 		return
 	movement = Input.get_axis("ui_left", "ui_right")
-	if movement != 0:
-		velocity.x = movement * move_speed
+	var target_speed := movement * move_speed
+	if not is_zero_approx(movement):
+		var acceleration := ground_acceleration if is_on_floor() else air_acceleration
+		velocity.x = move_toward(velocity.x, target_speed, acceleration * delta)
 	else:
-		velocity.x = move_toward(velocity.x, 0.0, move_speed * deceleration)
+		var stop_rate := ground_deceleration if is_on_floor() else air_deceleration
+		velocity.x = move_toward(velocity.x, 0.0, stop_rate * delta)
 
 func flip_logic():
 	if movement > 0:
@@ -843,8 +869,12 @@ func jump_logic():
 # ===========================================
 # HEALTH & DEATH SYSTEM
 # ===========================================
-func take_damage(amount: int = 1, source_position: Vector2 = Vector2.ZERO):
-	if is_invincible or is_dead:
+func take_damage(
+	amount: int = 1,
+	source_position: Vector2 = Vector2.ZERO,
+	ignore_invincibility: bool = false
+):
+	if (is_invincible and not ignore_invincibility) or is_dead:
 		return
 	
 	# Rinculo: spinta nella direzione opposta a chi ci ha colpito
@@ -1003,7 +1033,11 @@ func _spawn_death_particles():
 			p.call("play")
 
 func _find_respawn_position() -> Vector2:
-	# 1. Cerca spawn point nella scena
+	# 1. Un checkpoint esplicito deve avere precedenza sul terreno e sullo spawn.
+	if has_active_checkpoint:
+		return checkpoint_spawn_position
+
+	# 2. Cerca spawn point nella scena
 	var spawn_points = get_tree().get_nodes_in_group(spawn_point_group)
 	if spawn_points.size() > 0:
 		# Trova lo spawn point più vicino
@@ -1018,11 +1052,11 @@ func _find_respawn_position() -> Vector2:
 		if closest:
 			return closest.global_position + Vector2(0, respawn_y_offset)
 	
-	# 2. Usa l'ultima posizione sicura sul terreno
+	# 3. Usa l'ultima posizione sicura sul terreno
 	if use_last_ground_as_respawn and last_safe_ground_position != Vector2.ZERO:
 		return last_safe_ground_position + Vector2(0, respawn_y_offset)
 	
-	# 3. Fallback: posizione iniziale
+	# 4. Fallback: posizione iniziale
 	return initial_spawn_position
 
 func _on_respawn():
@@ -1578,20 +1612,41 @@ func _reel_fish_to_player():
 			current_fish.call("do_catch_jump")
 			_fish_catch_jump_done = true
 	if dist < fish_reel_distance:
-		print("🏆 Pesce catturato!")
-		heal(1)
-		var am = get_node_or_null("/root/AchievementManager")
-		if am != null and am.has_method("add_fish_caught"):
-			am.add_fish_caught()
-		current_fish.queue_free()
-		fish_hooked = false
-		current_fish = null
-		_destroy_hook()
+		_complete_fish_catch(current_fish)
 	else:
 		var rod = get_rod_tip_position()
 		var dir = (rod - current_fish.global_position).normalized()
 		if current_fish.has_method("apply_reel_force"):
 			current_fish.call("apply_reel_force", dir * reel_pull_force * 1.5)
+
+
+func _complete_fish_catch(fish: Node2D) -> void:
+	if fish == null or not is_instance_valid(fish):
+		return
+	print("🏆 Pesce catturato: nutrimento recuperato!")
+	var health_before := current_health
+	heal(fish_health_reward)
+	_spawn_fish_catch_effect(fish.global_position, current_health - health_before)
+	var am := get_node_or_null("/root/AchievementManager")
+	if am != null and am.has_method("add_fish_caught"):
+		am.call("add_fish_caught")
+	fish.queue_free()
+	fish_hooked = false
+	current_fish = null
+	_destroy_hook()
+
+
+func _spawn_fish_catch_effect(world_position: Vector2, health_restored: int) -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	var effect := Node2D.new()
+	effect.name = "FishCatchEffect"
+	effect.set_script(FISH_CATCH_EFFECT_SCRIPT)
+	scene.add_child(effect)
+	effect.global_position = world_position
+	effect.call("setup", health_restored)
+
 
 func _destroy_hook():
 	if hook_instance and is_instance_valid(hook_instance):
@@ -1672,18 +1727,30 @@ func _spawn_trail(pos: Vector2, direction: Vector2):
 # ===========================================
 # WATER
 # ===========================================
-func set_in_water(in_w: bool, grav_red: float = 0.3):
-	var was = is_in_water
+func set_in_water(in_w: bool, grav_red: float = 0.3, water_owner: Node = null):
+	var was := is_in_water
 	is_in_water = in_w
-	water_gravity_multiplier = grav_red if in_w else 1.0
+	water_gravity_multiplier = clampf(grav_red, 0.0, 1.0) if in_w else 1.0
 	if in_w and not was:
-		take_damage(1)
+		_water_owner = water_owner
+		velocity.y = -water_bounce_speed
+		take_damage(1, Vector2.ZERO, true)
+	elif not in_w:
+		_water_owner = null
 
-func in_water():
-	set_in_water(true, 0.3)
+func in_water(water_owner: Node = null):
+	set_in_water(true, 0.3, water_owner)
 
 func exit_water():
+	if is_in_water:
+		_request_water_splash()
 	set_in_water(false)
+
+func _request_water_splash():
+	if is_instance_valid(_water_owner) and _water_owner.has_method("splash_at"):
+		var direction := 1.0 if velocity.y > 0.0 else -1.0
+		var impulse := direction * maxf(absf(velocity.y), 90.0) * 0.65
+		_water_owner.call_deferred("splash_at", global_position.x, impulse, 72.0)
 
 # ===========================================
 # API
@@ -1720,4 +1787,6 @@ func retract_line():
 
 # Imposta un checkpoint manuale
 func set_checkpoint(pos: Vector2):
+	checkpoint_spawn_position = pos
+	has_active_checkpoint = true
 	last_safe_ground_position = pos

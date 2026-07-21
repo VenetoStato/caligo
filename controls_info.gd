@@ -1,52 +1,53 @@
 extends CanvasLayer
 
-# ===========================================
-# CONTROLS INFO - Infografica dei comandi
-# ===========================================
-# Mostra i comandi del gioco con icone/immagini
+const DOGANA_SCENE := "res://Levels/Scenes/punta_della_dogana.tscn"
+const DISPLAY_FONT := preload("res://UI/Fonts/CormorantGaramond.ttf")
+const BODY_FONT := preload("res://UI/Fonts/SourceSans3.ttf")
+const ARRIVAL_ART := preload("res://Landscape/Dogana/Illustrated/arrival.png")
 
 @export_category("Timing")
 @export var auto_advance_time: float = 10.0  # Secondi prima di avanzare automaticamente
 @export var fade_duration: float = 0.5
 
 @export_category("Visual")
-@export var background_color: Color = Color(0.05, 0.05, 0.1, 1.0)
-@export var text_color: Color = Color(1, 1, 1, 1)
-@export var key_color: Color = Color(0.3, 0.6, 0.9, 1.0)
+@export var background_color: Color = Color(0.004, 0.016, 0.022, 0.88)
+@export var text_color: Color = Color(0.86, 0.9, 0.84, 1.0)
+@export var key_color: Color = Color(0.1, 0.28, 0.27, 1.0)
 
 var controls_container: VBoxContainer
 var background: ColorRect
 var skip_timer: float = 0.0
+var _advancing := false
 
 # Comandi PC (tastiera)
 var _commands_pc: Array = [
-	["Movimento", "A / D", "Muovi il personaggio"],
-	["Salto", "SPAZIO", "Salta (doppio salto disponibile)"],
-	["Dash", "SHIFT", "Scatto veloce"],
-	["Attacco", "Z", "Attacco base"],
-	["Attacco Forte", "Click Destro", "Attacco potente"],
-	["Lancia Lenza", "F", "Lancia la lenza da pesca"],
-	["Tira Lenza", "R", "Tira la lenza verso di te"],
-	["Afferra", "G", "Afferra oggetti/ancoraggi"],
-	["Cambia Amo", "C", "Cambia tipo di amo"],
+	["MUOVITI", "A  /  D", "Esplora pontili e palazzi"],
+	["SALTA", "SPAZIO", "Premi ancora per il doppio salto"],
+	["SCATTA", "SHIFT", "Attraversa rapidamente il pericolo"],
+	["ATTACCA", "CLICK SX", "Colpo rapido con l'amo"],
+	["PESCA", "F", "Lancia la lenza verso i pesci"],
+	["RECUPERA", "R", "Tira la preda: il pesce cura la vita"],
+	["INTERAGISCI", "E", "Altari, porte, mappe e passaggi"],
+	["CAMBIA AMO", "C", "Alterna pesca e attraversamento"],
 ]
 # Comandi touch/Android (pulsanti a schermo)
 var _commands_touch: Array = [
-	["Movimento", "◀ ▶ (sinistra)", "Pulsanti in basso a sinistra"],
-	["Salto", "↑", "Pulsante freccia sopra movimento"],
-	["Attacco", "Z / Pwr", "Pulsanti in basso a destra"],
-	["Dash", "D", "Pulsante D a destra"],
-	["Lenza", "Lenza", "Lancia la lenza (pesca)"],
-	["Recupera", "Tira", "Tira la lenza verso di te"],
-	["Afferra / Pastura", "G", "Afferra oggetti o lancia pastura"],
-	["Cambia amo", "Amo", "Alterna amo da pesca / da lancio"],
+	["MUOVITI", "◀  ▶", "Comandi trasparenti a sinistra"],
+	["SALTA", "↑", "Premi ancora per il doppio salto"],
+	["ATTACCA", "Z", "Colpo rapido con l'amo"],
+	["SCATTA", "D", "Attraversa rapidamente il pericolo"],
+	["PESCA", "LENZA", "Lancia verso un pesce"],
+	["RECUPERA", "TIRA", "La preda pescata recupera vita"],
+	["INTERAGISCI", "✦", "Altari, porte e passaggi"],
+	["CAMBIA AMO", "AMO", "Alterna pesca e attraversamento"],
 ]
 
 func _is_touch_platform() -> bool:
-	return OS.get_name() == "Android" or DisplayServer.is_touchscreen_available()
+	return OS.get_name() == "Android"
 
 func _ready():
 	layer = 200  # Sopra tutto
+	AsyncSceneLoader.preload_scene(DOGANA_SCENE)
 	_create_background()
 	_create_controls_display()
 	
@@ -58,17 +59,35 @@ func _ready():
 	skip_timer = auto_advance_time
 
 func _process(delta):
+	if _advancing:
+		return
 	skip_timer -= delta
-	
-	# Skip: tastiera/click su PC, qualsiasi input su touch
-	if Input.is_anything_pressed():
-		_go_to_game()
-	
 	# Skip automatico
 	if skip_timer <= 0:
 		_go_to_game()
 
+
+func _input(event: InputEvent) -> void:
+	if _advancing:
+		return
+	var pressed: bool = (
+		event is InputEventKey and event.pressed and not event.echo
+		or event is InputEventMouseButton and event.pressed
+		or event is InputEventScreenTouch and event.pressed
+	)
+	if pressed:
+		_go_to_game()
+
 func _create_background():
+	var backdrop := TextureRect.new()
+	backdrop.name = "IllustratedBackdrop"
+	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	backdrop.texture = ARRIVAL_ART
+	backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	backdrop.modulate = Color(0.26, 0.38, 0.38, 0.52)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(backdrop)
 	background = ColorRect.new()
 	background.name = "Background"
 	background.color = background_color
@@ -77,111 +96,131 @@ func _create_background():
 	add_child(background)
 
 func _create_controls_display():
-	# Container principale centrato
-	var main_container = CenterContainer.new()
+	var main_container := CenterContainer.new()
 	main_container.name = "MainContainer"
 	main_container.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(main_container)
-	
-	# Container verticale per i comandi
+
+	var frame := PanelContainer.new()
+	frame.custom_minimum_size = Vector2(1040, 630)
+	var frame_style := StyleBoxFlat.new()
+	frame_style.bg_color = Color(0.008, 0.028, 0.034, 0.93)
+	frame_style.border_color = Color(0.57, 0.5, 0.31, 0.72)
+	frame_style.set_border_width_all(1)
+	frame_style.set_corner_radius_all(10)
+	frame_style.content_margin_left = 44.0
+	frame_style.content_margin_right = 44.0
+	frame_style.content_margin_top = 28.0
+	frame_style.content_margin_bottom = 24.0
+	frame_style.shadow_color = Color(0, 0, 0, 0.72)
+	frame_style.shadow_size = 18
+	frame.add_theme_stylebox_override("panel", frame_style)
+	main_container.add_child(frame)
+
 	controls_container = VBoxContainer.new()
 	controls_container.name = "ControlsContainer"
-	controls_container.add_theme_constant_override("separation", 18)
+	controls_container.add_theme_constant_override("separation", 10)
 	controls_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	main_container.add_child(controls_container)
-	
-	# Titolo
-	var title = Label.new()
+	frame.add_child(controls_container)
+
+	var eyebrow := Label.new()
+	eyebrow.text = "MANUALE DEL PESCATORE  ·  I"
+	eyebrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	eyebrow.add_theme_font_override("font", BODY_FONT)
+	eyebrow.add_theme_font_size_override("font_size", 13)
+	eyebrow.add_theme_color_override("font_color", Color(0.38, 0.74, 0.68, 0.9))
+	controls_container.add_child(eyebrow)
+
+	var title := Label.new()
 	title.name = "Title"
-	title.text = "CONTROLLI"
+	title.text = "Sopravvivere al Caligo"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 48)
-	title.add_theme_color_override("font_color", text_color)
-	title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-	title.add_theme_constant_override("outline_size", 4)
+	title.add_theme_font_override("font", DISPLAY_FONT)
+	title.add_theme_font_size_override("font_size", 45)
+	title.add_theme_color_override("font_color", Color(0.91, 0.83, 0.62, 1.0))
+	title.add_theme_color_override("font_outline_color", Color(0, 0.01, 0.014, 0.95))
+	title.add_theme_constant_override("outline_size", 3)
 	controls_container.add_child(title)
-	
-	# Spaziatura
-	var spacer1 = Control.new()
-	spacer1.custom_minimum_size = Vector2(0, 30)
-	controls_container.add_child(spacer1)
-	
+
+	var rule := HSeparator.new()
+	rule.custom_minimum_size = Vector2(760, 8)
+	controls_container.add_child(rule)
+
 	var commands: Array = _commands_touch if _is_touch_platform() else _commands_pc
-	# Aggiungi ogni comando (solo testo, senza sprite)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 14)
+	grid.add_theme_constant_override("v_separation", 10)
+	controls_container.add_child(grid)
 	for cmd in commands:
-		var action = cmd[0]
-		var key = cmd[1]
-		var desc = cmd[2] if cmd.size() > 2 else ""
-		_create_command_row(action, key, desc)
-	
-	# Spaziatura finale
-	var spacer2 = Control.new()
-	spacer2.custom_minimum_size = Vector2(0, 30)
-	controls_container.add_child(spacer2)
-	
-	# Istruzione per continuare
-	var instruction = Label.new()
+		_create_command_row(grid, cmd[0], cmd[1], cmd[2])
+
+	var fishing_note := Label.new()
+	fishing_note.text = "PESCA PER VIVERE  ·  Ogni pesce recuperato restituisce salute."
+	fishing_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	fishing_note.add_theme_font_override("font", BODY_FONT)
+	fishing_note.add_theme_font_size_override("font_size", 17)
+	fishing_note.add_theme_color_override("font_color", Color(0.43, 0.9, 0.78, 1.0))
+	controls_container.add_child(fishing_note)
+
+	var instruction := Label.new()
 	instruction.name = "Instruction"
-	instruction.text = "Tocca lo schermo per continuare..." if _is_touch_platform() else "Premi un tasto qualsiasi per continuare..."
+	instruction.text = "TOCCA PER CONTINUARE" if _is_touch_platform() else "PREMI UN TASTO PER CONTINUARE"
 	instruction.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	instruction.add_theme_font_size_override("font_size", 20)
-	instruction.add_theme_color_override("font_color", Color(text_color.r, text_color.g, text_color.b, 0.7))
+	instruction.add_theme_font_override("font", BODY_FONT)
+	instruction.add_theme_font_size_override("font_size", 13)
+	instruction.add_theme_color_override("font_color", Color(0.74, 0.74, 0.65, 0.72))
 	controls_container.add_child(instruction)
-	
-	# Inizia invisibile per fade in
+
 	controls_container.modulate.a = 0.0
 
-func _create_command_row(action: String, key: String, description: String):
-	# Riga allineata: Azione (larghezza fissa) | Tasto (box fisso) | Descrizione (larghezza fissa)
-	var row = HBoxContainer.new()
+
+func _create_command_row(parent: GridContainer, action: String, key: String, description: String):
+	var row := PanelContainer.new()
 	row.name = "CommandRow_" + action
-	row.add_theme_constant_override("separation", 24)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	controls_container.add_child(row)
-	
-	# Colonna azione (larghezza fissa, allineata a destra)
-	var action_label = Label.new()
-	action_label.name = "ActionLabel"
-	action_label.text = action + ":"
-	action_label.add_theme_font_size_override("font_size", 24)
-	action_label.add_theme_color_override("font_color", text_color)
-	action_label.custom_minimum_size = Vector2(200, 0)
-	action_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	action_label.size_flags_horizontal = Control.SIZE_SHRINK_END
-	row.add_child(action_label)
-	
-	# Box tasto (larghezza fissa)
-	var key_box = Panel.new()
-	key_box.name = "KeyBox"
-	key_box.custom_minimum_size = Vector2(180, 40)
-	
-	var style = StyleBoxFlat.new()
-	style.bg_color = key_color
-	style.border_color = Color(key_color.r * 0.6, key_color.g * 0.6, key_color.b * 0.6, 1.0)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(5)
-	key_box.add_theme_stylebox_override("panel", style)
-	
-	var key_label = Label.new()
-	key_label.name = "KeyLabel"
+	row.custom_minimum_size = Vector2(468, 76)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.025, 0.07, 0.075, 0.82)
+	style.border_color = Color(0.25, 0.45, 0.4, 0.44)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 16.0
+	style.content_margin_right = 16.0
+	style.content_margin_top = 8.0
+	style.content_margin_bottom = 8.0
+	row.add_theme_stylebox_override("panel", style)
+	parent.add_child(row)
+
+	var layout := HBoxContainer.new()
+	layout.add_theme_constant_override("separation", 14)
+	row.add_child(layout)
+	var key_label := Label.new()
 	key_label.text = key
+	key_label.custom_minimum_size = Vector2(110, 0)
 	key_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	key_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	key_label.add_theme_font_size_override("font_size", 18)
-	key_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
-	key_box.add_child(key_label)
-	
-	row.add_child(key_box)
-	
-	# Colonna descrizione (larghezza fissa, allineata a sinistra)
-	var desc_label = Label.new()
+	key_label.add_theme_font_override("font", BODY_FONT)
+	key_label.add_theme_font_size_override("font_size", 16)
+	key_label.add_theme_color_override("font_color", Color(0.92, 0.81, 0.52, 1.0))
+	layout.add_child(key_label)
+
+	var copy := VBoxContainer.new()
+	copy.add_theme_constant_override("separation", 0)
+	layout.add_child(copy)
+	var action_label := Label.new()
+	action_label.name = "ActionLabel"
+	action_label.text = action
+	action_label.add_theme_font_override("font", BODY_FONT)
+	action_label.add_theme_font_size_override("font_size", 16)
+	action_label.add_theme_color_override("font_color", text_color)
+	copy.add_child(action_label)
+	var desc_label := Label.new()
 	desc_label.name = "DescLabel"
 	desc_label.text = description
-	desc_label.add_theme_font_size_override("font_size", 20)
-	desc_label.add_theme_color_override("font_color", Color(text_color.r, text_color.g, text_color.b, 0.85))
-	desc_label.custom_minimum_size = Vector2(340, 0)
-	desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	row.add_child(desc_label)
+	desc_label.add_theme_font_override("font", BODY_FONT)
+	desc_label.add_theme_font_size_override("font_size", 13)
+	desc_label.add_theme_color_override("font_color", Color(0.62, 0.7, 0.67, 0.9))
+	copy.add_child(desc_label)
 
 func _load_image_from_path(path: String) -> Texture2D:
 	# Prova a caricare come scena e estrarre lo sprite
@@ -220,6 +259,11 @@ func _fade_out():
 	await tween.finished
 
 func _go_to_game():
+	if _advancing:
+		return
+	_advancing = true
+	set_process(false)
+	set_process_input(false)
 	await _fade_out()
 	
 	# Passa alla schermata del testo poetico
@@ -227,7 +271,4 @@ func _go_to_game():
 	if poetic_scene:
 		get_tree().change_scene_to_packed(poetic_scene)
 	else:
-		# Se non esiste, vai direttamente al gioco
-		var game_scene = load("res://Levels/Scenes/test_area.tscn")
-		if game_scene:
-			get_tree().change_scene_to_packed(game_scene)
+		AsyncSceneLoader.load_scene("res://Levels/Scenes/punta_della_dogana.tscn")

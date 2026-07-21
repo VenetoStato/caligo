@@ -1,0 +1,216 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://Levels/Scenes/Dogana/dogana_map.gd" id="1_map"]
+[ext_resource type="Script" path="res://Levels/Scenes/Dogana/dogana_map_canvas.gd" id="2_canvas"]
+
+[sub_resource type="StyleBoxFlat" id="FrameStyle"]
+bg_color = Color(0.055, 0.064, 0.06, 0.985)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.68, 0.58, 0.36, 0.92)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.65)
+shadow_size = 18
+
+[sub_resource type="StyleBoxFlat" id="SiteStyle"]
+bg_color = Color(0.105, 0.15, 0.14, 0.94)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.72, 0.62, 0.34, 0.9)
+corner_radius_top_left = 9
+corner_radius_top_right = 9
+corner_radius_bottom_right = 9
+corner_radius_bottom_left = 9
+shadow_color = Color(0.1, 0.8, 0.72, 0.28)
+shadow_size = 9
+
+[sub_resource type="StyleBoxFlat" id="SiteHover"]
+bg_color = Color(0.12, 0.3, 0.27, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.95, 0.78, 0.38, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_color = Color(0.25, 1, 0.88, 0.4)
+shadow_size = 14
+
+[sub_resource type="StyleBoxFlat" id="SiteDisabled"]
+bg_color = Color(0.04, 0.055, 0.06, 0.88)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.25, 0.29, 0.28, 0.7)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="DoganaMap" type="CanvasLayer"]
+layer = 90
+script = ExtResource("1_map")
+
+[node name="MapButton" type="Button" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -430.0
+offset_top = 8.0
+offset_right = -320.0
+offset_bottom = 42.0
+text = "CARTA  [M]"
+
+[node name="Overlay" type="Control" parent="."]
+process_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.005, 0.012, 0.016, 0.9)
+
+[node name="Frame" type="Panel" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -500.0
+offset_top = -310.0
+offset_right = 500.0
+offset_bottom = 310.0
+grow_horizontal = 2
+grow_vertical = 2
+pivot_offset = Vector2(500, 310)
+theme_override_styles/panel = SubResource("FrameStyle")
+
+[node name="Title" type="Label" parent="Overlay/Frame"]
+layout_mode = 0
+offset_left = 80.0
+offset_top = 14.0
+offset_right = 920.0
+offset_bottom = 52.0
+theme_override_colors/font_color = Color(0.9, 0.79, 0.52, 1)
+theme_override_font_sizes/font_size = 28
+text = "CARTA DELLA PUNTA DELLA DOGANA"
+horizontal_alignment = 1
+vertical_alignment = 0
+
+[node name="Subtitle" type="Label" parent="Overlay/Frame"]
+layout_mode = 0
+offset_left = 80.0
+offset_top = 38.0
+offset_right = 920.0
+offset_bottom = 68.0
+theme_override_colors/font_color = Color(0.56, 0.75, 0.74, 0.8)
+theme_override_font_sizes/font_size = 14
+text = "LA CARTA SI COMPLETA MENTRE ESPLORI • I PASSAGGI SEGRETI APPAIONO SOLO DOPO LA SCOPERTA"
+horizontal_alignment = 1
+
+[node name="MapCanvas" type="Control" parent="Overlay/Frame"]
+layout_mode = 0
+offset_left = 26.0
+offset_top = 72.0
+offset_right = 974.0
+offset_bottom = 554.0
+mouse_filter = 2
+script = ExtResource("2_canvas")
+
+[node name="Pontile" type="Button" parent="Overlay/Frame/MapCanvas"]
+layout_mode = 1
+anchor_left = 0.12
+anchor_top = 0.64
+anchor_right = 0.12
+anchor_bottom = 0.64
+offset_left = -57.0
+offset_top = -29.0
+offset_right = 57.0
+offset_bottom = 29.0
+mouse_filter = 0
+theme_override_colors/font_color = Color(0.87, 0.91, 0.84, 1)
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("SiteStyle")
+theme_override_styles/hover = SubResource("SiteHover")
+theme_override_styles/pressed = SubResource("SiteHover")
+theme_override_styles/disabled = SubResource("SiteDisabled")
+text = "✦
+PONTILE"
+
+[node name="Dogana" type="Button" parent="Overlay/Frame/MapCanvas"]
+layout_mode = 1
+anchor_left = 0.54
+anchor_top = 0.5
+anchor_right = 0.54
+anchor_bottom = 0.5
+offset_left = -57.0
+offset_top = -29.0
+offset_right = 57.0
+offset_bottom = 29.0
+mouse_filter = 0
+theme_override_colors/font_color = Color(0.87, 0.91, 0.84, 1)
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("SiteStyle")
+theme_override_styles/hover = SubResource("SiteHover")
+theme_override_styles/pressed = SubResource("SiteHover")
+theme_override_styles/disabled = SubResource("SiteDisabled")
+text = "✦
+DOGANA"
+
+[node name="Fortuna" type="Button" parent="Overlay/Frame/MapCanvas"]
+layout_mode = 1
+anchor_left = 0.87
+anchor_top = 0.32
+anchor_right = 0.87
+anchor_bottom = 0.32
+offset_left = -57.0
+offset_top = -29.0
+offset_right = 57.0
+offset_bottom = 29.0
+mouse_filter = 0
+theme_override_colors/font_color = Color(0.87, 0.91, 0.84, 1)
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("SiteStyle")
+theme_override_styles/hover = SubResource("SiteHover")
+theme_override_styles/pressed = SubResource("SiteHover")
+theme_override_styles/disabled = SubResource("SiteDisabled")
+text = "✦
+FORTUNA"
+
+[node name="Status" type="Label" parent="Overlay/Frame"]
+layout_mode = 0
+offset_left = 80.0
+offset_top = 568.0
+offset_right = 920.0
+offset_bottom = 602.0
+theme_override_colors/font_color = Color(0.65, 0.77, 0.73, 0.88)
+theme_override_font_sizes/font_size = 14
+text = "✦ Altare attivo  •  ● Posizione  •  Tratto turchese: passaggio segreto scoperto"
+horizontal_alignment = 1
+
+[node name="Close" type="Button" parent="Overlay/Frame"]
+layout_mode = 0
+offset_left = 940.0
+offset_top = 14.0
+offset_right = 980.0
+offset_bottom = 54.0
+text = "×"

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Levels/Scenes/Dogana/eldritch_fishing_props.gd" id="1_props"]
+
+[node name="EldritchFishingProps" type="Node2D" groups=["dogana_eldritch_props"]]
+script = ExtResource("1_props")

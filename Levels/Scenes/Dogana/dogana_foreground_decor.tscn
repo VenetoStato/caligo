@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Levels/Scenes/Dogana/dogana_foreground_decor.gd" id="1_decor"]
+
+[node name="DoganaForegroundDecor" type="Node2D" groups=["dogana_foreground_decor"]]
+script = ExtResource("1_decor")

@@ -9,9 +9,11 @@ extends RigidBody2D
 @export_category("Movement")
 @export var natural_swim_speed: float = 85.0
 @export var attraction_speed: float = 72.0
-@export var swim_change_interval: float = 0.9
+@export var swim_change_interval: float = 1.8
 @export var escape_speed: float = 65.0
 @export var escape_duration: float = 2.2
+@export_range(0.0, 0.5) var vertical_wander := 0.22
+@export_range(0.0, 1.0) var turn_chance := 0.28
 
 @export_category("Swim Area")
 ## Area di nuoto orizzontale attorno alla casa
@@ -108,6 +110,10 @@ var _water_body: Node = null
 const WATER_BOUNDS_MARGIN: float = 38.0
 var _breath_timer: float = 0.0
 var _fish_base_scale: float = 0.1  # Salvata per evitare che il respiro faccia sparire il pesce
+var _individual_speed_scale := 1.0
+var _next_swim_change := 1.8
+var _target_swim_direction := Vector2.RIGHT
+var _swim_animation_time := 0.0
 
 func _ready():
 	add_to_group("fish")
@@ -141,7 +147,13 @@ func _ready():
 		_fish_base_scale = abs(sprite.scale.x) if abs(sprite.scale.x) > 0.001 else 0.1
 	_setup_underwater_shader()
 	_setup_detection_area()
+	_individual_speed_scale = randf_range(0.78, 1.18)
+	_next_swim_change = swim_change_interval * randf_range(0.72, 1.45)
 	_pick_new_swim_direction()
+	var animation_player := get_node_or_null("AnimationPlayer") as AnimationPlayer
+	if animation_player:
+		# L'animazione viene avanzata direttamente: evita cache invalide durante i cambi scena rapidi.
+		animation_player.active = false
 
 func _setup_underwater_shader():
 	# Applica distorsione leggera ai pesci quando sono in acqua
@@ -205,7 +217,13 @@ func _setup_detection_area():
 		area.area_exited.connect(_on_area_exited)
 
 func _physics_process(delta: float):
+	# During a scene swap the old physics frame can still finish after current_scene
+	# has changed. Do not touch transforms or rendering resources while our scene exits.
+	var active_scene := get_tree().current_scene
+	if active_scene == null or not active_scene.is_ancestor_of(self):
+		return
 	# Aggiorna cooldown
+	_swim_animation_time += delta * _individual_speed_scale
 	if hook_cooldown > 0:
 		hook_cooldown -= delta
 	if _flip_cooldown > 0:
@@ -214,10 +232,6 @@ func _physics_process(delta: float):
 	# FORZA: blocca sempre la rotazione
 	lock_rotation = true
 	rotation = 0.0
-	
-	# Assicura che lo sprite non ruoti mai
-	if sprite != null:
-		sprite.rotation = 0.0
 	
 	# Se agganciato e sopra la superficie (ma non in reel zone): gravità lo riporta in acqua
 	var above_surface: bool = _is_above_water_surface()
@@ -302,11 +316,13 @@ func _process_swimming(delta: float):
 	else:
 		# Nuoto normale (movimento libero)
 		swim_timer += delta
-		if swim_timer >= swim_change_interval:
+		if swim_timer >= _next_swim_change:
 			swim_timer = 0.0
+			_next_swim_change = swim_change_interval * randf_range(0.72, 1.45)
 			_pick_new_swim_direction()
 
-		desired = swim_direction * natural_swim_speed
+		swim_direction = swim_direction.slerp(_target_swim_direction, minf(1.0, delta * 1.35)).normalized()
+		desired = swim_direction * natural_swim_speed * _individual_speed_scale
 
 	# Boundary steering: in reel zone vicino al player non spingere verso i bordi, così il pesce va diritto verso il player
 	if not (is_hooked_to_player and _in_reel_zone()):
@@ -399,21 +415,29 @@ func _process_falling(delta: float):
 	velocity.x *= 0.98
 
 func _pick_new_swim_direction():
-	# Movimento libero (non solo orizzontale)
-	# I pesci Go' si muovono poco dal fondale, quindi preferiscono movimento orizzontale
-	# ma possono anche muoversi leggermente in verticale
-	var angle = randf() * TAU
-	# Preferisci angoli più orizzontali (pesci sul fondale)
-	var horizontal_bias = 0.3  # 0.3 = più orizzontale, 1.0 = completamente random
-	var adjusted_angle = angle * horizontal_bias + (PI/2) * (1.0 - horizontal_bias)
-	swim_direction = Vector2(cos(adjusted_angle), sin(adjusted_angle) * 0.5).normalized()
+	# Conserva una rotta coerente e cambia lato solo occasionalmente.
+	# La vecchia formula produceva quasi sempre angoli verso sinistra e scatti innaturali.
+	var horizontal_sign := signf(swim_direction.x)
+	if is_zero_approx(horizontal_sign):
+		horizontal_sign = -1.0 if randf() < 0.5 else 1.0
+	if randf() < turn_chance:
+		horizontal_sign *= -1.0
+	var vertical := randf_range(-vertical_wander, vertical_wander)
+	_target_swim_direction = Vector2(horizontal_sign, vertical).normalized()
+	if swim_direction.length_squared() < 0.1:
+		swim_direction = _target_swim_direction
 
 func _update_sprite_direction():
 	if sprite == null:
 		return
 	
-	# FORZA: lo sprite non deve mai ruotare
-	sprite.rotation = 0.0
+	# Una lieve inclinazione segue la traiettoria; resta contenuta per non sembrare rotazione rigida.
+	var target_pitch := clampf(velocity.y / maxf(1.0, natural_swim_speed) * 0.12, -0.12, 0.12)
+	sprite.rotation = lerpf(sprite.rotation, target_pitch, 0.08)
+	if sprite is Sprite2D:
+		var fish_sprite := sprite as Sprite2D
+		if fish_sprite.hframes * fish_sprite.vframes >= 5:
+			fish_sprite.frame = 1 + int(_swim_animation_time * 8.0) % 4
 
 	# Flip solo se la velocità è chiara e non siamo in cooldown (evita "impazzire" a destra/sinistra)
 	if _flip_cooldown > 0:

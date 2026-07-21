@@ -1,0 +1,45 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://Levels/Scenes/Dogana/drowned_customs_warden.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/drowned_customs_warden.png" id="2_texture"]
+
+[sub_resource type="RectangleShape2D" id="BodyShape"]
+size = Vector2(128, 132)
+
+[sub_resource type="RectangleShape2D" id="HurtShape"]
+size = Vector2(178, 208)
+
+[sub_resource type="RectangleShape2D" id="AttackShape"]
+size = Vector2(214, 148)
+
+[node name="DrownedCustomsWarden" type="CharacterBody2D" groups=["dogana_boss"]]
+collision_layer = 2
+collision_mask = 1
+script = ExtResource("1_script")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(0, -111)
+scale = Vector2(0.46, 0.46)
+texture = ExtResource("2_texture")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -66)
+shape = SubResource("BodyShape")
+
+[node name="Hurtbox" type="Area2D" parent="."]
+position = Vector2(0, -102)
+collision_layer = 2
+collision_mask = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
+shape = SubResource("HurtShape")
+
+[node name="AttackHitbox" type="Area2D" parent="."]
+position = Vector2(0, -76)
+collision_layer = 0
+collision_mask = 2
+monitoring = false
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="AttackHitbox"]
+shape = SubResource("AttackShape")

@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 autoload_transition="*res://TransitionManager.gd"
 AchievementManager="*res://AchievementManager.gd"
 MobileControlsManager="*res://MobileControlsManager.gd"
+AsyncSceneLoader="*res://AsyncSceneLoader.gd"
 
 [display]
 
@@ -152,6 +153,10 @@ pause_menu={
 [input_devices]
 
 pointing/emulate_touch_from_mouse=true
+
+[gui]
+
+theme/custom="res://UI/caligo_ui_theme.tres"
 
 [plugins]
 

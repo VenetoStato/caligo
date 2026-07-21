@@ -1,0 +1,46 @@
+extends Node2D
+
+@onready var _player: CharacterBody2D = $Player
+@onready var _water: Node = $Water
+
+var _frame := 0
+var _peak_wave := 0.0
+var _entries := 0
+var _was_in_water := false
+var _strongest_bounce := 0.0
+
+
+func _physics_process(_delta: float) -> void:
+	_frame += 1
+	if "springs" in _water:
+		for spring in _water.springs:
+			_peak_wave = maxf(
+				_peak_wave,
+				absf(spring.position.y - float(spring.get("target_height")))
+			)
+	if _player.is_in_water and not _was_in_water:
+		_entries += 1
+		_strongest_bounce = minf(_strongest_bounce, _player.velocity.y)
+	_was_in_water = _player.is_in_water
+
+	if _frame < 110:
+		return
+	print("CALIGO_PLAYER_WATER_TEST: health %d, entries %d, bounce %.2f, peak wave %.2f px" % [
+		_player.current_health,
+		_entries,
+		_strongest_bounce,
+		_peak_wave,
+	])
+	if _entries < 1 or _player.current_health != maxi(0, _player.max_health - _entries):
+		push_error("Every distinct water entry must remove one health point.")
+		get_tree().quit(1)
+		return
+	if _strongest_bounce > -120.0:
+		push_error("Water entry must bounce the player upward.")
+		get_tree().quit(1)
+		return
+	if _peak_wave < 2.0:
+		push_error("Player entry did not create a visible physical wave.")
+		get_tree().quit(1)
+		return
+	get_tree().quit(0)

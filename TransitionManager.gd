@@ -53,8 +53,6 @@ func _create_fade_rect():
 	
 	# Copre tutto lo schermo
 	fade_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-	fade_rect.size = get_viewport().get_visible_rect().size * 2
-	fade_rect.position = -fade_rect.size / 4
 	
 	add_child(fade_rect)
 	

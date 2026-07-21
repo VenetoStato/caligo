@@ -16,10 +16,11 @@ extends CharacterBody2D
 
 @export_category("Aggro")
 @export var aggro_range: float = 140.0   # distanza: se il player si avvicina entro questo range, diventa aggressivo
-@export var jump_interval: float = 1.2   # secondi tra un salto e l'altro in aggro
+@export var wake_delay: float = 0.75      # breve telegraph prima che possa attivarsi
+@export var jump_interval: float = 1.7   # secondi tra un salto e l'altro in aggro
 @export var attack_range: float = 45.0   # distanza per considerare "vicino" al player
 @export var attack_damage: int = 1
-@export var attack_cooldown: float = 0.8
+@export var attack_cooldown: float = 1.35
 @export var knockback_speed: float = 1020.0  # rinculo quando colpito (metà di 2040)
 @export var knockback_duration: float = 0.35
 
@@ -42,6 +43,7 @@ var _attack_hitbox_disable_timer: float = 0.0
 var _knockback_timer: float = 0.0
 var _hit_flash_timer: float = 0.0
 var _flip_cooldown: float = 0.0
+var _attack_has_hit := false
 const FLIP_MIN_INTERVAL: float = 0.45  # cooldown tra un cambio direzione e l'altro (evita glitch avanti/indietro)
 
 var _hurtbox: Area2D = null
@@ -50,10 +52,12 @@ var _anim: AnimationPlayer = null
 var _original_sprite_scale: Vector2 = Vector2.ONE
 var _breath_timer: float = 0.0
 var _original_modulate: Color = Color(1.0, 1.0, 1.0, 1.0)
+var _wake_timer := 0.0
 
 func _ready():
 	add_to_group("enemy")
 	current_health = max_health
+	_wake_timer = wake_delay
 	_anim = get_node_or_null("AnimationPlayer")
 	_hurtbox = get_node_or_null("Hurtbox")
 	_attack_hitbox = get_node_or_null("AttackHitbox")
@@ -76,6 +80,8 @@ func _ready():
 	play_idle()
 
 func _physics_process(delta: float) -> void:
+	if state == State.DEAD:
+		return
 	# Respiro: espansione verticale leggera, poca compressione orizzontale
 	if sprite_node and state != State.DEAD:
 		_breath_timer += delta
@@ -93,11 +99,12 @@ func _physics_process(delta: float) -> void:
 				sprite_node.modulate = hit_flash_color
 
 	if state == State.IDLE:
+		_wake_timer = maxf(0.0, _wake_timer - delta)
 		# Se il player si avvicina, diventa aggressivo
 		var p = get_tree().get_first_node_in_group("player") as Node2D
 		if p and is_instance_valid(p):
 			var d = global_position.distance_to(p.global_position)
-			if d <= aggro_range:
+			if d <= aggro_range and _wake_timer <= 0.0:
 				state = State.AGGRO
 				player = p
 				jump_timer = 0.0
@@ -159,6 +166,7 @@ func _physics_process(delta: float) -> void:
 	var dist: float = global_position.distance_to(player.global_position)
 	if dist <= attack_range and attack_timer <= 0.0 and _attack_hitbox and _attack_hitbox_disable_timer <= 0.0:
 		attack_timer = attack_cooldown
+		_attack_has_hit = false
 		_attack_hitbox.monitoring = true
 		_attack_hitbox_disable_timer = 0.25
 		if _anim and _anim.has_animation("Attack"):
@@ -262,6 +270,12 @@ func _spawn_hit_particles(source_position: Vector2) -> void:
 
 func _die() -> void:
 	state = State.DEAD
+	if _hurtbox:
+		_hurtbox.set_deferred("monitoring", false)
+	if _attack_hitbox:
+		_attack_hitbox.set_deferred("monitoring", false)
+	collision_layer = 0
+	collision_mask = 0
 	# Crea un RigidBody2D "Dead Gamberetto" spostabile (attacco e hook possono spingerlo)
 	# Aggiungilo in deferred per evitare "Can't change this state while flushing queries"
 	var parent_node: Node = get_parent()
@@ -299,8 +313,13 @@ func _die() -> void:
 	queue_free()
 
 func _on_attack_hit_body(body: Node2D) -> void:
-	if body.is_in_group("player"):
-		if body.has_method("take_damage"):
-			body.take_damage(attack_damage, global_position)
-		elif "current_health" in body:
-			body.current_health = max(0, body.current_health - attack_damage)
+	if state == State.DEAD or _attack_has_hit or body == null or not is_instance_valid(body):
+		return
+	if not body.is_in_group("player"):
+		return
+	_attack_has_hit = true
+	# Deferred evita mutazioni del player/death sequence durante il flush della query fisica.
+	if body.has_method("take_damage"):
+		body.call_deferred("take_damage", attack_damage, global_position)
+	elif "current_health" in body:
+		body.set_deferred("current_health", maxi(0, int(body.get("current_health")) - attack_damage))

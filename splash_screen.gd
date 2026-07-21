@@ -1,9 +1,8 @@
 extends CanvasLayer
 
-# ===========================================
-# SPLASH SCREEN - Schermata iniziale CALIGO
-# ===========================================
-# Mostra il titolo con fade in/out
+const DISPLAY_FONT := preload("res://UI/Fonts/CormorantGaramond.ttf")
+const BODY_FONT := preload("res://UI/Fonts/SourceSans3.ttf")
+const ARRIVAL_ART := preload("res://Landscape/Dogana/Illustrated/arrival.png")
 
 @export_category("Timing")
 @export var fade_in_duration: float = 1.5
@@ -19,8 +18,11 @@ extends CanvasLayer
 
 var title_label: Label
 var background: ColorRect
+var title_group: VBoxContainer
 var can_skip: bool = true  # Permetti di skippare subito
 var is_skipping: bool = false  # Evita skip multipli
+var _transition_started := false
+var _active_tween: Tween
 
 func _ready():
 	layer = 200  # Sopra tutto
@@ -33,19 +35,45 @@ func _ready():
 
 func _input(event):
 	# Permetti di skippare con qualsiasi tasto o click
-	if can_skip and not is_skipping and (event is InputEventKey or event is InputEventMouseButton):
+	if can_skip and not is_skipping and (event is InputEventKey or event is InputEventMouseButton or event is InputEventScreenTouch):
 		if event.pressed:
 			_skip_to_controls()
 
 func _create_background():
+	var backdrop := TextureRect.new()
+	backdrop.name = "IllustratedBackdrop"
+	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	backdrop.texture = ARRIVAL_ART
+	backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	backdrop.modulate = Color(0.24, 0.34, 0.35, 0.54)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(backdrop)
 	background = ColorRect.new()
 	background.name = "Background"
-	background.color = Color(0, 0, 0, 1)
+	background.color = Color(0.003, 0.014, 0.02, 0.72)
 	background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(background)
 
 func _create_title():
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(center)
+	title_group = VBoxContainer.new()
+	title_group.custom_minimum_size = Vector2(720, 240)
+	title_group.alignment = BoxContainer.ALIGNMENT_CENTER
+	title_group.add_theme_constant_override("separation", 3)
+	center.add_child(title_group)
+
+	var eyebrow := Label.new()
+	eyebrow.text = "UNA STORIA DI PESCA NELLA NEBBIA"
+	eyebrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	eyebrow.add_theme_font_override("font", BODY_FONT)
+	eyebrow.add_theme_font_size_override("font_size", 13)
+	eyebrow.add_theme_color_override("font_color", Color(0.42, 0.78, 0.72, 0.88))
+	title_group.add_child(eyebrow)
+
 	title_label = Label.new()
 	title_label.name = "TitleLabel"
 	title_label.text = title_text
@@ -53,7 +81,8 @@ func _create_title():
 	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	
 	# Font grande e pulito
-	title_label.add_theme_font_size_override("font_size", title_font_size)
+	title_label.add_theme_font_override("font", DISPLAY_FONT)
+	title_label.add_theme_font_size_override("font_size", 104)
 	
 	# Colore principale
 	title_label.add_theme_color_override("font_color", title_color)
@@ -62,39 +91,39 @@ func _create_title():
 	title_label.add_theme_color_override("font_outline_color", title_outline_color)
 	title_label.add_theme_constant_override("outline_size", title_outline_size)
 	
-	# Centra PERFETTAMENTE al centro dello schermo
-	var viewport_size = get_viewport().get_visible_rect().size
-	title_label.set_anchors_preset(Control.PRESET_CENTER)
-	title_label.offset_left = -250
-	title_label.offset_top = -60
-	title_label.offset_right = 250
-	title_label.offset_bottom = 60
-	
-	add_child(title_label)
-	
-	# Inizia invisibile
-	title_label.modulate.a = 0.0
+	title_label.custom_minimum_size = Vector2(720, 118)
+	title_group.add_child(title_label)
+
+	var subtitle := Label.new()
+	subtitle.text = "PUNTA DELLA DOGANA  ·  VENEZIA"
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.add_theme_font_override("font", BODY_FONT)
+	subtitle.add_theme_font_size_override("font_size", 16)
+	subtitle.add_theme_color_override("font_color", Color(0.86, 0.76, 0.53, 0.88))
+	title_group.add_child(subtitle)
+
+	title_group.modulate.a = 0.0
 
 func _play_sequence():
-	# Fade in del titolo semplice ed elegante (senza movimento, solo fade)
-	var tween = create_tween()
-	tween.tween_property(title_label, "modulate:a", 1.0, fade_in_duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-	
-	await tween.finished
-	
-	# Mantieni visibile
-	await get_tree().create_timer(display_duration).timeout
-	
-	# Fade out semplice
-	tween = create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(title_label, "modulate:a", 0.0, fade_out_duration).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
-	tween.tween_property(background, "color:a", 0.0, fade_out_duration)
-	
-	await tween.finished
-	
-	# Passa alla schermata dei comandi
-	_go_to_controls()
+	_active_tween = create_tween()
+	_active_tween.tween_property(title_group, "modulate:a", 1.0, fade_in_duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	_active_tween.finished.connect(_on_title_faded_in, CONNECT_ONE_SHOT)
+
+
+func _on_title_faded_in() -> void:
+	if is_skipping or _transition_started:
+		return
+	get_tree().create_timer(display_duration).timeout.connect(_fade_sequence_out, CONNECT_ONE_SHOT)
+
+
+func _fade_sequence_out() -> void:
+	if is_skipping or _transition_started:
+		return
+	_active_tween = create_tween()
+	_active_tween.set_parallel(true)
+	_active_tween.tween_property(title_group, "modulate:a", 0.0, fade_out_duration).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+	_active_tween.tween_property(background, "color:a", 0.0, fade_out_duration)
+	_active_tween.finished.connect(_go_to_controls, CONNECT_ONE_SHOT)
 
 func _skip_to_controls():
 	# Evita skip multipli
@@ -104,23 +133,21 @@ func _skip_to_controls():
 	is_skipping = true
 	can_skip = false
 	
-	# Fade out rapido
-	var tween = create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(title_label, "modulate:a", 0.0, 0.2).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
-	tween.tween_property(background, "color:a", 0.0, 0.2)
-	
-	await tween.finished
-	
-	# Passa alla schermata dei comandi
-	_go_to_controls()
+	if _active_tween and _active_tween.is_valid():
+		_active_tween.kill()
+	_active_tween = create_tween()
+	_active_tween.set_parallel(true)
+	_active_tween.tween_property(title_group, "modulate:a", 0.0, 0.2).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+	_active_tween.tween_property(background, "color:a", 0.0, 0.2)
+	_active_tween.finished.connect(_go_to_controls, CONNECT_ONE_SHOT)
 
 func _go_to_controls():
+	if _transition_started:
+		return
+	_transition_started = true
+	can_skip = false
 	var controls_scene = load("res://controls_info.tscn")
 	if controls_scene:
 		get_tree().change_scene_to_packed(controls_scene)
 	else:
-		# Se non esiste, vai direttamente al gioco
-		var game_scene = load("res://Levels/Scenes/test_area.tscn")
-		if game_scene:
-			get_tree().change_scene_to_packed(game_scene)
+		AsyncSceneLoader.load_scene("res://Levels/Scenes/punta_della_dogana.tscn")

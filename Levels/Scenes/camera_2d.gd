@@ -214,9 +214,18 @@ func _update_postfx_center() -> void:
 	_post_mat.set_shader_parameter("u_center_uv", center_uv)
 
 func _clamp_to_room(p: Vector2) -> Vector2:
-	# This clamps camera center inside room rect.
-	# If you use zoom or want perfect edge behavior, adapt with viewport size.
 	var r := room_limits
-	p.x = clamp(p.x, r.position.x, r.position.x + r.size.x)
-	p.y = clamp(p.y, r.position.y, r.position.y + r.size.y)
+	var viewport_size := get_viewport().get_visible_rect().size
+	var safe_zoom := Vector2(maxf(zoom.x, 0.01), maxf(zoom.y, 0.01))
+	var half_view := viewport_size * 0.5 / safe_zoom
+	var min_center := r.position + half_view
+	var max_center := r.end - half_view
+	if min_center.x <= max_center.x:
+		p.x = clampf(p.x, min_center.x, max_center.x)
+	else:
+		p.x = r.get_center().x
+	if min_center.y <= max_center.y:
+		p.y = clampf(p.y, min_center.y, max_center.y)
+	else:
+		p.y = r.get_center().y
 	return p

@@ -1,0 +1,18 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/bricola.svg" id="1_bricola"]
+
+[sub_resource type="RectangleShape2D" id="BricolaCollision"]
+size = Vector2(48, 278)
+
+[node name="Bricola" type="StaticBody2D" groups=["dogana_bricole", "dogana_geometry"]]
+collision_layer = 1
+collision_mask = 2
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(0, -137)
+texture = ExtResource("1_bricola")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -126)
+shape = SubResource("BricolaCollision")

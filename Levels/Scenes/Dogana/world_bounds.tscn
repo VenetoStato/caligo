@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Levels/Scenes/Dogana/world_bounds.gd" id="1_bounds"]
+
+[node name="WorldBounds" type="Node2D" groups=["dogana_world_bounds"]]
+script = ExtResource("1_bounds")

@@ -1,0 +1,29 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://Levels/Scenes/Dogana/breakable_wall.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/breakable_fishbone_wall.png" id="2_texture"]
+
+[sub_resource type="RectangleShape2D" id="WallShape"]
+size = Vector2(54, 188)
+
+[sub_resource type="RectangleShape2D" id="HurtShape"]
+size = Vector2(76, 204)
+
+[node name="BreakableWall" type="StaticBody2D" groups=["dogana_breakable"]]
+collision_layer = 1
+collision_mask = 2
+script = ExtResource("1_script")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("WallShape")
+
+[node name="Visual" type="Sprite2D" parent="."]
+scale = Vector2(0.2, 0.44)
+texture = ExtResource("2_texture")
+
+[node name="Hurtbox" type="Area2D" parent="."]
+collision_layer = 2
+collision_mask = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
+shape = SubResource("HurtShape")

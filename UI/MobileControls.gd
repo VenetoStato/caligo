@@ -18,6 +18,7 @@ const BUTTON_LABELS := {
 	"reel": "↙",
 	"grab": "✧",
 	"change_hook": "⇄",
+	"interact": "✦",
 }
 
 func _ready() -> void:
@@ -35,6 +36,7 @@ func _ready() -> void:
 	# --- SINISTRA (r0): sinistra e salto ---
 	_place("ui_left", MARGIN_H, r0, BTN, BTN, false)
 	_place("ui_accept", MARGIN_H + BTN + GAP, r0, BTN, BTN, false)
+	_place("interact", MARGIN_H + BTN + GAP, r1, BTN, BTN, true)
 	# --- DESTRA: destra (r1) + combattimento ---
 	var c4 := w - MARGIN_H - BTN
 	var c3 := c4 - BTN - GAP
@@ -80,7 +82,7 @@ func _remove_mouse_from_attack_actions() -> void:
 				InputMap.action_erase_event(action_name, ev)
 
 func _is_mobile() -> bool:
-	return OS.get_name() == "Android" or DisplayServer.is_touchscreen_available()
+	return OS.get_name() == "Android"
 
 func _place(action: String, px: float, py: float, sz: float, sz_y: float, is_fish: bool) -> void:
 	var label: String = BUTTON_LABELS.get(action, "?")
@@ -107,26 +109,26 @@ func _place(action: String, px: float, py: float, sz: float, sz_y: float, is_fis
 		btn.add_theme_color_override("font_color", Color(1.0, 0.98, 0.9, 1))
 		btn.add_theme_color_override("font_pressed_color", Color(1.0, 1.0, 0.95, 1))
 	elif is_fish:
-		style_n.bg_color = Color(0.06, 0.16, 0.22, 0.92)
-		style_n.border_color = Color(0.48, 0.7, 0.65, 0.88)
+		style_n.bg_color = Color(0.025, 0.1, 0.13, 0.5)
+		style_n.border_color = Color(0.48, 0.78, 0.7, 0.62)
 		style_n.set_border_width_all(2)
 		style_n.set_corner_radius_all(radius)
-		style_n.shadow_color = Color(0, 0, 0, 0.35)
-		style_n.shadow_size = 4
-		_apply_pressed_gradient(style_p, Color(0.25, 0.45, 0.55, 1.0), Color(0.65, 0.9, 0.85, 1.0), radius, 2)
+		style_n.shadow_color = Color(0, 0, 0, 0.18)
+		style_n.shadow_size = 2
+		_apply_pressed_gradient(style_p, Color(0.16, 0.38, 0.43, 0.82), Color(0.65, 0.9, 0.85, 0.9), radius, 2)
 		btn.add_theme_font_size_override("font_size", 38)
-		btn.add_theme_color_override("font_color", Color(0.98, 1.0, 0.95, 1))
+		btn.add_theme_color_override("font_color", Color(0.98, 1.0, 0.95, 0.78))
 		btn.add_theme_color_override("font_pressed_color", Color(1.0, 1.0, 1.0, 1))
 	else:
-		style_n.bg_color = Color(0.08, 0.12, 0.2, 0.9)
-		style_n.border_color = Color(0.38, 0.5, 0.78, 0.88)
+		style_n.bg_color = Color(0.035, 0.055, 0.1, 0.48)
+		style_n.border_color = Color(0.45, 0.58, 0.82, 0.62)
 		style_n.set_border_width_all(2)
 		style_n.set_corner_radius_all(radius)
-		style_n.shadow_color = Color(0, 0, 0, 0.35)
-		style_n.shadow_size = 4
-		_apply_pressed_gradient(style_p, Color(0.35, 0.45, 0.75, 1.0), Color(0.7, 0.85, 1.0, 1.0), radius, 2)
+		style_n.shadow_color = Color(0, 0, 0, 0.18)
+		style_n.shadow_size = 2
+		_apply_pressed_gradient(style_p, Color(0.25, 0.35, 0.65, 0.82), Color(0.7, 0.85, 1.0, 0.9), radius, 2)
 		btn.add_theme_font_size_override("font_size", 38)
-		btn.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0, 1))
+		btn.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0, 0.78))
 		btn.add_theme_color_override("font_pressed_color", Color(1.0, 1.0, 1.0, 1))
 	btn.add_theme_stylebox_override("normal", style_n)
 	btn.add_theme_stylebox_override("pressed", style_p)

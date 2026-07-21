@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="430" viewBox="0 0 1120 430">
+  <defs>
+    <linearGradient id="stone" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#4c5358"/><stop offset="1" stop-color="#20272c"/>
+    </linearGradient>
+    <pattern id="blocks" width="92" height="42" patternUnits="userSpaceOnUse">
+      <path d="M0 1h92M0 41h92M46 1v40" stroke="#9a978c" stroke-opacity=".13" fill="none"/>
+    </pattern>
+  </defs>
+  <path d="M20 392L558 22l542 370v30H20z" fill="url(#stone)" stroke="#777a76" stroke-width="5"/>
+  <path d="M20 392L558 22l542 370v30H20z" fill="url(#blocks)"/>
+  <path d="M70 392L558 70l492 322" fill="none" stroke="#b7aa92" stroke-width="7" opacity=".28"/>
+  <g fill="#12191e" opacity=".78">
+    <rect x="208" y="320" width="80" height="72" rx="3"/>
+    <rect x="832" y="320" width="80" height="72" rx="3"/>
+    <rect x="511" y="225" width="96" height="167" rx="45"/>
+  </g>
+  <g fill="#9e947e" opacity=".26">
+    <rect x="334" y="280" width="38" height="52"/><rect x="748" y="280" width="38" height="52"/>
+  </g>
+</svg>
