@@ -117,6 +117,7 @@ func _build_platform_art() -> void:
 		var scale_x := rect.size.x / float(PLATFORM_TEXTURE.get_width())
 		sprite.scale = Vector2(scale_x, scale_x * 0.72)
 		sprite.modulate = Color(0.64, 0.72, 0.7, 1.0)
+		sprite.set_meta("walkable_rect", rect)
 		art.add_child(sprite)
 		var rim := Line2D.new()
 		rim.points = PackedVector2Array([rect.position, Vector2(rect.end.x, rect.position.y)])
@@ -298,6 +299,7 @@ func _build_enemy_encounters() -> void:
 		][index]
 		enemy.scale = Vector2(0.036, 0.036)
 		enemy.set("wake_delay", 1.45 + index * 0.2)
+		enemy.set("activation_managed", true)
 		container.add_child(enemy)
 		enemy.set_physics_process(false)
 		_palace_enemies.append(enemy)

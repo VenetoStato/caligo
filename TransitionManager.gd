@@ -1,12 +1,14 @@
 extends CanvasLayer
 
+class_name TransitionManager
+
+const PARTICLE_BURST := preload("res://Fx/particle_burst.gd")
+
 # ===========================================
 # TRANSITION MANAGER - Fade In/Out stile Hollow Knight
 # ===========================================
 # Gestisce le transizioni di schermo (fade in/out)
 # e gli effetti di morte/respawn
-
-class_name TransitionManager
 
 # Singleton
 static var instance: TransitionManager
@@ -187,8 +189,16 @@ func _spawn_death_particles(pos: Vector2) -> void:
 			if p.has_method("play"):
 				p.call("play")
 	else:
-		# Crea particelle semplici se non c'è una scena
-		_spawn_simple_death_particles(pos)
+		PARTICLE_BURST.spawn(
+			get_tree().current_scene,
+			pos,
+			Color(0.08, 0.12, 0.13, 0.95),
+			death_particle_count * 2,
+			Vector2.UP,
+			75.0,
+			210.0,
+			1.0
+		)
 
 func _spawn_simple_death_particles(pos: Vector2) -> void:
 	for i in range(death_particle_count):

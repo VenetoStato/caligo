@@ -1,4 +1,4 @@
-[gd_scene load_steps=41 format=3]
+[gd_scene load_steps=45 format=3]
 
 [ext_resource type="Script" path="res://Levels/Scenes/Dogana/dogana_level.gd" id="1_level"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/dogana_environment.tscn" id="2_environment"]
@@ -23,6 +23,10 @@
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/vertical_palace.tscn" id="21_palace"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/world_bounds.tscn" id="22_bounds"]
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/quay_platform.png" id="23_platform_texture"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/tide_bloater.png" id="24_bloater"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/lagoon_oracle.png" id="25_oracle"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/tutorial_gate.tscn" id="26_tutorial_gate"]
+[ext_resource type="Script" path="res://Levels/Scenes/Dogana/access_marker.gd" id="27_access_marker"]
 
 [sub_resource type="RectangleShape2D" id="GroundArrival"]
 size = Vector2(1010, 96)
@@ -72,9 +76,9 @@ size = Vector2(30, 220)
 [sub_resource type="ShaderMaterial" id="DoganaPostFX"]
 shader = ExtResource("6_postfx")
 shader_parameter/u_center_uv = Vector2(0.5, 0.52)
-shader_parameter/u_vignette_strength = 0.72
-shader_parameter/u_vignette_softness = 0.48
-shader_parameter/u_vignette_radius = 1.02
+shader_parameter/u_vignette_strength = 0.88
+shader_parameter/u_vignette_softness = 0.42
+shader_parameter/u_vignette_radius = 0.94
 shader_parameter/u_grain_amount = 0.075
 shader_parameter/u_grain_size = 2.1
 shader_parameter/u_grain_speed = 0.7
@@ -122,6 +126,35 @@ visible = false
 [node name="VerticalPalace" parent="Gameplay" instance=ExtResource("21_palace")]
 
 [node name="WorldBounds" parent="Gameplay" instance=ExtResource("22_bounds")]
+
+[node name="TutorialGate" parent="Gameplay" instance=ExtResource("26_tutorial_gate")]
+position = Vector2(1100, 350)
+
+[node name="AccessMarkers" type="Node2D" parent="Gameplay"]
+
+[node name="ArchiveEntry" type="Node2D" parent="Gameplay/AccessMarkers"]
+position = Vector2(2000, 756)
+script = ExtResource("27_access_marker")
+access_id = "archive"
+
+[node name="PalaceEntry" type="Node2D" parent="Gameplay/AccessMarkers"]
+position = Vector2(2710, 55)
+script = ExtResource("27_access_marker")
+access_id = "palace"
+marker_scale = 0.85
+
+[node name="GateControl" type="Node2D" parent="Gameplay/AccessMarkers"]
+position = Vector2(3110, 335)
+script = ExtResource("27_access_marker")
+access_id = "canal_gate"
+marker_color = Color(0.86, 0.69, 0.32, 1)
+marker_scale = 0.85
+
+[node name="OssuaryEntry" type="Node2D" parent="Gameplay/AccessMarkers"]
+position = Vector2(3995, 145)
+script = ExtResource("27_access_marker")
+access_id = "ossuary"
+marker_scale = 0.78
 
 [node name="Spawn" type="Marker2D" parent="Gameplay" groups=["spawn"]]
 position = Vector2(330, 425)
@@ -725,6 +758,62 @@ position = Vector2(4300, 188)
 scale = Vector2(0.034, 0.034)
 wake_delay = 1.6
 
+[node name="TideBloaterCustoms" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(2390, 350)
+scale = Vector2(0.06, 0.06)
+move_speed = 48.0
+max_health = 8
+aggro_range = 205.0
+wake_delay = 2.0
+attack_pattern = 1
+variant_texture = ExtResource("24_bloater")
+variant_scale_multiplier = 0.82
+special_attack_cooldown = 3.7
+area_attack_radius = 94.0
+
+[node name="LagoonOracleWedge" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(2780, 120)
+scale = Vector2(0.055, 0.055)
+move_speed = 62.0
+max_health = 7
+aggro_range = 245.0
+wake_delay = 2.2
+attack_pattern = 2
+variant_texture = ExtResource("25_oracle")
+variant_scale_multiplier = 0.72
+hovering = true
+special_attack_cooldown = 3.4
+projectile_count = 5
+projectile_speed = 145.0
+
+[node name="TideBloaterCanal" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(3650, 350)
+scale = Vector2(0.058, 0.058)
+move_speed = 50.0
+max_health = 8
+aggro_range = 210.0
+wake_delay = 2.25
+attack_pattern = 1
+variant_texture = ExtResource("24_bloater")
+variant_scale_multiplier = 0.78
+special_attack_cooldown = 3.8
+area_attack_radius = 98.0
+
+[node name="LagoonOracleFortuna" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(4160, 90)
+scale = Vector2(0.052, 0.052)
+move_speed = 58.0
+max_health = 9
+aggro_range = 270.0
+wake_delay = 2.5
+attack_pattern = 3
+variant_texture = ExtResource("25_oracle")
+variant_scale_multiplier = 0.68
+hovering = true
+special_attack_cooldown = 4.2
+projectile_count = 10
+projectile_speed = 112.0
+
 [node name="GamberoArchiveA" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
 position = Vector2(1580, 795)
 scale = Vector2(0.04, 0.04)
@@ -772,7 +861,9 @@ deadzone_y = 46.0
 use_room_limits = true
 room_limits = Rect2(0, -1200, 6080, 2120)
 postfx_colorrect_path = NodePath("PostFX/Overlay")
-vignette_strength = 0.72
+vignette_strength = 0.88
+vignette_softness = 0.42
+vignette_radius = 0.94
 grain_amount = 0.075
 desaturate = 0.13
 

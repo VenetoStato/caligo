@@ -38,6 +38,10 @@ func _ready() -> void:
 	# Le stanze segrete condividono lo stesso linguaggio visivo.
 	_add_ledge(Rect2(1200, 632, 760, 36), 0.5)
 	_add_ledge(Rect2(1200, 832, 760, 36), 0.5)
+	# Discesa visibile sul lato destro del muro segreto: il giocatore può
+	# scendere dal cuneo, atterrare e colpire la parete dall'esterno.
+	_add_ledge(Rect2(1975, 686, 190, 28), 0.72)
+	_add_ledge(Rect2(1905, 806, 190, 28), 0.72)
 	_add_ledge(Rect2(3615, 20, 430, 30), 0.48)
 	_add_ledge(Rect2(3615, 235, 430, 30), 0.48)
 

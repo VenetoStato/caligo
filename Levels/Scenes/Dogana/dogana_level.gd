@@ -1,5 +1,7 @@
 extends Node2D
 
+signal grace_activated(site_id: String)
+
 @export var player_path: NodePath = NodePath("Player")
 @export var spawn_path: NodePath = NodePath("Gameplay/Spawn")
 @export var persistence_enabled := true
@@ -19,6 +21,10 @@ var _discovered_regions: Dictionary = {"arrival": true}
 var _last_region := ""
 var _boss_is_defeated := false
 var _has_palace_seal := false
+var _grab_hook_unlocked := false
+var _encounter_update_timer := 0.0
+var _managed_encounters: Array[CharacterBody2D] = []
+var _managed_waters: Array[Node] = []
 
 
 func _ready() -> void:
@@ -28,6 +34,10 @@ func _ready() -> void:
 		_active_checkpoint = spawn.global_position
 	if _player:
 		_apply_respawn(_active_checkpoint)
+		if _player.has_signal("respawned"):
+			_player.connect("respawned", _on_player_respawned)
+		if _player.has_signal("locked_skill_requested"):
+			_player.connect("locked_skill_requested", _on_locked_skill_requested)
 		var camera := _player.get_node_or_null("Camera2D")
 		if camera and camera.has_method("set_camera_target"):
 			camera.call("set_camera_target", _player, 0)
@@ -47,7 +57,7 @@ func _ready() -> void:
 			hidden_area.body_entered.connect(_on_hidden_area_entered.bind(hidden_area))
 	for wall in get_tree().get_nodes_in_group("dogana_breakable"):
 		if wall.has_signal("wall_broken"):
-			wall.wall_broken.connect(_on_secret_wall_broken)
+			wall.wall_broken.connect(_on_secret_wall_broken.bind(wall))
 	for boss in get_tree().get_nodes_in_group("dogana_boss"):
 		if boss.has_signal("boss_awakened"):
 			boss.boss_awakened.connect(_on_boss_awakened)
@@ -61,17 +71,29 @@ func _ready() -> void:
 	if persistence_enabled:
 		_load_graces()
 	_restore_palace_progress()
+	_apply_grab_hook_unlock()
 	_restore_discovered_artwork()
 	_initialize_graces()
+	_configure_encounter_culling()
+	for water in get_tree().get_nodes_in_group("water"):
+		if water.is_ancestor_of(_player) or not water.is_inside_tree():
+			continue
+		_managed_waters.append(water)
+	_update_water_culling()
 	var map := get_node_or_null("DoganaMap")
 	if map:
 		map.fast_travel_requested.connect(_on_fast_travel_requested)
 	_sync_map()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not _player or not is_instance_valid(_player):
 		return
+	_encounter_update_timer -= delta
+	if _encounter_update_timer <= 0.0:
+		_encounter_update_timer = 0.18
+		_update_encounter_culling()
+		_update_water_culling()
 	var region := _get_player_region(_player.global_position)
 	if region != _last_region:
 		_last_region = region
@@ -110,6 +132,62 @@ func _on_checkpoint_entered(body: Node2D, checkpoint: Area2D) -> void:
 	if beacon:
 		beacon.color = Color(0.86, 0.72, 0.39, 0.9)
 	_show_message("CHECKPOINT  •  " + checkpoint.name.to_upper())
+
+
+func _on_player_respawned() -> void:
+	for attack in get_tree().get_nodes_in_group("enemy_transient_attack"):
+		if is_instance_valid(attack):
+			attack.queue_free()
+	for corpse in get_tree().get_nodes_in_group("dead_enemy"):
+		if is_instance_valid(corpse):
+			corpse.queue_free()
+	for enemy in get_tree().get_nodes_in_group("enemy"):
+		if enemy.has_method("reset_to_home"):
+			enemy.call("reset_to_home")
+	_update_encounter_culling()
+
+
+func _configure_encounter_culling() -> void:
+	var encounters := get_node_or_null("Gameplay/Encounters")
+	if encounters == null:
+		return
+	for child in encounters.get_children():
+		if child is CharacterBody2D and child.is_in_group("enemy"):
+			var enemy := child as CharacterBody2D
+			enemy.set("activation_managed", true)
+			_managed_encounters.append(enemy)
+	_update_encounter_culling()
+
+
+func _update_encounter_culling() -> void:
+	if _player == null:
+		return
+	var player_in_palace := _player.global_position.y < -100.0
+	for enemy in _managed_encounters:
+		if not is_instance_valid(enemy):
+			continue
+		var dead := int(enemy.get("state")) == 2
+		var near_player := enemy.global_position.distance_squared_to(_player.global_position) <= 900.0 * 900.0
+		enemy.set_physics_process(not dead and near_player and not player_in_palace)
+
+
+func _update_water_culling() -> void:
+	if _player == null:
+		return
+	var player_in_palace := _player.global_position.y < -100.0
+	for water in _managed_waters:
+		if not is_instance_valid(water) or not water.has_method("get_water_bounds_global_rect"):
+			continue
+		var bounds := water.call("get_water_bounds_global_rect") as Rect2
+		var near_horizontal := (
+			_player.global_position.x >= bounds.position.x - 720.0
+			and _player.global_position.x <= bounds.end.x + 720.0
+		)
+		water.process_mode = (
+			Node.PROCESS_MODE_INHERIT
+			if near_horizontal and not player_in_palace
+			else Node.PROCESS_MODE_DISABLED
+		)
 
 func _on_finish_entered(body: Node2D) -> void:
 	if body != _player or _completed or not _boss_is_defeated:
@@ -166,6 +244,7 @@ func _open_canal_gate(interactable: Area2D) -> void:
 		var tween := create_tween().set_parallel(true)
 		tween.tween_property(gate, "position:y", gate.position.y - 820.0, 0.9).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN_OUT)
 		tween.tween_property(gate, "modulate:a", 0.42, 0.9)
+	_mark_access_open("canal_gate")
 	var lever := interactable.get_node_or_null("Lever") as Node2D
 	if lever:
 		create_tween().tween_property(lever, "rotation", 0.8, 0.22)
@@ -185,6 +264,7 @@ func _use_palace_passage(interactable: Area2D) -> void:
 		camera.reset_smoothing()
 	if target.y < -100.0:
 		_mark_region_discovered("palace")
+		_mark_access_open("palace")
 		_show_message("PALAZZO DEI TRIBUTI  •  IL PERCORSO PROSEGUE VERSO L'ALTO")
 	else:
 		_show_message("RITORNO ALLA DOGANA DA MAR")
@@ -224,6 +304,9 @@ func _on_boss_defeated() -> void:
 	if _boss_is_defeated:
 		return
 	_boss_is_defeated = true
+	_grab_hook_unlocked = true
+	_apply_grab_hook_unlock()
+	_save_graces()
 	var entrance_seal := get_node_or_null("Gameplay/Geometry/BossArena/EntranceSeal") as StaticBody2D
 	if entrance_seal:
 		var seal_collision := entrance_seal.get_node_or_null("CollisionShape2D") as CollisionShape2D
@@ -244,7 +327,7 @@ func _on_boss_defeated() -> void:
 		if finish_collision:
 			finish_collision.set_deferred("disabled", false)
 		finish.set_deferred("monitoring", true)
-	_show_message("CUSTODE SCONFITTO  •  LA ROTTA VERSO LA FORTUNA È APERTA")
+	_show_message("CUSTODE SCONFITTO  •  OTTENUTO AMO DEL TRASCINAMENTO [C]")
 
 
 func _on_hidden_area_entered(body: Node2D, hidden_area: Area2D) -> void:
@@ -255,6 +338,7 @@ func _on_hidden_area_entered(body: Node2D, hidden_area: Area2D) -> void:
 	if veil:
 		create_tween().tween_property(veil, "modulate:a", 0.0, 0.55)
 	var secret_id := str(hidden_area.get_meta("secret_id", "archive"))
+	_mark_access_open(secret_id)
 	for artwork in get_tree().get_nodes_in_group("dogana_secret_artwork"):
 		if str(artwork.get_meta("secret_id", "")) == secret_id:
 			create_tween().tween_property(artwork, "modulate:a", 0.9, 0.8)
@@ -268,8 +352,15 @@ func _on_hidden_area_entered(body: Node2D, hidden_area: Area2D) -> void:
 	_show_message("PASSAGGIO SEGRETO — " + secret_name)
 
 
-func _on_secret_wall_broken() -> void:
+func _on_secret_wall_broken(wall: Node2D) -> void:
+	_mark_access_open("ossuary" if wall.global_position.x > 3500.0 else "archive")
 	_show_message("UN VARCO NASCOSTO SI È APERTO")
+
+
+func _mark_access_open(access_id: String) -> void:
+	for marker in get_tree().get_nodes_in_group("dogana_access_marker"):
+		if str(marker.get("access_id")) == access_id and marker.has_method("mark_open"):
+			marker.call("mark_open")
 
 
 func _on_grace_entered(body: Node2D, grace: Area2D) -> void:
@@ -296,6 +387,7 @@ func _activate_grace(grace: Area2D, show_message := true) -> void:
 	_save_graces()
 	_sync_map()
 	if show_message:
+		grace_activated.emit(site_id)
 		_show_message("ALTARE RISVEGLIATO  •  %s" % str(grace.get("display_name")).to_upper())
 
 
@@ -364,6 +456,7 @@ func _load_graces() -> void:
 		if bool(config.get_value("map", region_id, region_id == "arrival")):
 			_discovered_regions[region_id] = true
 	_has_palace_seal = bool(config.get_value("progress", "palace_seal", false))
+	_grab_hook_unlocked = bool(config.get_value("progress", "grab_hook_unlocked", false))
 
 
 func _save_graces() -> void:
@@ -376,6 +469,7 @@ func _save_graces() -> void:
 	for region_id in ["arrival", "customs", "palace", "canal", "fortuna", "archive", "ossuary", "palace_vault"]:
 		config.set_value("map", region_id, bool(_discovered_regions.get(region_id, false)))
 	config.set_value("progress", "palace_seal", _has_palace_seal)
+	config.set_value("progress", "grab_hook_unlocked", _grab_hook_unlocked)
 	config.save(GRACE_SAVE_PATH)
 
 
@@ -392,6 +486,15 @@ func _restore_palace_progress() -> void:
 	var gate_lever := get_node_or_null("Gameplay/Interactions/GateLever") as Area2D
 	if gate_lever:
 		gate_lever.set_meta("prompt", "[E] Usa il Sigillo e solleva la paratia")
+
+
+func _apply_grab_hook_unlock() -> void:
+	if _grab_hook_unlocked and _player and _player.has_method("unlock_grab_hook"):
+		_player.call("unlock_grab_hook")
+
+
+func _on_locked_skill_requested() -> void:
+	_show_message("AMO DEL TRASCINAMENTO SIGILLATO  •  SCONFIGGI IL CUSTODE")
 
 
 func _get_player_region(world_position: Vector2) -> String:

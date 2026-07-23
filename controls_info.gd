@@ -28,7 +28,7 @@ var _commands_pc: Array = [
 	["PESCA", "F", "Lancia la lenza verso i pesci"],
 	["RECUPERA", "R", "Tira la preda: il pesce cura la vita"],
 	["INTERAGISCI", "E", "Altari, porte, mappe e passaggi"],
-	["CAMBIA AMO", "C", "Alterna pesca e attraversamento"],
+	["ABILITÀ SIGILLATA", "C", "L'amo da attraversamento si ottiene dal Custode"],
 ]
 # Comandi touch/Android (pulsanti a schermo)
 var _commands_touch: Array = [
@@ -39,7 +39,7 @@ var _commands_touch: Array = [
 	["PESCA", "LENZA", "Lancia verso un pesce"],
 	["RECUPERA", "TIRA", "La preda pescata recupera vita"],
 	["INTERAGISCI", "✦", "Altari, porte e passaggi"],
-	["CAMBIA AMO", "AMO", "Alterna pesca e attraversamento"],
+	["ABILITÀ SIGILLATA", "AMO", "Si sblocca sconfiggendo il Custode"],
 ]
 
 func _is_touch_platform() -> bool:

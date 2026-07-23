@@ -19,9 +19,9 @@ extends RigidBody2D
 
 @export_category("Water Physics")
 @export var water_drag: float = 4.0
-@export var water_vertical_brake: float = 900.0
-@export var sink_slowly_in_water: bool = false
-@export var sink_speed: float = 20.0
+@export var water_vertical_brake: float = 260.0
+@export var sink_slowly_in_water: bool = true
+@export var sink_speed: float = 38.0
 
 @export_category("Fish Detection")
 @export var fish_detection_radius: float = 25.0
@@ -69,6 +69,7 @@ func _ready():
 
 	contact_monitor = true
 	max_contacts_reported = 4
+	z_index = 14
 
 func _find_sprite():
 	if sprite_node_name != "":
@@ -97,6 +98,7 @@ func _apply_body_collision_scale():
 			var cs := child as CollisionShape2D
 			if cs.shape == null:
 				continue
+			cs.shape = cs.shape.duplicate()
 
 			if cs.shape is CircleShape2D:
 				var c := cs.shape as CircleShape2D
@@ -123,6 +125,10 @@ func _find_point_light():
 func _setup_fish_detection():
 	fish_detection_area = Area2D.new()
 	fish_detection_area.name = "FishDetection"
+	fish_detection_area.collision_layer = 0
+	fish_detection_area.collision_mask = 129
+	fish_detection_area.monitoring = true
+	fish_detection_area.monitorable = false
 	add_child(fish_detection_area)
 
 	var collision = CollisionShape2D.new()
@@ -278,6 +284,18 @@ func _exit_water():
 
 func is_in_water() -> bool:
 	return in_water
+
+
+func set_in_water(value: bool, _gravity_reduction := 0.0, _water_owner: Node = null) -> void:
+	if value:
+		_enter_water()
+	else:
+		_exit_water()
+
+
+func exit_water() -> void:
+	_exit_water()
+
 
 func _on_area_entered(area: Area2D):
 	var area_name = area.name.to_lower()

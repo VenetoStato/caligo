@@ -26,6 +26,15 @@ func _ready() -> void:
 		await get_tree().process_frame
 		await get_tree().process_frame
 
+	var death_anim := _player.get_node("anim") as AnimationPlayer
+	if (
+		not bool(_player.get("is_dead"))
+		or death_anim.current_animation != "Falling"
+		or death_anim.get_playing_speed() > 0.65
+	):
+		push_error("Lethal contact did not enter the slow looping fall animation.")
+		get_tree().quit(1)
+		return
 	await get_tree().create_timer(4.5, true, false, true).timeout
 	if bool(_player.get("is_dead")) or int(_player.get("current_health")) <= 0:
 		push_error("Player did not recover after lethal enemy contact.")

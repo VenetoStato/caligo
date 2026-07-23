@@ -1,161 +1,319 @@
 extends CanvasLayer
 
-# ===========================================
-# TUTORIAL HINTS - Indicazioni all'inizio e vicino all'acqua
-# ===========================================
-# All'inizio: attacco e doppio salto
-# Vicino all'acqua: pesca
+signal tutorial_completed
 
-@export var start_hint_duration: float = 6.0
-@export var near_water_distance: float = 700.0
-@export var fishing_hint_duration: float = 7.0
+enum Step {
+	MOVE,
+	INTERACT,
+	JUMP,
+	DOUBLE_JUMP,
+	DASH,
+	ATTACK,
+	CAST,
+	REEL,
+	MAP,
+	COMPLETE,
+}
 
-var _player: Node2D = null
-var _start_panel: PanelContainer = null
-var _fishing_panel: PanelContainer = null
-var _start_timer: float = 0.0
-var _start_hint_hidden: bool = false
+const DISPLAY_FONT := preload("res://UI/Fonts/CormorantGaramond.ttf")
+const BODY_FONT := preload("res://UI/Fonts/SourceSans3.ttf")
+const STEP_ORDER: Array[Step] = [
+	Step.MOVE,
+	Step.INTERACT,
+	Step.JUMP,
+	Step.DOUBLE_JUMP,
+	Step.DASH,
+	Step.ATTACK,
+	Step.CAST,
+	Step.REEL,
+	Step.MAP,
+]
+
+var _player: CharacterBody2D
+var _panel: PanelContainer
+var _fishing_panel: PanelContainer
+var _eyebrow: Label
+var _title: Label
+var _instruction: Label
+var _key_label: Label
+var _progress: Label
 var _start_position := Vector2.INF
-var _fishing_timer := 0.0
+var _completed: Dictionary = {}
+var _observed: Dictionary = {}
+var _current_step: Step = Step.MOVE
+var _completion_started := false
+var _player_signal_connected := false
 
-func _ready():
+
+func _ready() -> void:
 	layer = 15
-	_build_start_hint()
-	_build_fishing_hint()
-	_start_timer = start_hint_duration
-	_start_panel.visible = true
-	_fishing_panel.visible = false
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	for step in STEP_ORDER:
+		_completed[step] = false
+		_observed[step] = false
+	_build_panel()
+	_fishing_panel = _panel
+	var level := get_tree().current_scene
+	if level and level.has_signal("grace_activated"):
+		level.connect("grace_activated", _on_grace_activated)
+	var training_cache := level.get_node_or_null("Gameplay/Breakables/ArrivalCache") if level else null
+	if training_cache and training_cache.has_signal("prop_broken"):
+		training_cache.connect("prop_broken", _on_training_cache_broken)
+	_refresh_step()
 
-func _process(delta: float):
+
+func _process(_delta: float) -> void:
 	if _player == null:
-		_player = get_tree().get_first_node_in_group("player") as Node2D
+		_player = get_tree().get_first_node_in_group("player") as CharacterBody2D
 		if _player == null:
 			return
 		_start_position = _player.global_position
+	if not _player_signal_connected and _player.has_signal("tutorial_action_performed"):
+		_player.connect("tutorial_action_performed", _on_player_tutorial_action)
+		_player_signal_connected = true
+	if _current_step == Step.MOVE:
+		var moved := absf(_player.global_position.x - _start_position.x) >= 72.0
+		if moved:
+			_mark_completed(Step.MOVE)
+	if _current_step == Step.MAP:
+		var map_overlay := get_tree().current_scene.get_node_or_null("DoganaMap/Overlay") as Control
+		if map_overlay and map_overlay.visible:
+			_observe_step(Step.MAP)
 
-	# Hint iniziale: attacco e doppio salto (nasconde dopo durata o primo input attacco/salto)
-	if _start_panel.visible and not _start_hint_hidden:
-		_start_timer -= delta
-		var left_intro_area := _start_position != Vector2.INF and _player.global_position.distance_to(_start_position) > 280.0
-		if _start_timer <= 0.0 or left_intro_area or Input.is_action_just_pressed("ui_attack") or Input.is_action_just_pressed("ui_attack_strong") or Input.is_action_just_pressed("ui_accept"):
-			_hide_start_hint()
-			_start_hint_hidden = true
 
-	# Hint pesca: solo vicino all'acqua
-	var near_water := _is_player_near_water()
-	if near_water and _start_hint_hidden and _fishing_timer < fishing_hint_duration:
-		_fishing_timer += delta
-		_fishing_panel.visible = true
-	else:
-		_fishing_panel.visible = false
+func _unhandled_input(event: InputEvent) -> void:
+	# Le azioni vengono confermate dai sistemi che le hanno realmente eseguite,
+	# non dal solo tasto premuto. Manteniamo l'hook per compatibilità con la scena.
+	if event is InputEventKey and event.pressed and event.physical_keycode == KEY_M:
+		var map_overlay := get_tree().current_scene.get_node_or_null("DoganaMap/Overlay") as Control
+		if map_overlay and map_overlay.visible:
+			_observe_step(Step.MAP)
 
-func _is_player_near_water() -> bool:
-	if _player == null:
-		return false
-	if _player.get("is_in_water") != null and bool(_player.get("is_in_water")):
-		return true
-	var waters = get_tree().get_nodes_in_group("water")
-	for w in waters:
-		if w is Node2D:
-			var dist = _player.global_position.distance_to((w as Node2D).global_position)
-			if dist < near_water_distance:
-				return true
-	return false
 
-func _build_style_panel(bg_alpha: float = 0.88) -> StyleBoxFlat:
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.008, 0.03, 0.035, bg_alpha)
-	style.border_color = Color(0.55, 0.48, 0.3, 0.78)
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(6)
-	style.set_content_margin_all(12)
-	style.shadow_color = Color(0, 0, 0, 0.55)
-	style.shadow_size = 8
-	return style
+func _on_player_tutorial_action(action: StringName) -> void:
+	match action:
+		&"jump":
+			_observe_step(Step.JUMP)
+		&"double_jump":
+			_observe_step(Step.DOUBLE_JUMP)
+		&"dash":
+			_observe_step(Step.DASH)
+		&"cast":
+			_observe_step(Step.CAST)
+		&"reel":
+			_observe_step(Step.REEL)
 
-func _is_touch_platform() -> bool:
-	return OS.get_name() == "Android"
 
-func _build_start_hint():
-	_start_panel = PanelContainer.new()
-	_start_panel.name = "StartHint"
-	_start_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	_start_panel.set_offset(SIDE_LEFT, 24)
-	_start_panel.set_offset(SIDE_TOP, 110)
-	_start_panel.set_custom_minimum_size(Vector2(318, 0))
-	_start_panel.add_theme_stylebox_override("panel", _build_style_panel())
-	add_child(_start_panel)
+func _on_grace_activated(_site_id: String) -> void:
+	_observe_step(Step.INTERACT)
 
-	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 6)
-	_start_panel.add_child(vbox)
 
-	var title = Label.new()
-	title.text = "PRIMA DI PARTIRE"
-	title.add_theme_font_size_override("font_size", 15)
-	title.add_theme_color_override("font_color", Color(0.9, 0.85, 0.7, 1))
-	title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-	title.add_theme_constant_override("outline_size", 2)
-	vbox.add_child(title)
+func _on_training_cache_broken() -> void:
+	_observe_step(Step.ATTACK)
 
-	var l1 = Label.new()
-	l1.text = "CLICK SX  attacca   ·   SPAZIO ×2  doppio salto" if not _is_touch_platform() else "Usa i comandi trasparenti ai lati dello schermo"
-	l1.custom_minimum_size = Vector2(294, 0)
-	l1.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l1.add_theme_font_size_override("font_size", 14)
-	l1.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
-	l1.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
-	l1.add_theme_constant_override("outline_size", 1)
-	vbox.add_child(l1)
 
-	var l2 = Label.new()
-	l2.text = "F pesca  ·  R recupera  ·  ogni pesce restituisce vita" if not _is_touch_platform() else "LENZA + TIRA  ·  ogni pesce restituisce vita"
-	l2.add_theme_font_size_override("font_size", 14)
-	l2.add_theme_color_override("font_color", Color(0.45, 0.9, 0.78, 1.0))
-	vbox.add_child(l2)
+func _observe_step(step: Step) -> void:
+	_observed[step] = true
+	if step == _current_step:
+		_mark_completed(step)
 
-func _build_fishing_hint():
-	_fishing_panel = PanelContainer.new()
-	_fishing_panel.name = "FishingHint"
-	_fishing_panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	_fishing_panel.set_anchor(SIDE_LEFT, 0.5)
-	_fishing_panel.set_anchor(SIDE_BOTTOM, 1.0)
-	_fishing_panel.set_offset(SIDE_LEFT, -180)
-	_fishing_panel.set_offset(SIDE_BOTTOM, -24)
-	_fishing_panel.set_custom_minimum_size(Vector2(360, 0))
-	_fishing_panel.add_theme_stylebox_override("panel", _build_style_panel())
-	add_child(_fishing_panel)
 
-	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 6)
-	_fishing_panel.add_child(vbox)
-
-	var title = Label.new()
-	title.text = "PESCA = NUTRIMENTO"
-	title.add_theme_font_size_override("font_size", 15)
-	title.add_theme_color_override("font_color", Color(0.7, 0.9, 1, 1))
-	title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-	title.add_theme_constant_override("outline_size", 2)
-	vbox.add_child(title)
-
-	var l1 = Label.new()
-	l1.text = (
-		"Cattura un pesce per recuperare 1 punto vita.\nF: lancia la lenza  •  R: tira a impulsi  •  C: cambia amo"
-		if not _is_touch_platform()
-		else
-		"Cattura un pesce per recuperare 1 punto vita.\nUsa LENZA, poi TIRA a impulsi quando il pesce abbocca."
-	)
-	l1.custom_minimum_size = Vector2(336, 0)
-	l1.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l1.add_theme_font_size_override("font_size", 14)
-	l1.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
-	l1.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
-	l1.add_theme_constant_override("outline_size", 1)
-	vbox.add_child(l1)
-
-func _hide_start_hint():
-	if _start_panel == null:
+func _mark_completed(step: Step) -> void:
+	if bool(_completed.get(step, false)):
 		return
-	var tween = create_tween()
-	tween.tween_property(_start_panel, "modulate:a", 0.0, 0.4)
-	tween.tween_callback(func(): _start_panel.visible = false)
+	_completed[step] = true
+	_refresh_step()
+
+
+func _refresh_step() -> void:
+	for step in STEP_ORDER:
+		if not bool(_completed.get(step, false)):
+			if bool(_observed.get(step, false)):
+				_completed[step] = true
+				continue
+			_current_step = step
+			_apply_step_copy(step)
+			return
+	_current_step = Step.COMPLETE
+	_unlock_tutorial_gate()
+	_show_completion()
+
+
+func _apply_step_copy(step: Step) -> void:
+	var touch := OS.get_name() == "Android"
+	var copy := _get_step_copy(step, touch)
+	_eyebrow.text = "ADDESTRAMENTO  ·  %02d / %02d" % [_completed_count() + 1, STEP_ORDER.size()]
+	_title.text = str(copy.title)
+	_instruction.text = str(copy.instruction)
+	_key_label.text = str(copy.key)
+	_progress.text = _build_progress_text()
+	_panel.visible = true
+	_panel.modulate.a = 1.0
+	var pulse := create_tween()
+	pulse.tween_property(_key_label, "modulate", Color(1.35, 1.2, 0.72, 1.0), 0.12)
+	pulse.tween_property(_key_label, "modulate", Color.WHITE, 0.22)
+
+
+func _get_step_copy(step: Step, touch: bool) -> Dictionary:
+	match step:
+		Step.MOVE:
+			return {
+				"title": "Prendi confidenza col pontile",
+				"instruction": "Muoviti fino all'altare. Il pannello resta visibile finché l'azione non è completata.",
+				"key": "◀  ▶" if touch else "A   /   D",
+			}
+		Step.INTERACT:
+			return {
+				"title": "Risveglia e usa gli altari",
+				"instruction": "Avvicinati all'altare luminoso e interagisci. Qui riposi, curi e imposti il respawn.",
+				"key": "✦" if touch else "E",
+			}
+		Step.JUMP:
+			return {
+				"title": "Supera gli ostacoli bassi",
+				"instruction": "Prova un salto sul pontile. Il comando risponde appena viene premuto.",
+				"key": "↑" if touch else "SPAZIO",
+			}
+		Step.DOUBLE_JUMP:
+			return {
+				"title": "Resta sospeso un istante",
+				"instruction": "Premi salto una seconda volta mentre sei in aria per effettuare il doppio salto.",
+				"key": "↑   ↑" if touch else "SPAZIO  × 2",
+			}
+		Step.DASH:
+			return {
+				"title": "Attraversa rapidamente il pericolo",
+				"instruction": "Esegui uno scatto. Puoi usarlo a terra o durante un salto.",
+				"key": "D" if touch else "SHIFT",
+			}
+		Step.ATTACK:
+			return {
+				"title": "Rompi la cassa da pesca",
+				"instruction": "Colpisci la cassa illustrata sul pontile. Gli oggetti crepati nascondono spesso passaggi.",
+				"key": "Z" if touch else "CLICK SINISTRO",
+			}
+		Step.CAST:
+			return {
+				"title": "La pesca è il tuo nutrimento",
+				"instruction": "Tieni premuto per mirare e lancia la lenza verso i pesci sotto il pontile.",
+				"key": "LENZA" if touch else "F",
+			}
+		Step.REEL:
+			return {
+				"title": "Recupera la preda",
+				"instruction": "Quando un pesce abbocca, tira a impulsi. Ogni cattura restituisce un punto vita.",
+				"key": "TIRA" if touch else "R",
+			}
+		Step.MAP:
+			return {
+				"title": "Consulta la mappa della laguna",
+				"instruction": "Apri la mappa: mostra stanze scoperte, altari attivi e passaggi nascosti trovati.",
+				"key": "MAPPA" if touch else "M",
+			}
+	return {"title": "", "instruction": "", "key": ""}
+
+
+func _completed_count() -> int:
+	var count := 0
+	for step in STEP_ORDER:
+		if bool(_completed.get(step, false)):
+			count += 1
+	return count
+
+
+func _build_progress_text() -> String:
+	var markers: PackedStringArray = []
+	for step in STEP_ORDER:
+		markers.append("◆" if bool(_completed.get(step, false)) else "◇")
+	return "  ".join(markers)
+
+
+func _unlock_tutorial_gate() -> void:
+	var gate := get_tree().get_first_node_in_group("dogana_tutorial_gate")
+	if gate and gate.has_method("unlock"):
+		gate.call("unlock")
+
+
+func _show_completion() -> void:
+	if _completion_started:
+		return
+	_completion_started = true
+	_eyebrow.text = "ADDESTRAMENTO COMPLETATO"
+	_title.text = "La Dogana è davanti a te"
+	_instruction.text = "Pesca per curarti, osserva i telegraph nemici e cerca crepe nelle pareti."
+	_key_label.text = "IL VARCO È APERTO"
+	_progress.text = "◆  ◆  ◆  ◆  ◆  ◆  ◆  ◆  ◆"
+	tutorial_completed.emit()
+	var completion_timer := Timer.new()
+	completion_timer.one_shot = true
+	completion_timer.wait_time = 5.5
+	completion_timer.process_callback = Timer.TIMER_PROCESS_IDLE
+	completion_timer.timeout.connect(_fade_completed_tutorial)
+	add_child(completion_timer)
+	completion_timer.start()
+
+
+func _fade_completed_tutorial() -> void:
+	var tween := create_tween()
+	tween.tween_property(_panel, "modulate:a", 0.0, 0.8)
+	tween.tween_callback(func() -> void: _panel.visible = false)
+
+
+func _build_panel() -> void:
+	_panel = PanelContainer.new()
+	_panel.name = "GuidedTutorial"
+	_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_panel.offset_left = 24.0
+	_panel.offset_top = 108.0
+	_panel.custom_minimum_size = Vector2(390.0, 0.0)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.006, 0.025, 0.032, 0.985)
+	style.border_color = Color(0.78, 0.66, 0.36, 0.94)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(7)
+	style.set_content_margin_all(14)
+	style.shadow_color = Color(0, 0, 0, 0.62)
+	style.shadow_size = 10
+	_panel.add_theme_stylebox_override("panel", style)
+	add_child(_panel)
+
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 5)
+	_panel.add_child(content)
+	_eyebrow = Label.new()
+	_eyebrow.add_theme_font_override("font", BODY_FONT)
+	_eyebrow.add_theme_font_size_override("font_size", 12)
+	_eyebrow.add_theme_color_override("font_color", Color(0.56, 1.0, 0.88, 1.0))
+	_eyebrow.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	_eyebrow.add_theme_constant_override("outline_size", 1)
+	content.add_child(_eyebrow)
+	_title = Label.new()
+	_title.add_theme_font_override("font", DISPLAY_FONT)
+	_title.add_theme_font_size_override("font_size", 27)
+	_title.add_theme_color_override("font_color", Color(1.0, 0.92, 0.7, 1.0))
+	_title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1.0))
+	_title.add_theme_constant_override("outline_size", 2)
+	content.add_child(_title)
+	_instruction = Label.new()
+	_instruction.custom_minimum_size = Vector2(360, 0)
+	_instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_instruction.add_theme_font_override("font", BODY_FONT)
+	_instruction.add_theme_font_size_override("font_size", 14)
+	_instruction.add_theme_color_override("font_color", Color(0.92, 0.96, 0.92, 1.0))
+	_instruction.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	_instruction.add_theme_constant_override("outline_size", 1)
+	content.add_child(_instruction)
+	_key_label = Label.new()
+	_key_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_key_label.add_theme_font_override("font", BODY_FONT)
+	_key_label.add_theme_font_size_override("font_size", 16)
+	_key_label.add_theme_color_override("font_color", Color(0.56, 1.0, 0.86, 1.0))
+	_key_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1.0))
+	_key_label.add_theme_constant_override("outline_size", 2)
+	content.add_child(_key_label)
+	_progress = Label.new()
+	_progress.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_progress.add_theme_font_override("font", BODY_FONT)
+	_progress.add_theme_font_size_override("font_size", 12)
+	_progress.add_theme_color_override("font_color", Color(0.9, 0.82, 0.55, 0.9))
+	content.add_child(_progress)

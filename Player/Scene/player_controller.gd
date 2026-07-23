@@ -2,6 +2,11 @@ extends CharacterBody2D
 
 const FISH_CATCH_EFFECT_SCRIPT := preload("res://Fx/fish_catch_effect.gd")
 
+signal respawned
+signal fish_caught(health_restored: int)
+signal tutorial_action_performed(action: StringName)
+signal locked_skill_requested
+
 # ===========================================
 # PLAYER SCRIPT - VERSIONE CON DEATH SYSTEM
 # ===========================================
@@ -45,6 +50,7 @@ const FISH_CATCH_EFFECT_SCRIPT := preload("res://Fx/fish_catch_effect.gd")
 @export var cast_speed: float = 600.0
 @export var max_charge_time: float = 1.0
 @export var min_cast_power: float = 0.3
+@export var grab_hook_unlocked := false
 
 @export_category("Line Physics")
 @export var rope_segments: int = 20
@@ -90,6 +96,7 @@ const FISH_CATCH_EFFECT_SCRIPT := preload("res://Fx/fish_catch_effect.gd")
 @export var particles_on_jump: bool = true
 @export var particles_on_attack: bool = true
 @export var particles_on_move: bool = false
+@export var particles_on_land: bool = true
 @export var move_particle_interval: float = 0.03
 
 @export_category("Fish Struggle")
@@ -239,6 +246,7 @@ var _cast_aim_angle: float = 0.0  # radianti, 0=orizzontale, + = su, - = giù
 var _display_cast_direction: Vector2 = Vector2.RIGHT
 var _target_cast_direction: Vector2 = Vector2.RIGHT  # target filtrato (riduce jitter input)
 var move_particle_timer: float = 0.0
+var _was_on_floor := false
 
 func _ready():
 	add_to_group("player")
@@ -260,6 +268,7 @@ func _ready():
 	current_health = max_health
 	initial_spawn_position = global_position
 	last_safe_ground_position = global_position
+	_was_on_floor = is_on_floor()
 	
 	# La vita si mostra all'inizio (dopo il fade in)
 	_show_health_ui()
@@ -273,15 +282,22 @@ func _setup_sprite():
 		_breath_base_scale = sprite_node.scale
 
 func _setup_fishing_line():
+	if has_node("FishingLine"):
+		fishing_line = get_node("FishingLine") as Line2D
 	var p = get_parent()
-	if p and p.has_node("FishingLine"):
+	if fishing_line == null and p and p.has_node("FishingLine"):
 		fishing_line = p.get_node("FishingLine") as Line2D
-	elif get_tree().current_scene and get_tree().current_scene.has_node("FishingLine"):
+	elif fishing_line == null and get_tree().current_scene and get_tree().current_scene.has_node("FishingLine"):
 		fishing_line = get_tree().current_scene.get_node("FishingLine") as Line2D
 	if fishing_line:
-		fishing_line.width = 2.0
+		fishing_line.top_level = true
+		fishing_line.z_index = 20
+		fishing_line.width = 3.0
 		fishing_line.default_color = line_color_normal
 		fishing_line.joint_mode = Line2D.LINE_JOINT_ROUND
+		fishing_line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+		fishing_line.end_cap_mode = Line2D.LINE_CAP_ROUND
+		fishing_line.antialiased = true
 
 func _setup_attack_hitbox():
 	# Area che danneggia i nemici quando fai attacco (Z o click destro)
@@ -513,6 +529,13 @@ func _draw_cast_charge_bar():
 func _draw_cast_direction_indicator():
 	var rod_local = base_axis_offset + (line_origin_offset_right if facing_right else line_origin_offset_left) + (rod_tip_offset_right if facing_right else rod_tip_offset_left)
 	var dir = _display_cast_direction.normalized() if _display_cast_direction.length_squared() > 0.01 else Vector2.RIGHT
+	var power: float = clampf(current_charge_time / maxf(max_charge_time, 0.01), min_cast_power, 1.0)
+	var preview_speed: float = cast_speed * power
+	for index in range(1, 9):
+		var time := float(index) * 0.075
+		var preview_point: Vector2 = rod_local + dir * preview_speed * time + Vector2(0, 490.0 * time * time)
+		var alpha := 0.62 * (1.0 - float(index - 1) / 10.0)
+		draw_circle(preview_point, 2.8 if index < 5 else 2.1, Color(0.45, 0.95, 0.78, alpha))
 	var shaft_end = rod_local + dir * (direction_indicator_length - 22.0)
 	var end = rod_local + dir * direction_indicator_length
 	var perp = Vector2(-dir.y, dir.x)
@@ -544,6 +567,12 @@ func _input(event):
 		return
 	
 	if event.is_action_pressed("change_hook"):
+		if not grab_hook_unlocked:
+			using_fishing_hook = true
+			locked_skill_requested.emit()
+			return
+		if line_extended:
+			return
 		using_fishing_hook = !using_fishing_hook
 		return
 	
@@ -554,7 +583,7 @@ func _input(event):
 	
 	if event.is_action_pressed("cast"):
 		if not line_extended and hook_instance == null:
-			line_mode = LineMode.FISHING
+			line_mode = LineMode.FISHING if using_fishing_hook or not grab_hook_unlocked else LineMode.GRAB
 			is_charging = true
 			current_charge_time = 0.0
 			_reset_cast_aim_from_mouse()
@@ -580,6 +609,7 @@ func _input(event):
 	
 	if event.is_action_pressed("reel"):
 		if line_extended and hook_instance:
+			tutorial_action_performed.emit(&"reel")
 			if fish_hooked:
 				# Pesca: click per trascinare (non tenere premuto). Ogni click = breve impulso di reel
 				reel_pulse_timer = reel_pulse_duration
@@ -625,7 +655,15 @@ func _physics_process(delta: float):
 		_on_death()
 		return
 	
+	var impact_speed := velocity.y
 	move_and_slide()
+	if particles_on_land and not _was_on_floor and is_on_floor() and impact_speed > 95.0:
+		if black_particle_scene:
+			_spawn_particles(global_position + Vector2(0, 4), Vector2.UP, 0.18, 4)
+		if ambient_trail_scene:
+			_spawn_trail(global_position + Vector2(0, 4), Vector2.UP)
+		_request_shake(minf(0.16, impact_speed / 1800.0))
+	_was_on_floor = is_on_floor()
 	
 	# Aggiorna l'ultima posizione sicura sul terreno
 	if is_on_floor():
@@ -728,6 +766,7 @@ func _start_dash(direction: Vector2):
 	dash_particle_timer = 0.0
 	facing_right = direction.x > 0
 	velocity.y = 0
+	tutorial_action_performed.emit(&"dash")
 	if particles_on_dash and black_particle_scene:
 		_spawn_particles(global_position, -direction, 0.3, 2)
 	if particles_on_dash and ambient_trail_scene:
@@ -794,12 +833,14 @@ func set_animation():
 		if anim.has_animation("Attack_strong"):
 			anim.play("Attack_strong")
 			_enable_attack_hitbox(2)
+			tutorial_action_performed.emit(&"attack")
 			if particles_on_attack and black_particle_scene:
 				_spawn_particles(global_position, Vector2.RIGHT if facing_right else Vector2.LEFT, 0.25)
 		return
 	if Input.is_action_just_pressed("ui_attack") and not line_extended:
 		anim.play("Attack_fast")
 		_enable_attack_hitbox(1)
+		tutorial_action_performed.emit(&"attack")
 		if particles_on_attack and black_particle_scene:
 			_spawn_particles(global_position, Vector2.RIGHT if facing_right else Vector2.LEFT, 0.2)
 		return
@@ -854,6 +895,7 @@ func jump_logic():
 		if Input.is_action_just_pressed("ui_accept"):
 			jump_amount -= 1
 			velocity.y -= lerp(jump_speed, jump_acceleration, 0.1)
+			tutorial_action_performed.emit(&"jump")
 			if particles_on_jump and black_particle_scene:
 				_spawn_particles(global_position, Vector2.DOWN, 0.2)
 			if particles_on_jump and ambient_trail_scene:
@@ -861,6 +903,7 @@ func jump_logic():
 	elif jump_amount > 0 and Input.is_action_just_pressed("ui_accept"):
 		jump_amount -= 1
 		velocity.y -= lerp(jump_speed, jump_acceleration, 1.0)
+		tutorial_action_performed.emit(&"double_jump")
 		if particles_on_jump and black_particle_scene:
 			_spawn_particles(global_position, Vector2.DOWN, 0.2)
 		if particles_on_jump and ambient_trail_scene:
@@ -931,12 +974,11 @@ func _on_death():
 	
 	print("☠️ MORTE!")
 	
-	# Mostra il frame di morte scelto (configurabile nell'Inspector)
-	if sprite_node != null:
-		if "frame" in sprite_node:
-			sprite_node.frame = death_frame
-	if anim:
-		anim.stop()
+	# La morte usa la caduta in loop lento: evita il frame statico incoerente.
+	if anim and anim.has_animation("Falling"):
+		anim.play("Falling", -1.0, 0.55)
+	elif sprite_node != null and "frame" in sprite_node:
+		sprite_node.frame = death_frame
 	
 	# Reset mondo: reload scena e riparti dall'inizio
 	if reload_scene_on_death:
@@ -1087,6 +1129,7 @@ func _on_respawn():
 		sprite_node.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	
 	_show_health_ui()
+	respawned.emit()
 	
 	print("🔄 Respawn!")
 
@@ -1267,6 +1310,7 @@ func cast_hook_charged():
 		hook_instance.call("set_player_reference", self)
 	line_extended = true
 	is_reeling = false
+	tutorial_action_performed.emit(&"cast")
 	fishing_anim_started = false
 	fishing_anim_finished = false
 	target_line_length = max_line_length * power
@@ -1367,7 +1411,7 @@ func _update_line_color(delta: float):
 		col = line_color_reeling
 	_current_line_stress = lerp(_current_line_stress, stress, delta * _line_color_lerp_speed)
 	fishing_line.default_color = fishing_line.default_color.lerp(col, delta * _line_color_lerp_speed)
-	fishing_line.width = lerp(2.0, 4.0, _current_line_stress)
+	fishing_line.width = lerp(2.8, 4.6, _current_line_stress)
 	# Se la lenza diventa troppo rossa durante la lotta, il pesce si libera
 	if fish_hooked and fish_struggle_active and _current_line_stress >= stress_escape_threshold:
 		_on_fish_escaped()
@@ -1626,7 +1670,9 @@ func _complete_fish_catch(fish: Node2D) -> void:
 	print("🏆 Pesce catturato: nutrimento recuperato!")
 	var health_before := current_health
 	heal(fish_health_reward)
-	_spawn_fish_catch_effect(fish.global_position, current_health - health_before)
+	var health_restored := current_health - health_before
+	_spawn_fish_catch_effect(fish.global_position, health_restored)
+	fish_caught.emit(health_restored)
 	var am := get_node_or_null("/root/AchievementManager")
 	if am != null and am.has_method("add_fish_caught"):
 		am.call("add_fish_caught")
@@ -1674,7 +1720,7 @@ func _reset_line_state():
 	if fishing_line:
 		fishing_line.clear_points()
 		fishing_line.default_color = line_color_normal
-		fishing_line.width = 2.0
+		fishing_line.width = 3.0
 
 func _update_line_visual():
 	if fishing_line == null or points.size() < 2:
@@ -1760,6 +1806,16 @@ func has_fish_hooked() -> bool:
 
 func is_line_extended() -> bool:
 	return line_extended
+
+
+func unlock_grab_hook() -> void:
+	grab_hook_unlocked = true
+	using_fishing_hook = true
+
+
+func is_grab_hook_unlocked() -> bool:
+	return grab_hook_unlocked
+
 
 func is_fish_struggling() -> bool:
 	return fish_struggle_active
