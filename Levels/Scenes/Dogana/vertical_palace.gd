@@ -121,9 +121,10 @@ func _build_platform_art() -> void:
 		art.add_child(sprite)
 		var rim := Line2D.new()
 		rim.points = PackedVector2Array([rect.position, Vector2(rect.end.x, rect.position.y)])
-		rim.width = 2.6
+		rim.width = 4.0
 		rim.default_color = Color(0.82, 0.76, 0.57, 0.82)
 		rim.antialiased = true
+		rim.z_index = 7
 		art.add_child(rim)
 	for wall in [
 		Rect2(2020, -1160, 44, 1060),

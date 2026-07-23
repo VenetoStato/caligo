@@ -14,7 +14,7 @@ func _ready() -> void:
 	var panel := tutorial.get("_panel") as PanelContainer
 	var gate := level.get_node("Gameplay/TutorialGate") as StaticBody2D
 	var gate_collision := gate.get_node("CollisionShape2D") as CollisionShape2D
-	if sprite.position.y < -3.0 or panel == null or not panel.visible or gate_collision.disabled:
+	if sprite.position.y > -2.0 or sprite.position.y < -8.0 or panel == null or not panel.visible or gate_collision.disabled:
 		push_error("Grounded player alignment or persistent tutorial gate is not configured.")
 		get_tree().quit(1)
 		return

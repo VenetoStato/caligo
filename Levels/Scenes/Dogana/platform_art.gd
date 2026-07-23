@@ -63,9 +63,10 @@ func _add_ledge(rect: Rect2, depth_scale: float) -> void:
 		rect.position,
 		Vector2(rect.end.x, rect.position.y),
 	])
-	rim.width = 2.4
+	rim.width = 4.0
 	rim.default_color = Color(0.78, 0.73, 0.58, 0.78)
 	rim.antialiased = true
+	rim.z_index = 7
 	add_child(rim)
 
 
@@ -77,3 +78,14 @@ func _add_central_wedge() -> void:
 	sprite.position = Vector2(1980, 148)
 	sprite.modulate = Color(0.72, 0.78, 0.76, 1.0)
 	add_child(sprite)
+	var foreground_rim := Line2D.new()
+	foreground_rim.points = PackedVector2Array([
+		Vector2(1980, 538),
+		Vector2(2630, 148),
+		Vector2(3260, 538),
+	])
+	foreground_rim.width = 4.5
+	foreground_rim.default_color = Color(0.78, 0.73, 0.58, 0.84)
+	foreground_rim.antialiased = true
+	foreground_rim.z_index = 7
+	add_child(foreground_rim)
