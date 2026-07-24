@@ -18,6 +18,13 @@ var controls_container: VBoxContainer
 var background: ColorRect
 var skip_timer: float = 0.0
 var _advancing := false
+var _frame: PanelContainer
+var _frame_style: StyleBoxFlat
+var _grid: GridContainer
+var _title: Label
+var _rule: HSeparator
+var _rows: Array[PanelContainer] = []
+var _key_labels: Array[Label] = []
 
 # Comandi PC (tastiera)
 var _commands_pc: Array = [
@@ -50,6 +57,8 @@ func _ready():
 	AsyncSceneLoader.preload_scene(DOGANA_SCENE)
 	_create_background()
 	_create_controls_display()
+	get_viewport().size_changed.connect(_apply_responsive_layout)
+	_apply_responsive_layout()
 	
 	# Fade in
 	await get_tree().process_frame
@@ -101,27 +110,31 @@ func _create_controls_display():
 	main_container.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(main_container)
 
-	var frame := PanelContainer.new()
-	frame.custom_minimum_size = Vector2(1040, 630)
-	var frame_style := StyleBoxFlat.new()
-	frame_style.bg_color = Color(0.008, 0.028, 0.034, 0.93)
-	frame_style.border_color = Color(0.57, 0.5, 0.31, 0.72)
-	frame_style.set_border_width_all(1)
-	frame_style.set_corner_radius_all(10)
-	frame_style.content_margin_left = 44.0
-	frame_style.content_margin_right = 44.0
-	frame_style.content_margin_top = 28.0
-	frame_style.content_margin_bottom = 24.0
-	frame_style.shadow_color = Color(0, 0, 0, 0.72)
-	frame_style.shadow_size = 18
-	frame.add_theme_stylebox_override("panel", frame_style)
-	main_container.add_child(frame)
+	_frame = PanelContainer.new()
+	_frame_style = StyleBoxFlat.new()
+	_frame_style.bg_color = Color(0.008, 0.028, 0.034, 0.93)
+	_frame_style.border_color = Color(0.57, 0.5, 0.31, 0.72)
+	_frame_style.set_border_width_all(1)
+	_frame_style.set_corner_radius_all(10)
+	_frame_style.shadow_color = Color(0, 0, 0, 0.72)
+	_frame_style.shadow_size = 18
+	_frame.add_theme_stylebox_override("panel", _frame_style)
+	main_container.add_child(_frame)
+
+	var scroll := ScrollContainer.new()
+	scroll.name = "ResponsiveScroll"
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_frame.add_child(scroll)
 
 	controls_container = VBoxContainer.new()
 	controls_container.name = "ControlsContainer"
 	controls_container.add_theme_constant_override("separation", 10)
 	controls_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	frame.add_child(controls_container)
+	controls_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(controls_container)
 
 	var eyebrow := Label.new()
 	eyebrow.text = "MANUALE DEL PESCATORE  ·  I"
@@ -131,33 +144,36 @@ func _create_controls_display():
 	eyebrow.add_theme_color_override("font_color", Color(0.38, 0.74, 0.68, 0.9))
 	controls_container.add_child(eyebrow)
 
-	var title := Label.new()
-	title.name = "Title"
-	title.text = "Sopravvivere al Caligo"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_override("font", DISPLAY_FONT)
-	title.add_theme_font_size_override("font_size", 45)
-	title.add_theme_color_override("font_color", Color(0.91, 0.83, 0.62, 1.0))
-	title.add_theme_color_override("font_outline_color", Color(0, 0.01, 0.014, 0.95))
-	title.add_theme_constant_override("outline_size", 3)
-	controls_container.add_child(title)
+	_title = Label.new()
+	_title.name = "Title"
+	_title.text = "Sopravvivere al Caligo"
+	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_title.add_theme_font_override("font", DISPLAY_FONT)
+	_title.add_theme_font_size_override("font_size", 45)
+	_title.add_theme_color_override("font_color", Color(0.91, 0.83, 0.62, 1.0))
+	_title.add_theme_color_override("font_outline_color", Color(0, 0.01, 0.014, 0.95))
+	_title.add_theme_constant_override("outline_size", 3)
+	controls_container.add_child(_title)
 
-	var rule := HSeparator.new()
-	rule.custom_minimum_size = Vector2(760, 8)
-	controls_container.add_child(rule)
+	_rule = HSeparator.new()
+	_rule.custom_minimum_size.y = 8
+	_rule.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	controls_container.add_child(_rule)
 
 	var commands: Array = _commands_touch if _is_touch_platform() else _commands_pc
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 14)
-	grid.add_theme_constant_override("v_separation", 10)
-	controls_container.add_child(grid)
+	_grid = GridContainer.new()
+	_grid.columns = 2
+	_grid.add_theme_constant_override("h_separation", 14)
+	_grid.add_theme_constant_override("v_separation", 10)
+	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	controls_container.add_child(_grid)
 	for cmd in commands:
-		_create_command_row(grid, cmd[0], cmd[1], cmd[2])
+		_create_command_row(_grid, cmd[0], cmd[1], cmd[2])
 
 	var fishing_note := Label.new()
 	fishing_note.text = "PESCA PER VIVERE  ·  Ogni pesce recuperato restituisce salute."
 	fishing_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	fishing_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	fishing_note.add_theme_font_override("font", BODY_FONT)
 	fishing_note.add_theme_font_size_override("font_size", 17)
 	fishing_note.add_theme_color_override("font_color", Color(0.43, 0.9, 0.78, 1.0))
@@ -178,7 +194,8 @@ func _create_controls_display():
 func _create_command_row(parent: GridContainer, action: String, key: String, description: String):
 	var row := PanelContainer.new()
 	row.name = "CommandRow_" + action
-	row.custom_minimum_size = Vector2(468, 76)
+	row.custom_minimum_size = Vector2(0, 76)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.025, 0.07, 0.075, 0.82)
 	style.border_color = Color(0.25, 0.45, 0.4, 0.44)
@@ -190,6 +207,7 @@ func _create_command_row(parent: GridContainer, action: String, key: String, des
 	style.content_margin_bottom = 8.0
 	row.add_theme_stylebox_override("panel", style)
 	parent.add_child(row)
+	_rows.append(row)
 
 	var layout := HBoxContainer.new()
 	layout.add_theme_constant_override("separation", 14)
@@ -203,6 +221,7 @@ func _create_command_row(parent: GridContainer, action: String, key: String, des
 	key_label.add_theme_font_size_override("font_size", 16)
 	key_label.add_theme_color_override("font_color", Color(0.92, 0.81, 0.52, 1.0))
 	layout.add_child(key_label)
+	_key_labels.append(key_label)
 
 	var copy := VBoxContainer.new()
 	copy.add_theme_constant_override("separation", 0)
@@ -220,7 +239,30 @@ func _create_command_row(parent: GridContainer, action: String, key: String, des
 	desc_label.add_theme_font_override("font", BODY_FONT)
 	desc_label.add_theme_font_size_override("font_size", 13)
 	desc_label.add_theme_color_override("font_color", Color(0.62, 0.7, 0.67, 0.9))
+	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	copy.add_child(desc_label)
+
+
+func _apply_responsive_layout() -> void:
+	if _frame == null:
+		return
+	var viewport_size := CaligoResponsiveLayout.viewport_size(self)
+	var compact := CaligoResponsiveLayout.is_compact(viewport_size)
+	_frame.custom_minimum_size = CaligoResponsiveLayout.fitted_panel(viewport_size, Vector2(1040, 630), 16.0)
+	var side_margin := 16.0 if compact else 44.0
+	_frame_style.content_margin_left = side_margin
+	_frame_style.content_margin_right = side_margin
+	_frame_style.content_margin_top = 14.0 if compact else 28.0
+	_frame_style.content_margin_bottom = 14.0 if compact else 24.0
+	_grid.columns = 1 if compact else 2
+	_grid.add_theme_constant_override("h_separation", 8 if compact else 14)
+	_grid.add_theme_constant_override("v_separation", 6 if compact else 10)
+	controls_container.add_theme_constant_override("separation", 6 if compact else 10)
+	_title.add_theme_font_size_override("font_size", 33 if compact else 45)
+	for row in _rows:
+		row.custom_minimum_size.y = 62.0 if compact else 76.0
+	for key_label in _key_labels:
+		key_label.custom_minimum_size.x = 82.0 if compact else 110.0
 
 func _load_image_from_path(path: String) -> Texture2D:
 	# Prova a caricare come scena e estrarre lo sprite

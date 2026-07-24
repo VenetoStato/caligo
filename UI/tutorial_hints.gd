@@ -56,6 +56,8 @@ func _ready() -> void:
 		_completed[step] = false
 		_observed[step] = false
 	_build_panel()
+	get_viewport().size_changed.connect(_apply_responsive_layout)
+	_apply_responsive_layout()
 	_fishing_panel = _panel
 	var level := get_tree().current_scene
 	if level and level.has_signal("grace_activated"):
@@ -351,7 +353,7 @@ func _build_panel() -> void:
 	_title.add_theme_constant_override("outline_size", 2)
 	content.add_child(_title)
 	_instruction = Label.new()
-	_instruction.custom_minimum_size = Vector2(360, 0)
+	_instruction.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_instruction.add_theme_font_override("font", BODY_FONT)
 	_instruction.add_theme_font_size_override("font_size", 14)
@@ -373,3 +375,16 @@ func _build_panel() -> void:
 	_progress.add_theme_font_size_override("font_size", 12)
 	_progress.add_theme_color_override("font_color", Color(0.9, 0.82, 0.55, 0.9))
 	content.add_child(_progress)
+
+
+func _apply_responsive_layout() -> void:
+	if _panel == null:
+		return
+	var viewport_size := CaligoResponsiveLayout.viewport_size(self)
+	var compact := CaligoResponsiveLayout.is_compact(viewport_size)
+	var margin := clampf(viewport_size.x * 0.025, 12.0, 24.0)
+	_panel.offset_left = margin
+	_panel.offset_top = clampf(viewport_size.y * 0.12, 58.0, 108.0)
+	_panel.custom_minimum_size.x = clampf(viewport_size.x - margin * 2.0, 280.0, 390.0)
+	_title.add_theme_font_size_override("font_size", 22 if compact else 27)
+	_instruction.add_theme_font_size_override("font_size", 13 if compact else 14)

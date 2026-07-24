@@ -120,14 +120,6 @@ func _build_platform_art() -> void:
 		sprite.modulate = Color(0.64, 0.72, 0.7, 1.0)
 		sprite.set_meta("walkable_rect", rect)
 		art.add_child(sprite)
-		var rim := Line2D.new()
-		rim.add_to_group("dogana_foot_lip")
-		rim.points = PackedVector2Array([rect.position, Vector2(rect.end.x, rect.position.y)])
-		rim.width = 1.8
-		rim.default_color = Color(0.14, 0.22, 0.21, 0.72)
-		rim.antialiased = true
-		rim.z_index = 7
-		art.add_child(rim)
 	for wall in [
 		Rect2(2020, -1160, 44, 1060),
 		Rect2(3276, -1160, 44, 1060),

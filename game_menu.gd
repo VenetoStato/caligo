@@ -25,6 +25,9 @@ var _water_sliders: Dictionary = {}
 var _water_value_labels: Dictionary = {}
 var _water_nodes: Array[Node] = []
 var _saved_water_tuning: Dictionary = {}
+var _water_expanded := false
+var _menu_tween: Tween
+var _menu_transitioning := false
 
 const DOGANA_SCENE := "res://Levels/Scenes/punta_della_dogana.tscn"
 const ORIGINAL_SCENE := "res://Levels/Scenes/test_area.tscn"
@@ -73,6 +76,8 @@ func _ready():
 		if sl_look_y:
 			sl_look_y.value_changed.connect(_on_look_ahead_y_changed)
 	_apply_visual_theme()
+	get_viewport().size_changed.connect(_apply_responsive_layout)
+	_apply_responsive_layout()
 
 
 func _apply_visual_theme() -> void:
@@ -204,24 +209,43 @@ func _unhandled_input(event):
 		get_viewport().set_input_as_handled()
 
 func toggle():
+	if _menu_transitioning:
+		return
 	if panel.visible:
 		_close()
 	else:
 		_open()
 
 func _open():
+	_menu_transitioning = true
 	if menu_btn:
 		menu_btn.visible = false
 	panel.visible = true
+	panel.modulate.a = 0.0
+	panel.scale = Vector2.ONE * 0.96
 	get_tree().paused = true
 	_update_level_button()
 	_sync_scenario_selector()
 	_update_hook_label()
 	_find_player_and_camera()
 	_update_camera_sliders()
+	_menu_tween = create_tween().set_parallel(true)
+	_menu_tween.tween_property(panel, "modulate:a", 1.0, 0.18).set_trans(Tween.TRANS_SINE)
+	_menu_tween.tween_property(panel, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK)
+	_menu_tween.finished.connect(func() -> void: _menu_transitioning = false, CONNECT_ONE_SHOT)
 
 func _close():
+	_menu_transitioning = true
+	_menu_tween = create_tween().set_parallel(true)
+	_menu_tween.tween_property(panel, "modulate:a", 0.0, 0.14).set_trans(Tween.TRANS_SINE)
+	_menu_tween.tween_property(panel, "scale", Vector2.ONE * 0.97, 0.14).set_trans(Tween.TRANS_SINE)
+	_menu_tween.finished.connect(_finish_close, CONNECT_ONE_SHOT)
+
+
+func _finish_close() -> void:
 	panel.visible = false
+	panel.modulate.a = 1.0
+	panel.scale = Vector2.ONE
 	controls_panel.visible = false
 	camera_panel.visible = false
 	if _water_panel:
@@ -230,6 +254,7 @@ func _close():
 	if menu_btn:
 		menu_btn.visible = true
 	get_tree().paused = false
+	_menu_transitioning = false
 
 func _find_player_and_camera():
 	if _player != null and is_instance_valid(_player):
@@ -293,8 +318,27 @@ func _on_water_tuning() -> void:
 		_sync_water_sliders()
 
 func _set_water_panel_size(expanded: bool) -> void:
-	panel.offset_top = -330.0 if expanded else -160.0
-	panel.offset_bottom = 330.0 if expanded else 160.0
+	_water_expanded = expanded
+	_apply_responsive_layout()
+
+
+func _apply_responsive_layout() -> void:
+	if panel == null:
+		return
+	var viewport_size := CaligoResponsiveLayout.viewport_size(self)
+	var compact := CaligoResponsiveLayout.is_compact(viewport_size)
+	var panel_width := clampf(viewport_size.x - 24.0, 280.0, 360.0)
+	var desired_height := 660.0 if _water_expanded else 320.0
+	var panel_height := minf(desired_height, viewport_size.y - 24.0)
+	panel.offset_left = -panel_width * 0.5
+	panel.offset_right = panel_width * 0.5
+	panel.offset_top = -panel_height * 0.5
+	panel.offset_bottom = panel_height * 0.5
+	panel.pivot_offset = Vector2(panel_width, panel_height) * 0.5
+	if _water_panel:
+		_water_panel.custom_minimum_size.y = minf(310.0, viewport_size.y * 0.42)
+	for slider in _water_sliders.values():
+		(slider as HSlider).custom_minimum_size.x = 190.0 if compact else 260.0
 
 func _find_water_nodes() -> void:
 	_water_nodes = get_tree().get_nodes_in_group("water")

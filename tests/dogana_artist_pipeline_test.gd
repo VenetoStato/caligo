@@ -31,11 +31,9 @@ func _ready() -> void:
 	if player.z_index <= grace.z_index or altar.z_index >= player.z_index:
 		_fail("The player is not rendered in front of the tide altar.")
 		return
-	for lip in get_tree().get_nodes_in_group("dogana_foot_lip"):
-		var line := lip as Line2D
-		if line == null or line.width > 2.0 or line.default_color.r > 0.35:
-			_fail("A bright or oversized platform line still covers the player.")
-			return
+	if not get_tree().get_nodes_in_group("dogana_foot_lip").is_empty():
+		_fail("A platform line still covers the player's feet.")
+		return
 
 	var variants: Dictionary = {}
 	for prop in get_tree().get_nodes_in_group("dogana_breakable_prop"):

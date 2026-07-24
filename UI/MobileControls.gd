@@ -27,35 +27,49 @@ func _ready() -> void:
 		return
 	layer = 500
 	_remove_mouse_from_attack_actions()
+	get_viewport().size_changed.connect(_build_controls)
+	_build_controls()
+
+
+func _build_controls() -> void:
+	for child in get_children():
+		remove_child(child)
+		child.queue_free()
 	var v := get_viewport().get_visible_rect().size
 	var w := v.x
 	var h := v.y
+	var adaptive_scale := clampf(minf(w / 900.0, h / 620.0), 0.58, 1.08)
+	var btn := roundf(BTN * adaptive_scale)
+	var gap := roundf(GAP * adaptive_scale)
+	var cast_size := roundf(CAST_SIZE * adaptive_scale)
+	var margin_h := maxf(8.0, MARGIN_H * adaptive_scale)
+	var margin_bottom := maxf(4.0, MARGIN_BOTTOM * adaptive_scale)
 	# Pulsanti lungo il bordo basso
-	var r0 := h - MARGIN_BOTTOM - BTN
-	var r1 := r0 - GAP - BTN
+	var r0 := h - margin_bottom - btn
+	var r1 := r0 - gap - btn
 	# --- SINISTRA (r0): sinistra e salto ---
-	_place("ui_left", MARGIN_H, r0, BTN, BTN, false)
-	_place("ui_accept", MARGIN_H + BTN + GAP, r0, BTN, BTN, false)
-	_place("interact", MARGIN_H + BTN + GAP, r1, BTN, BTN, true)
+	_place("ui_left", margin_h, r0, btn, btn, false)
+	_place("ui_accept", margin_h + btn + gap, r0, btn, btn, false)
+	_place("interact", margin_h + btn + gap, r1, btn, btn, true)
 	# --- DESTRA: destra (r1) + combattimento ---
-	var c4 := w - MARGIN_H - BTN
-	var c3 := c4 - BTN - GAP
-	var c2 := c3 - BTN - GAP
-	var c1 := c2 - BTN - GAP
-	_place("ui_attack", c1, r1, BTN, BTN, false)
-	_place("ui_attack_strong", c2, r1, BTN, BTN, false)
-	_place("dash", c3, r1, BTN, BTN, false)
-	_place("ui_right", c4, r1, BTN, BTN, false)
+	var c4 := w - margin_h - btn
+	var c3 := c4 - btn - gap
+	var c2 := c3 - btn - gap
+	var c1 := c2 - btn - gap
+	_place("ui_attack", c1, r1, btn, btn, false)
+	_place("ui_attack_strong", c2, r1, btn, btn, false)
+	_place("dash", c3, r1, btn, btn, false)
+	_place("ui_right", c4, r1, btn, btn, false)
 	# --- PESCA (r0, bordo basso): cast, reel, grab, change ---
 	var fish_y := r0
 	var f4 := c4
-	var f3 := f4 - BTN - GAP
-	var f2 := f3 - BTN - GAP
-	var f1 := f2 - CAST_SIZE - GAP
-	_place_cast_joystick(f1, fish_y, CAST_SIZE)
-	_place("reel", f2, fish_y, BTN, BTN, true)
-	_place("grab", f3, fish_y, BTN, BTN, true)
-	_place("change_hook", f4, fish_y, BTN, BTN, true)
+	var f3 := f4 - btn - gap
+	var f2 := f3 - btn - gap
+	var f1 := f2 - cast_size - gap
+	_place_cast_joystick(f1, fish_y, cast_size)
+	_place("reel", f2, fish_y, btn, btn, true)
+	_place("grab", f3, fish_y, btn, btn, true)
+	_place("change_hook", f4, fish_y, btn, btn, true)
 
 func _apply_pressed_gradient(s: StyleBoxFlat, bg: Color, border: Color, rad: int, bw: int) -> void:
 	s.bg_color = bg

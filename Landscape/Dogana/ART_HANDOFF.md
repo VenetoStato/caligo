@@ -34,9 +34,10 @@ top edge at the top of the source image; collision is defined separately.
 - Background section art: z `-18`
 - Secret-room art: z `-2`
 - Walkable platform body: z `-1`
-- Player and enemies: z `0`
-- Thin foreground rim over feet: effective z `6`
+- Player: z `2`
+- Enemies and world props: z `0` or their scene-specific combat layer
 - Fishing line and hook: z `14–20`
 
-The foreground rim is intentionally narrow: it should cover only the bottom of the
-feet, never the character body.
+Do not add a procedural Line2D over the walkable edge. If an illustrator wants
+foreground foot occlusion, it must be painted into a dedicated transparent prop
+and reviewed per platform rather than stretched across the whole floor.

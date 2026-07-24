@@ -1656,7 +1656,12 @@ func _reel_fish_to_player():
 		elif horizontal_dist < reel_zone_dist and near_surface:
 			current_fish.call("do_catch_jump")
 			_fish_catch_jump_done = true
-	if dist < fish_reel_distance:
+	var reached_pontile_edge := (
+		_fish_catch_jump_done
+		and horizontal_dist < fish_reel_distance
+		and (near_surface or not bool(current_fish.call("is_in_water")))
+	)
+	if dist < fish_reel_distance or reached_pontile_edge:
 		_complete_fish_catch(current_fish)
 	else:
 		var rod = get_rod_tip_position()

@@ -28,6 +28,8 @@ func _ready():
 	layer = 200  # Sopra tutto
 	_create_background()
 	_create_title()
+	get_viewport().size_changed.connect(_apply_responsive_layout)
+	_apply_responsive_layout()
 	
 	# Inizia la sequenza
 	await get_tree().process_frame
@@ -103,6 +105,17 @@ func _create_title():
 	title_group.add_child(subtitle)
 
 	title_group.modulate.a = 0.0
+
+
+func _apply_responsive_layout() -> void:
+	if title_group == null or title_label == null:
+		return
+	var viewport_size := CaligoResponsiveLayout.viewport_size(self)
+	var compact := CaligoResponsiveLayout.is_compact(viewport_size)
+	var width := clampf(viewport_size.x - 32.0, 280.0, 720.0)
+	title_group.custom_minimum_size = Vector2(width, minf(240.0, viewport_size.y - 24.0))
+	title_label.custom_minimum_size = Vector2(width, 88.0 if compact else 118.0)
+	title_label.add_theme_font_size_override("font_size", 70 if compact else 104)
 
 func _play_sequence():
 	_active_tween = create_tween()

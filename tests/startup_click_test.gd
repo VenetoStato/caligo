@@ -16,14 +16,29 @@ func _run() -> void:
 		return
 	await process_frame
 	await process_frame
+	var splash_group := current_scene.get("title_group") as Control
+	if not _fits_viewport(splash_group):
+		_fail("Splash layout exceeds the current viewport.")
+		return
 	_click_burst(12)
 	if not await _wait_for_scene(CONTROLS, 2.0):
 		_fail("Repeated splash clicks did not reach controls safely.")
+		return
+	var controls_frame := current_scene.get("_frame") as Control
+	var controls_grid := current_scene.get("_grid") as GridContainer
+	if not _fits_viewport(controls_frame):
+		_fail("Controls layout exceeds the current viewport.")
+		return
+	if CaligoResponsiveLayout.is_compact(root.get_visible_rect().size) and controls_grid.columns != 1:
+		_fail("Controls did not switch to the compact single-column layout.")
 		return
 
 	_click_burst(12)
 	if not await _wait_for_scene(POETIC, 2.0):
 		_fail("Repeated controls clicks did not reach poetic screen safely.")
+		return
+	if not _fits_viewport(current_scene.get("_frame") as Control):
+		_fail("Prologue layout exceeds the current viewport.")
 		return
 	var original_lines := [
 		["PoeticTextEnglish", "From the mist of the marsh, a bundle took life"],
@@ -65,6 +80,16 @@ func _wait_for_scene(path: String, timeout: float) -> bool:
 		if current_scene and current_scene.scene_file_path == path:
 			return true
 	return false
+
+
+func _fits_viewport(control: Control) -> bool:
+	if control == null:
+		return false
+	var viewport_size := root.get_visible_rect().size
+	return (
+		control.custom_minimum_size.x <= viewport_size.x + 1.0
+		and control.custom_minimum_size.y <= viewport_size.y + 1.0
+	)
 
 
 func _fail(message: String) -> void:

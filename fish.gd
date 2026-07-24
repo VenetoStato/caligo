@@ -647,6 +647,7 @@ func stop_struggle():
 func do_catch_jump():
 	var up_strength: float = 320.0
 	var toward_strength: float = 220.0
+	in_water = false
 	if player_ref != null and is_instance_valid(player_ref):
 		var to_player: Vector2 = (player_ref.global_position - global_position).normalized()
 		# Sempre verso l'alto + verso il player

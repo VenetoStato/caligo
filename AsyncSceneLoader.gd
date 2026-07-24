@@ -15,12 +15,16 @@ var _prepared_scene: PackedScene
 var _overlay: ColorRect
 var _progress: ProgressBar
 var _status: Label
+var _box: VBoxContainer
+var _loading_title: Label
 
 
 func _ready() -> void:
 	layer = 1000
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build_loading_ui()
+	get_viewport().size_changed.connect(_apply_responsive_layout)
+	_apply_responsive_layout()
 	set_process(false)
 
 
@@ -190,21 +194,20 @@ func _build_loading_ui() -> void:
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_overlay.add_child(center)
-	var box := VBoxContainer.new()
-	box.custom_minimum_size = Vector2(580.0, 170.0)
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 20)
-	center.add_child(box)
+	_box = VBoxContainer.new()
+	_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_box.add_theme_constant_override("separation", 20)
+	center.add_child(_box)
 
-	var title := Label.new()
-	title.text = "CALIGO"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_override("font", DISPLAY_FONT)
-	title.add_theme_font_size_override("font_size", 58)
-	title.add_theme_color_override("font_color", Color(0.9, 0.82, 0.6, 1.0))
-	title.add_theme_color_override("font_outline_color", Color(0.0, 0.01, 0.014, 0.95))
-	title.add_theme_constant_override("outline_size", 5)
-	box.add_child(title)
+	_loading_title = Label.new()
+	_loading_title.text = "CALIGO"
+	_loading_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_loading_title.add_theme_font_override("font", DISPLAY_FONT)
+	_loading_title.add_theme_font_size_override("font_size", 58)
+	_loading_title.add_theme_color_override("font_color", Color(0.9, 0.82, 0.6, 1.0))
+	_loading_title.add_theme_color_override("font_outline_color", Color(0.0, 0.01, 0.014, 0.95))
+	_loading_title.add_theme_constant_override("outline_size", 5)
+	_box.add_child(_loading_title)
 
 	var subtitle := Label.new()
 	subtitle.text = "PUNTA DELLA DOGANA  ·  VENEZIA"
@@ -212,17 +215,17 @@ func _build_loading_ui() -> void:
 	subtitle.add_theme_font_override("font", BODY_FONT)
 	subtitle.add_theme_font_size_override("font_size", 13)
 	subtitle.add_theme_color_override("font_color", Color(0.46, 0.76, 0.7, 0.82))
-	box.add_child(subtitle)
+	_box.add_child(subtitle)
 
 	_status = Label.new()
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status.add_theme_font_override("font", BODY_FONT)
 	_status.add_theme_font_size_override("font_size", 15)
 	_status.add_theme_color_override("font_color", Color(0.55, 0.82, 0.78, 0.9))
-	box.add_child(_status)
+	_box.add_child(_status)
 
 	_progress = ProgressBar.new()
-	_progress.custom_minimum_size = Vector2(580.0, 18.0)
+	_progress.custom_minimum_size.y = 18.0
 	_progress.show_percentage = false
 	var background := StyleBoxFlat.new()
 	background.bg_color = Color(0.02, 0.05, 0.06, 1.0)
@@ -236,4 +239,14 @@ func _build_loading_ui() -> void:
 	fill.set_corner_radius_all(8)
 	_progress.add_theme_stylebox_override("background", background)
 	_progress.add_theme_stylebox_override("fill", fill)
-	box.add_child(_progress)
+	_box.add_child(_progress)
+
+
+func _apply_responsive_layout() -> void:
+	if _box == null:
+		return
+	var viewport_size := CaligoResponsiveLayout.viewport_size(self)
+	var compact := CaligoResponsiveLayout.is_compact(viewport_size)
+	_box.custom_minimum_size = Vector2(clampf(viewport_size.x - 40.0, 260.0, 580.0), 150.0)
+	_loading_title.add_theme_font_size_override("font_size", 42 if compact else 58)
+	_progress.custom_minimum_size.x = clampf(viewport_size.x - 40.0, 260.0, 580.0)
