@@ -6,8 +6,8 @@ const BODY_FONT := preload("res://UI/Fonts/SourceSans3.ttf")
 const ARRIVAL_ART := preload("res://Landscape/Dogana/Illustrated/arrival.png")
 
 @export_category("Timing")
-@export var auto_advance_time: float = 10.0  # Secondi prima di avanzare automaticamente
-@export var fade_duration: float = 0.5
+@export var auto_advance_time: float = 18.0
+@export var fade_duration: float = 1.65
 
 @export_category("Visual")
 @export var background_color: Color = Color(0.004, 0.016, 0.022, 0.88)
@@ -25,6 +25,7 @@ var _title: Label
 var _rule: HSeparator
 var _rows: Array[PanelContainer] = []
 var _key_labels: Array[Label] = []
+var _fade_tween: Tween
 
 # Comandi PC (tastiera)
 var _commands_pc: Array = [
@@ -289,16 +290,18 @@ func _load_image_from_path(path: String) -> Texture2D:
 	return null
 
 func _fade_in():
-	var tween = create_tween()
-	tween.tween_property(controls_container, "modulate:a", 1.0, fade_duration)
-	await tween.finished
+	_fade_tween = create_tween()
+	_fade_tween.tween_property(controls_container, "modulate:a", 1.0, fade_duration).set_trans(Tween.TRANS_SINE)
+	await _fade_tween.finished
 
 func _fade_out():
-	var tween = create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(controls_container, "modulate:a", 0.0, fade_duration)
-	tween.tween_property(background, "color:a", 0.0, fade_duration)
-	await tween.finished
+	if _fade_tween and _fade_tween.is_valid():
+		_fade_tween.kill()
+	_fade_tween = create_tween()
+	_fade_tween.set_parallel(true)
+	_fade_tween.tween_property(controls_container, "modulate:a", 0.0, fade_duration).set_trans(Tween.TRANS_SINE)
+	_fade_tween.tween_property(background, "color:a", 0.0, fade_duration)
+	await _fade_tween.finished
 
 func _go_to_game():
 	if _advancing:

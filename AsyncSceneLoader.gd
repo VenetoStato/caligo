@@ -1,6 +1,6 @@
 extends CanvasLayer
 
-const MIN_VISIBLE_TIME := 0.45
+const MIN_VISIBLE_TIME := 1.2
 const READY_FRAMES := 3
 const DISPLAY_FONT := preload("res://UI/Fonts/CormorantGaramond.ttf")
 const BODY_FONT := preload("res://UI/Fonts/SourceSans3.ttf")
@@ -45,7 +45,7 @@ func load_scene(scene_path: String) -> void:
 	_overlay.modulate.a = 0.0
 	_progress.value = 0.0
 	_status.text = "APRENDO LE ACQUE DELLA LAGUNA…"
-	create_tween().tween_property(_overlay, "modulate:a", 1.0, 0.18)
+	create_tween().tween_property(_overlay, "modulate:a", 1.0, 0.75).set_trans(Tween.TRANS_SINE)
 
 	if scene_path == _prepared_path:
 		if _prepared_scene:
@@ -133,7 +133,7 @@ func _finish_loading() -> void:
 	_status.text = "LA DOGANA È PRONTA"
 	await get_tree().process_frame
 	var tween := create_tween()
-	tween.tween_property(_overlay, "modulate:a", 0.0, 0.5).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(_overlay, "modulate:a", 0.0, 1.25).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 	await tween.finished
 	_overlay.visible = false
 	_loading = false

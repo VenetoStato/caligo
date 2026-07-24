@@ -159,9 +159,9 @@ func _apply_step_copy(step: Step) -> void:
 	if _title.text.is_empty():
 		_panel.modulate.a = 0.0
 	else:
-		_step_transition.tween_property(_panel, "modulate:a", 0.0, 0.24).set_trans(Tween.TRANS_SINE)
+		_step_transition.tween_property(_panel, "modulate:a", 0.0, 0.45).set_trans(Tween.TRANS_SINE)
 	_step_transition.tween_callback(_set_step_copy.bind(step, copy))
-	_step_transition.tween_property(_panel, "modulate:a", 1.0, 0.38).set_trans(Tween.TRANS_SINE)
+	_step_transition.tween_property(_panel, "modulate:a", 1.0, 0.75).set_trans(Tween.TRANS_SINE)
 
 
 func _set_step_copy(step: Step, copy: Dictionary) -> void:
@@ -200,8 +200,8 @@ func _play_section_dissolve() -> void:
 	if _section_veil == null:
 		return
 	var tween := create_tween()
-	tween.tween_property(_section_veil, "modulate:a", 0.2, 0.16).set_trans(Tween.TRANS_SINE)
-	tween.tween_property(_section_veil, "modulate:a", 0.0, 0.52).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(_section_veil, "modulate:a", 0.2, 0.28).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(_section_veil, "modulate:a", 0.0, 0.85).set_trans(Tween.TRANS_SINE)
 
 
 func _get_step_copy(step: Step, touch: bool) -> Dictionary:

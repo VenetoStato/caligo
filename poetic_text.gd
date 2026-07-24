@@ -5,8 +5,8 @@ const BODY_FONT := preload("res://UI/Fonts/SourceSans3.ttf")
 const ARRIVAL_ART := preload("res://Landscape/Dogana/Illustrated/arrival.png")
 
 @export_category("Timing")
-@export var auto_advance_time: float = 8.0
-@export var fade_duration: float = 0.8
+@export var auto_advance_time: float = 15.0
+@export var fade_duration: float = 2.1
 
 @export_category("Visual")
 @export var background_color: Color = Color(0.003, 0.014, 0.02, 0.84)
@@ -20,6 +20,7 @@ var _frame: PanelContainer
 var _frame_style: StyleBoxFlat
 var _primary_line: Label
 var _veneto_line: Label
+var _fade_tween: Tween
 
 func _ready():
 	layer = 200  # Sopra tutto
@@ -183,16 +184,18 @@ func _apply_responsive_layout() -> void:
 	_veneto_line.add_theme_font_size_override("font_size", 20 if compact else 25)
 
 func _fade_in():
-	var tween = create_tween()
-	tween.tween_property(text_container, "modulate:a", 1.0, fade_duration)
-	await tween.finished
+	_fade_tween = create_tween()
+	_fade_tween.tween_property(text_container, "modulate:a", 1.0, fade_duration).set_trans(Tween.TRANS_SINE)
+	await _fade_tween.finished
 
 func _fade_out():
-	var tween = create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(text_container, "modulate:a", 0.0, fade_duration)
-	tween.tween_property(background, "color:a", 0.0, fade_duration)
-	await tween.finished
+	if _fade_tween and _fade_tween.is_valid():
+		_fade_tween.kill()
+	_fade_tween = create_tween()
+	_fade_tween.set_parallel(true)
+	_fade_tween.tween_property(text_container, "modulate:a", 0.0, fade_duration).set_trans(Tween.TRANS_SINE)
+	_fade_tween.tween_property(background, "color:a", 0.0, fade_duration)
+	await _fade_tween.finished
 
 func _go_to_game():
 	if _advancing:

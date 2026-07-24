@@ -17,11 +17,15 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	var splash_group := current_scene.get("title_group") as Control
-	if not _fits_viewport(splash_group):
+	if (
+		not _fits_viewport(splash_group)
+		or float(current_scene.get("fade_in_duration")) < 2.5
+		or float(current_scene.get("skip_fade_duration")) < 1.0
+	):
 		_fail("Splash layout exceeds the current viewport.")
 		return
 	_click_burst(12)
-	if not await _wait_for_scene(CONTROLS, 2.0):
+	if not await _wait_for_scene(CONTROLS, 4.0):
 		_fail("Repeated splash clicks did not reach controls safely.")
 		return
 	var controls_frame := current_scene.get("_frame") as Control
@@ -32,13 +36,19 @@ func _run() -> void:
 	if CaligoResponsiveLayout.is_compact(root.get_visible_rect().size) and controls_grid.columns != 1:
 		_fail("Controls did not switch to the compact single-column layout.")
 		return
+	if float(current_scene.get("fade_duration")) < 1.5 or float(current_scene.get("auto_advance_time")) < 15.0:
+		_fail("Controls transition timing is still too fast.")
+		return
 
 	_click_burst(12)
-	if not await _wait_for_scene(POETIC, 2.0):
+	if not await _wait_for_scene(POETIC, 4.5):
 		_fail("Repeated controls clicks did not reach poetic screen safely.")
 		return
 	if not _fits_viewport(current_scene.get("_frame") as Control):
 		_fail("Prologue layout exceeds the current viewport.")
+		return
+	if float(current_scene.get("fade_duration")) < 2.0 or float(current_scene.get("auto_advance_time")) < 14.0:
+		_fail("Prologue transition timing is still too fast.")
 		return
 	var original_lines := [
 		["PoeticTextEnglish", "From the mist of the marsh, a bundle took life"],
@@ -52,7 +62,7 @@ func _run() -> void:
 			return
 
 	_click_burst(12)
-	if not await _wait_for_scene(DOGANA, 12.0):
+	if not await _wait_for_scene(DOGANA, 16.0):
 		_fail("Async loading did not reach Dogana.")
 		return
 

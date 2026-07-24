@@ -5,9 +5,10 @@ const BODY_FONT := preload("res://UI/Fonts/SourceSans3.ttf")
 const ARRIVAL_ART := preload("res://Landscape/Dogana/Illustrated/arrival.png")
 
 @export_category("Timing")
-@export var fade_in_duration: float = 1.5
-@export var display_duration: float = 2.5
-@export var fade_out_duration: float = 1.0
+@export var fade_in_duration: float = 2.8
+@export var display_duration: float = 4.5
+@export var fade_out_duration: float = 2.2
+@export var skip_fade_duration: float = 1.15
 
 @export_category("Visual")
 @export var title_text: String = "CALIGO"
@@ -150,8 +151,8 @@ func _skip_to_controls():
 		_active_tween.kill()
 	_active_tween = create_tween()
 	_active_tween.set_parallel(true)
-	_active_tween.tween_property(title_group, "modulate:a", 0.0, 0.2).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
-	_active_tween.tween_property(background, "color:a", 0.0, 0.2)
+	_active_tween.tween_property(title_group, "modulate:a", 0.0, skip_fade_duration).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	_active_tween.tween_property(background, "color:a", 0.0, skip_fade_duration)
 	_active_tween.finished.connect(_go_to_controls, CONNECT_ONE_SHOT)
 
 func _go_to_controls():
