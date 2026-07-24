@@ -121,9 +121,10 @@ func _build_platform_art() -> void:
 		sprite.set_meta("walkable_rect", rect)
 		art.add_child(sprite)
 		var rim := Line2D.new()
+		rim.add_to_group("dogana_foot_lip")
 		rim.points = PackedVector2Array([rect.position, Vector2(rect.end.x, rect.position.y)])
-		rim.width = 2.8
-		rim.default_color = Color(0.82, 0.76, 0.57, 0.82)
+		rim.width = 1.8
+		rim.default_color = Color(0.14, 0.22, 0.21, 0.72)
 		rim.antialiased = true
 		rim.z_index = 7
 		art.add_child(rim)

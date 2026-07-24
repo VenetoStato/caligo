@@ -45,6 +45,8 @@ var _completion_started := false
 var _player_signal_connected := false
 var _fish_signal_connected := false
 var _step_transition: Tween
+var _section_veil: ColorRect
+var _last_section := ""
 
 
 func _ready() -> void:
@@ -161,8 +163,12 @@ func _apply_step_copy(step: Step) -> void:
 
 
 func _set_step_copy(step: Step, copy: Dictionary) -> void:
+	var section := _get_section_label(step)
+	if not _last_section.is_empty() and section != _last_section:
+		_play_section_dissolve()
+	_last_section = section
 	_eyebrow.text = "%s  ·  %02d / %02d" % [
-		_get_section_label(step),
+		section,
 		_completed_count() + 1,
 		STEP_ORDER.size(),
 	]
@@ -186,6 +192,14 @@ func _get_section_label(step: Step) -> String:
 	if step in [Step.CAST, Step.REEL]:
 		return "SEZIONE IV  ·  PESCA"
 	return "SEZIONE V  ·  ORIENTAMENTO"
+
+
+func _play_section_dissolve() -> void:
+	if _section_veil == null:
+		return
+	var tween := create_tween()
+	tween.tween_property(_section_veil, "modulate:a", 0.2, 0.16).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(_section_veil, "modulate:a", 0.0, 0.52).set_trans(Tween.TRANS_SINE)
 
 
 func _get_step_copy(step: Step, touch: bool) -> Dictionary:
@@ -294,6 +308,14 @@ func _fade_completed_tutorial() -> void:
 
 
 func _build_panel() -> void:
+	_section_veil = ColorRect.new()
+	_section_veil.name = "SectionDissolve"
+	_section_veil.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_section_veil.color = Color(0.005, 0.024, 0.03, 0.86)
+	_section_veil.modulate.a = 0.0
+	_section_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_section_veil)
+
 	_panel = PanelContainer.new()
 	_panel.name = "GuidedTutorial"
 	_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)

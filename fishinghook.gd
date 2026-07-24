@@ -46,6 +46,7 @@ var original_linear_damp: float = 0.0
 var is_visible: bool = true
 
 var fish_detection_area: Area2D = null
+var _fish_scan_timer := 0.0
 
 func _ready():
 	original_gravity_scale = gravity_scale
@@ -149,8 +150,19 @@ func _physics_process(delta: float):
 		# In acqua: gravità 0, quindi smorza la velocità verticale verso target
 		var target_vy = sink_speed if sink_slowly_in_water else 0.0
 		linear_velocity.y = move_toward(linear_velocity.y, target_vy, water_vertical_brake * delta)
+		_fish_scan_timer -= delta
+		if hooked_fish == null and _fish_scan_timer <= 0.0:
+			_fish_scan_timer = 0.12
+			_scan_nearby_fish()
 
 	_update_sprite_rotation()
+
+
+func _scan_nearby_fish() -> void:
+	var radius_squared := pow(fish_detection_radius * 1.6, 2)
+	for fish in get_tree().get_nodes_in_group(fish_group_name):
+		if fish is Node2D and (fish as Node2D).global_position.distance_squared_to(global_position) <= radius_squared:
+			_check_if_fish(fish)
 
 func _update_sprite_rotation():
 	if sprite == null:
@@ -245,9 +257,11 @@ func _check_if_fish(node: Node):
 	elif "fish" in node.name.to_lower():
 		is_fish = true
 
-	# Non chiamare _hook_fish: il pesce rileva l'amo (area/body), va verso, e abbocca a distanza < 30
-	# if is_fish:
-	# 	_hook_fish(node as Node2D)
+	# Non agganciare subito: notifichiamo però esplicitamente il pesce. Affidarsi
+	# soltanto all'Area del pesce rendeva l'abboccata dipendente dalla scala del
+	# collider e poteva lasciare l'amo invisibile ai pesci del tutorial.
+	if is_fish and node.has_method("_on_hook_detected"):
+		node.call_deferred("_on_hook_detected", self)
 
 func _hook_fish(fish: Node2D):
 	if fish == null:

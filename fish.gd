@@ -117,6 +117,8 @@ var _swim_animation_time := 0.0
 
 func _ready():
 	add_to_group("fish")
+	if bool(get_meta("tutorial_fish", false)):
+		_configure_tutorial_fish()
 	# z_index > water (10): pesci visibili sopra l'acqua
 	z_index = 15
 	# Configurazione RigidBody2D per pesci
@@ -154,6 +156,19 @@ func _ready():
 	if animation_player:
 		# L'animazione viene avanzata direttamente: evita cache invalide durante i cambi scena rapidi.
 		animation_player.active = false
+
+
+func _configure_tutorial_fish() -> void:
+	# Il branco didattico resta visibile sotto il pontile e raggiunge rapidamente
+	# l'amo: il tutorial deve insegnare la pesca, non cercare pesci fuori camera.
+	natural_swim_speed = 38.0
+	attraction_speed = 118.0
+	swim_bounds_x = 72.0
+	swim_bounds_y = 28.0
+	home_offset = Vector2.ZERO
+	min_depth_from_top = 36.0
+	max_depth_from_top = 96.0
+	turn_chance = 0.16
 
 func _setup_underwater_shader():
 	# Applica distorsione leggera ai pesci quando sono in acqua
@@ -657,7 +672,11 @@ func set_in_water(water: bool):
 func _in_reel_zone() -> bool:
 	if player_ref == null or not is_instance_valid(player_ref):
 		return false
-	return global_position.distance_to(player_ref.global_position) <= reel_zone_radius
+	var player_2d := player_ref as Node2D
+	if player_2d == null:
+		return false
+	var offset: Vector2 = global_position - player_2d.global_position
+	return absf(offset.x) <= reel_zone_radius and absf(offset.y) <= reel_zone_radius * 2.2
 
 ## True se la posizione del pesce è sopra la superficie dell'acqua (Y minore = più in alto)
 func _is_above_water_surface() -> bool:

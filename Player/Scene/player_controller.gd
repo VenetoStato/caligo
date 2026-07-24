@@ -1640,6 +1640,7 @@ func _reel_fish_to_player():
 		_destroy_hook()
 		return
 	var dist = global_position.distance_to(current_fish.global_position)
+	var horizontal_dist := absf(global_position.x - current_fish.global_position.x)
 	# Salto: quando il pesce è in FishArea, O entro fish_catch_jump_distance, O vicino al player E vicino alla superficie (può uscire anche con collider)
 	var fish_area: Area2D = get_node_or_null("FishArea") as Area2D
 	var in_area: bool = fish_area != null and current_fish in fish_area.get_overlapping_bodies()
@@ -1652,7 +1653,7 @@ func _reel_fish_to_player():
 		elif dist < fish_catch_jump_distance and dist >= fish_reel_distance:
 			current_fish.call("do_catch_jump")
 			_fish_catch_jump_done = true
-		elif dist < reel_zone_dist and near_surface:
+		elif horizontal_dist < reel_zone_dist and near_surface:
 			current_fish.call("do_catch_jump")
 			_fish_catch_jump_done = true
 	if dist < fish_reel_distance:

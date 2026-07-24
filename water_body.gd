@@ -506,7 +506,9 @@ func spawn_fish_in_water() -> void:
 		if use_variant:
 			fish.call("set_fish_texture", _fish_textures[randi() % _fish_textures.size()], fish_scale)
 
-		fish.scale = Vector2.ONE * fish_scale
+		# Il corpo resta a scala 1: scalare il root riduceva anche l'Area di
+		# abboccata fino a circa un pixel, rendendo la pesca quasi impossibile.
+		fish.scale = Vector2.ONE
 		var sprite := fish.get_node_or_null("Fishes")
 		if sprite == null:
 			sprite = fish.get_node_or_null("Sprite2D")
@@ -514,15 +516,16 @@ func spawn_fish_in_water() -> void:
 			sprite.scale = Vector2.ONE * 0.1
 		var collision := fish.get_node_or_null("CollisionShape2D") as CollisionShape2D
 		if collision != null:
-			collision.scale = Vector2.ONE * fish_scale
+			collision.scale = Vector2.ONE * 0.62
 
 		var spawn_position: Vector2
 		if i < tutorial_fish_count:
 			var cluster_offset := (float(i) - float(tutorial_fish_count - 1) * 0.5) * 58.0
 			spawn_position = Vector2(
 				lerpf(bounds.position.x, bounds.end.x, tutorial_fish_center_ratio) + cluster_offset,
-				bounds.position.y + 72.0 + float(i % 2) * 34.0
+				bounds.position.y + 48.0 + float(i % 2) * 24.0
 			)
+			fish.set_meta("tutorial_fish", true)
 		else:
 			spawn_position = Vector2(
 				randf_range(bounds.position.x + 20.0, bounds.end.x - 20.0),
@@ -534,8 +537,10 @@ func spawn_fish_in_water() -> void:
 func _add_fish_to_scene(fish: Node, scene: Node, spawn_position: Vector2) -> void:
 	if fish == null or scene == null or not is_instance_valid(fish) or not is_instance_valid(scene):
 		return
-	scene.add_child(fish)
-	if fish is Node2D:
-		(fish as Node2D).global_position = spawn_position
 	if fish.has_method("set_water_body"):
 		fish.call("set_water_body", self)
+	if fish is Node2D:
+		var fish_2d := fish as Node2D
+		var scene_2d := scene as Node2D
+		fish_2d.position = scene_2d.to_local(spawn_position) if scene_2d else spawn_position
+	scene.add_child(fish)

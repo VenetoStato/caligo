@@ -56,14 +56,15 @@ func _add_ledge(rect: Rect2, depth_scale: float) -> void:
 	sprite.set_meta("walkable_rect", rect)
 	add_child(sprite)
 
-	# Una linea chiara sulla sommità separa sempre arte e collisione.
+	# Un labbro scuro e sottile passa davanti soltanto alla base dei piedi.
 	var rim := Line2D.new()
+	rim.add_to_group("dogana_foot_lip")
 	rim.points = PackedVector2Array([
 		rect.position,
 		Vector2(rect.end.x, rect.position.y),
 	])
-	rim.width = 2.6
-	rim.default_color = Color(0.78, 0.73, 0.58, 0.78)
+	rim.width = 1.7
+	rim.default_color = Color(0.16, 0.23, 0.22, 0.68)
 	rim.antialiased = true
 	rim.z_index = 7
 	add_child(rim)
@@ -78,13 +79,14 @@ func _add_central_wedge() -> void:
 	sprite.modulate = Color(0.72, 0.78, 0.76, 1.0)
 	add_child(sprite)
 	var foreground_rim := Line2D.new()
+	foreground_rim.add_to_group("dogana_foot_lip")
 	foreground_rim.points = PackedVector2Array([
 		Vector2(1980, 538),
 		Vector2(2630, 148),
 		Vector2(3260, 538),
 	])
-	foreground_rim.width = 3.0
-	foreground_rim.default_color = Color(0.78, 0.73, 0.58, 0.84)
+	foreground_rim.width = 1.9
+	foreground_rim.default_color = Color(0.16, 0.23, 0.22, 0.72)
 	foreground_rim.antialiased = true
 	foreground_rim.z_index = 7
 	add_child(foreground_rim)
