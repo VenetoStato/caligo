@@ -1,7 +1,6 @@
 extends Node2D
 
-const PLATFORM_TEXTURE := preload("res://Landscape/Dogana/Generated/quay_platform.png")
-const WEDGE_TEXTURE := preload("res://Landscape/Dogana/Generated/central_dogana_wedge.png")
+@export var art_profile: DoganaArtProfile = preload("res://Levels/Scenes/Dogana/dogana_art_profile.tres")
 
 
 func _ready() -> void:
@@ -48,10 +47,10 @@ func _ready() -> void:
 
 func _add_ledge(rect: Rect2, depth_scale: float) -> void:
 	var sprite := Sprite2D.new()
-	sprite.texture = PLATFORM_TEXTURE
+	sprite.texture = art_profile.walkable_platform
 	sprite.centered = false
 	sprite.position = rect.position
-	var scale_x := rect.size.x / float(PLATFORM_TEXTURE.get_width())
+	var scale_x := rect.size.x / float(art_profile.walkable_platform.get_width())
 	sprite.scale = Vector2(scale_x, scale_x * depth_scale)
 	sprite.modulate = Color(0.78, 0.84, 0.82, 1.0)
 	sprite.set_meta("walkable_rect", rect)
@@ -63,7 +62,7 @@ func _add_ledge(rect: Rect2, depth_scale: float) -> void:
 		rect.position,
 		Vector2(rect.end.x, rect.position.y),
 	])
-	rim.width = 4.0
+	rim.width = 2.6
 	rim.default_color = Color(0.78, 0.73, 0.58, 0.78)
 	rim.antialiased = true
 	rim.z_index = 7
@@ -73,7 +72,7 @@ func _add_ledge(rect: Rect2, depth_scale: float) -> void:
 func _add_central_wedge() -> void:
 	var sprite := Sprite2D.new()
 	sprite.name = "CentralDoganaWedgeArt"
-	sprite.texture = WEDGE_TEXTURE
+	sprite.texture = art_profile.central_wedge
 	sprite.centered = false
 	sprite.position = Vector2(1980, 148)
 	sprite.modulate = Color(0.72, 0.78, 0.76, 1.0)
@@ -84,7 +83,7 @@ func _add_central_wedge() -> void:
 		Vector2(2630, 148),
 		Vector2(3260, 538),
 	])
-	foreground_rim.width = 4.5
+	foreground_rim.width = 3.0
 	foreground_rim.default_color = Color(0.78, 0.73, 0.58, 0.84)
 	foreground_rim.antialiased = true
 	foreground_rim.z_index = 7

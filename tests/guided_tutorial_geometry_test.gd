@@ -36,6 +36,11 @@ func _ready() -> void:
 	tutorial.call("_on_training_cache_broken")
 	tutorial.call("_on_player_tutorial_action", &"cast")
 	tutorial.call("_on_player_tutorial_action", &"reel")
+	if bool((tutorial.get("_completed") as Dictionary).get(7, false)):
+		push_error("Fishing tutorial completed from a button press without catching a fish.")
+		get_tree().quit(1)
+		return
+	tutorial.call("_on_fish_caught", 1)
 	var map := level.get_node("DoganaMap")
 	map.call("open_map")
 	await get_tree().process_frame

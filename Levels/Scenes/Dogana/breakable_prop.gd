@@ -2,7 +2,13 @@ extends StaticBody2D
 
 signal prop_broken
 
+const PARTICLE_BURST := preload("res://Fx/particle_burst.gd")
+
+enum VisualVariant { FISHING_CACHE, CRACKED_URN, NET_BUNDLE }
+
 @export_range(1, 4, 1) var hits_required := 1
+@export var visual_variant := VisualVariant.FISHING_CACHE
+@export var art_profile: DoganaArtProfile = preload("res://Levels/Scenes/Dogana/dogana_art_profile.tres")
 
 @onready var _solid: CollisionShape2D = $CollisionShape2D
 @onready var _hurtbox: Area2D = $Hurtbox
@@ -15,7 +21,26 @@ var _broken := false
 func _ready() -> void:
 	add_to_group("dogana_breakable")
 	_hits_left = hits_required
+	_apply_visual_variant()
 	_hurtbox.area_entered.connect(_on_hurtbox_entered)
+
+
+func _apply_visual_variant() -> void:
+	if art_profile == null:
+		return
+	match visual_variant:
+		VisualVariant.CRACKED_URN:
+			_visual.texture = art_profile.cracked_urn
+			_visual.scale = art_profile.cracked_urn_scale
+			_visual.position = art_profile.cracked_urn_offset
+		VisualVariant.NET_BUNDLE:
+			_visual.texture = art_profile.net_bundle
+			_visual.scale = art_profile.net_bundle_scale
+			_visual.position = art_profile.net_bundle_offset
+		_:
+			_visual.texture = art_profile.fishing_cache
+			_visual.scale = art_profile.fishing_cache_scale
+			_visual.position = art_profile.fishing_cache_offset
 
 
 func _on_hurtbox_entered(area: Area2D) -> void:
@@ -47,7 +72,17 @@ func _break() -> void:
 
 
 func _spawn_debris() -> void:
-	for index in 9:
+	PARTICLE_BURST.spawn(
+		get_tree().current_scene,
+		global_position + Vector2(0, -36),
+		Color(0.2, 0.67, 0.58, 0.88),
+		16,
+		Vector2.UP,
+		45.0,
+		145.0,
+		0.72
+	)
+	for index in 5:
 		var shard := Polygon2D.new()
 		var size := randf_range(3.0, 8.0)
 		shard.polygon = PackedVector2Array([

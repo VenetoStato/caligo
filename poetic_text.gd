@@ -104,7 +104,7 @@ func _create_text_display():
 
 	var poetic_text_english = Label.new()
 	poetic_text_english.name = "PoeticTextEnglish"
-	poetic_text_english.text = "Dal caligo della laguna,\nun piccolo pescatore imparò a respirare."
+	poetic_text_english.text = "From the mist of the marsh, a bundle took life"
 	poetic_text_english.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	poetic_text_english.add_theme_font_override("font", DISPLAY_FONT)
 	poetic_text_english.add_theme_font_size_override("font_size", 39)
@@ -119,7 +119,7 @@ func _create_text_display():
 	
 	var poetic_text_veneto = Label.new()
 	poetic_text_veneto.name = "PoeticTextVeneto"
-	poetic_text_veneto.text = "Tra acqua e piera, ogni preda xe un altro respiro."
+	poetic_text_veneto.text = "Un manuin in te la paude, in mexo al caligo, taco a movarse"
 	poetic_text_veneto.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	poetic_text_veneto.add_theme_font_override("font", DISPLAY_FONT)
 	poetic_text_veneto.add_theme_font_size_override("font_size", 25)
@@ -134,7 +134,7 @@ func _create_text_display():
 	
 	var poetic_text_english_normal = Label.new()
 	poetic_text_english_normal.name = "PoeticTextEnglishNormal"
-	poetic_text_english_normal.text = "Pesca per curarti. Esplora per ricordare. Non fidarti dell'acqua."
+	poetic_text_english_normal.text = "From the fog of the swamp, a bundle began to move"
 	poetic_text_english_normal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	poetic_text_english_normal.add_theme_font_override("font", BODY_FONT)
 	poetic_text_english_normal.add_theme_font_size_override("font_size", 16)

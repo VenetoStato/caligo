@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="DoganaArtProfile" load_steps=17 format=3]
+
+[ext_resource type="Script" path="res://Levels/Scenes/Dogana/dogana_art_profile.gd" id="1_profile"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Illustrated/arrival.png" id="2_arrival"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Illustrated/customs.png" id="3_customs"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Illustrated/canal.png" id="4_canal"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Illustrated/fortuna.png" id="5_fortuna"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Illustrated/archive.png" id="6_archive"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/quay_platform.png" id="7_platform"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/central_dogana_wedge.png" id="8_wedge"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/tide_altar.png" id="9_altar"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/breakable_fishing_cache.png" id="10_cache"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/breakable_fishbone_wall.png" id="11_wall"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/tide_bloater.png" id="12_bloater"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/lagoon_oracle.png" id="13_oracle"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/drowned_customs_warden.png" id="14_boss"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/breakable_urn.png" id="15_urn"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/breakable_net_bundle.png" id="16_net"]
+
+[resource]
+script = ExtResource("1_profile")
+arrival_background = ExtResource("2_arrival")
+customs_background = ExtResource("3_customs")
+canal_background = ExtResource("4_canal")
+fortuna_background = ExtResource("5_fortuna")
+archive_background = ExtResource("6_archive")
+walkable_platform = ExtResource("7_platform")
+central_wedge = ExtResource("8_wedge")
+tide_altar = ExtResource("9_altar")
+fishing_cache = ExtResource("10_cache")
+cracked_urn = ExtResource("15_urn")
+net_bundle = ExtResource("16_net")
+fishbone_wall = ExtResource("11_wall")
+tide_bloater = ExtResource("12_bloater")
+lagoon_oracle = ExtResource("13_oracle")
+drowned_warden = ExtResource("14_boss")

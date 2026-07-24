@@ -3,10 +3,12 @@ extends Area2D
 @export var site_id := "pontile"
 @export var display_name := "Pontile della Dogana"
 @export var activated := false
+@export var art_profile: DoganaArtProfile = preload("res://Levels/Scenes/Dogana/dogana_art_profile.tres")
 
 var _time := 0.0
 var _player_near := false
 var _light: PointLight2D
+var _illustration: Sprite2D
 
 
 func _ready() -> void:
@@ -15,6 +17,7 @@ func _ready() -> void:
 	add_to_group("dogana_grace")
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
+	_create_illustrated_visual()
 	_create_light()
 	_update_prompt()
 	queue_redraw()
@@ -79,22 +82,36 @@ func _create_light() -> void:
 	add_child(_light)
 
 
+func _create_illustrated_visual() -> void:
+	if art_profile == null or art_profile.tide_altar == null:
+		return
+	_illustration = Sprite2D.new()
+	_illustration.name = "IllustratedAltar"
+	_illustration.texture = art_profile.tide_altar
+	_illustration.position = art_profile.tide_altar_offset
+	_illustration.scale = art_profile.tide_altar_scale
+	_illustration.modulate = Color(0.66, 0.72, 0.7, 0.9)
+	_illustration.z_index = -1
+	add_child(_illustration)
+
+
 func _draw() -> void:
 	var glow := Color(0.34, 0.9, 0.84, 0.82) if activated else Color(0.48, 0.52, 0.5, 0.44)
 	var gold := Color(0.9, 0.72, 0.34, 0.95) if activated else Color(0.36, 0.38, 0.36, 0.8)
 	var pulse := 1.0 + sin(_time * 2.4) * 0.08
 
-	draw_polygon(
-		PackedVector2Array([
-			Vector2(-30, 2), Vector2(-22, -9), Vector2(-12, -14),
-			Vector2(12, -14), Vector2(22, -9), Vector2(30, 2),
-			Vector2(24, 10), Vector2(-24, 10),
-		]),
-		PackedColorArray([Color(0.17, 0.21, 0.21, 1.0)])
-	)
-	draw_arc(Vector2(0, -8), 25.0 * pulse, PI, TAU, 30, glow, 3.0)
-	draw_arc(Vector2(0, -8), 17.0 * pulse, PI, TAU, 24, gold, 2.0)
-	draw_line(Vector2(-20, 6), Vector2(20, 6), gold, 2.0)
+	if _illustration == null:
+		draw_polygon(
+			PackedVector2Array([
+				Vector2(-30, 2), Vector2(-22, -9), Vector2(-12, -14),
+				Vector2(12, -14), Vector2(22, -9), Vector2(30, 2),
+				Vector2(24, 10), Vector2(-24, 10),
+			]),
+			PackedColorArray([Color(0.17, 0.21, 0.21, 1.0)])
+		)
+		draw_arc(Vector2(0, -8), 25.0 * pulse, PI, TAU, 30, glow, 3.0)
+		draw_arc(Vector2(0, -8), 17.0 * pulse, PI, TAU, 24, gold, 2.0)
+		draw_line(Vector2(-20, 6), Vector2(20, 6), gold, 2.0)
 
 	for index in 5:
 		var phase := _time * (1.2 + index * 0.11) + index * 1.37

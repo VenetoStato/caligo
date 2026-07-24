@@ -52,6 +52,8 @@ enum QualityPreset { AUTO, ANDROID, PC }
 @export_category("Fish spawning")
 @export var fish_scene: PackedScene
 @export_range(0, 30, 1) var fish_count: int = 5
+@export_range(0, 6, 1) var tutorial_fish_count: int = 0
+@export_range(0.05, 0.95, 0.01) var tutorial_fish_center_ratio := 0.5
 
 # Legacy-facing fields retained for existing boat/fish integrations.
 var springs: Array[Node2D] = []
@@ -514,10 +516,18 @@ func spawn_fish_in_water() -> void:
 		if collision != null:
 			collision.scale = Vector2.ONE * fish_scale
 
-		var spawn_position := Vector2(
-			randf_range(bounds.position.x + 20.0, bounds.end.x - 20.0),
-			randf_range(bounds.position.y + bounds.size.y * 0.2, bounds.position.y + bounds.size.y * 0.65)
-		)
+		var spawn_position: Vector2
+		if i < tutorial_fish_count:
+			var cluster_offset := (float(i) - float(tutorial_fish_count - 1) * 0.5) * 58.0
+			spawn_position = Vector2(
+				lerpf(bounds.position.x, bounds.end.x, tutorial_fish_center_ratio) + cluster_offset,
+				bounds.position.y + 72.0 + float(i % 2) * 34.0
+			)
+		else:
+			spawn_position = Vector2(
+				randf_range(bounds.position.x + 20.0, bounds.end.x - 20.0),
+				randf_range(bounds.position.y + bounds.size.y * 0.2, bounds.position.y + bounds.size.y * 0.65)
+			)
 		call_deferred("_add_fish_to_scene", fish, scene, spawn_position)
 
 

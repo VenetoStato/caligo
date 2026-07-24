@@ -71,6 +71,7 @@ func _ready() -> void:
 	if persistence_enabled:
 		_load_graces()
 	_restore_palace_progress()
+	_restore_boss_progress()
 	_apply_grab_hook_unlock()
 	_restore_discovered_artwork()
 	_initialize_graces()
@@ -457,6 +458,7 @@ func _load_graces() -> void:
 			_discovered_regions[region_id] = true
 	_has_palace_seal = bool(config.get_value("progress", "palace_seal", false))
 	_grab_hook_unlocked = bool(config.get_value("progress", "grab_hook_unlocked", false))
+	_boss_is_defeated = bool(config.get_value("progress", "boss_defeated", false))
 
 
 func _save_graces() -> void:
@@ -470,6 +472,7 @@ func _save_graces() -> void:
 		config.set_value("map", region_id, bool(_discovered_regions.get(region_id, false)))
 	config.set_value("progress", "palace_seal", _has_palace_seal)
 	config.set_value("progress", "grab_hook_unlocked", _grab_hook_unlocked)
+	config.set_value("progress", "boss_defeated", _boss_is_defeated)
 	config.save(GRACE_SAVE_PATH)
 
 
@@ -486,6 +489,22 @@ func _restore_palace_progress() -> void:
 	var gate_lever := get_node_or_null("Gameplay/Interactions/GateLever") as Area2D
 	if gate_lever:
 		gate_lever.set_meta("prompt", "[E] Usa il Sigillo e solleva la paratia")
+
+
+func _restore_boss_progress() -> void:
+	if not _boss_is_defeated:
+		return
+	for boss in get_tree().get_nodes_in_group("dogana_boss"):
+		if boss.has_method("restore_defeated"):
+			boss.call("restore_defeated")
+	var entrance_seal := get_node_or_null("Gameplay/Geometry/BossArena/EntranceSeal") as StaticBody2D
+	if entrance_seal:
+		var collision := entrance_seal.get_node_or_null("CollisionShape2D") as CollisionShape2D
+		if collision:
+			collision.set_deferred("disabled", true)
+		var visual := entrance_seal.get_node_or_null("Visual") as CanvasItem
+		if visual:
+			visual.hide()
 
 
 func _apply_grab_hook_unlock() -> void:

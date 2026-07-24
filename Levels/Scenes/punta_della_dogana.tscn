@@ -505,33 +505,42 @@ position = Vector2(770, 460)
 [node name="FirstCombatCache" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
 position = Vector2(1290, 485)
 hits_required = 2
+visual_variant = 1
 
 [node name="QuayCache" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
 position = Vector2(1870, 485)
+visual_variant = 2
 
 [node name="WedgeLeftCache" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
 position = Vector2(2260, 396)
+visual_variant = 1
 
 [node name="WedgeRightCache" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
 position = Vector2(3000, 396)
 hits_required = 2
+visual_variant = 2
 
 [node name="CanalCacheA" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
 position = Vector2(3360, 491)
+visual_variant = 1
 
 [node name="CanalCacheB" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
 position = Vector2(3830, 331)
 hits_required = 2
+visual_variant = 2
 
 [node name="TowerCache" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
 position = Vector2(4290, 121)
+visual_variant = 1
 
 [node name="ArenaCacheLeft" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
 position = Vector2(4750, 485)
 hits_required = 2
+visual_variant = 2
 
 [node name="ArenaCacheRight" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
 position = Vector2(5620, 485)
+visual_variant = 1
 
 [node name="Bricole" type="Node2D" parent="Gameplay" groups=["dogana_bricole"]]
 
@@ -557,6 +566,8 @@ scale = Vector2(0.58, 0.58)
 script = ExtResource("7_water")
 depth = 420.0
 fish_count = 4
+tutorial_fish_count = 3
+tutorial_fish_center_ratio = 0.48
 
 [node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Gameplay/WaterBasins/GiudeccaBasin"]
 polygon = PackedVector2Array(-120, 565, 1240, 565, 1240, 880, -120, 880)

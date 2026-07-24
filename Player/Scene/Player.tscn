@@ -172,7 +172,7 @@ ambient_trail_scene = ExtResource("6_ambient")
 death_frame = 37
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
-position = Vector2(3, -4)
+position = Vector2(3, -7)
 scale = Vector2(0.1, 0.1)
 texture = ExtResource("1_gqxai")
 hframes = 5

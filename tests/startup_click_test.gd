@@ -25,6 +25,16 @@ func _run() -> void:
 	if not await _wait_for_scene(POETIC, 2.0):
 		_fail("Repeated controls clicks did not reach poetic screen safely.")
 		return
+	var original_lines := [
+		["PoeticTextEnglish", "From the mist of the marsh, a bundle took life"],
+		["PoeticTextVeneto", "Un manuin in te la paude, in mexo al caligo, taco a movarse"],
+		["PoeticTextEnglishNormal", "From the fog of the swamp, a bundle began to move"],
+	]
+	for line in original_lines:
+		var label := current_scene.find_child(str(line[0]), true, false) as Label
+		if label == null or label.text != str(line[1]):
+			_fail("The original three-line prologue was not preserved.")
+			return
 
 	_click_burst(12)
 	if not await _wait_for_scene(DOGANA, 12.0):

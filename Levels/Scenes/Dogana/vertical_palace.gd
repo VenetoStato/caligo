@@ -1,9 +1,10 @@
 extends Node2D
 
-const PLATFORM_TEXTURE := preload("res://Landscape/Dogana/Generated/quay_platform.png")
 const BREAKABLE_PROP := preload("res://Levels/Scenes/Dogana/breakable_prop.tscn")
 const BREAKABLE_WALL := preload("res://Levels/Scenes/Dogana/breakable_wall.tscn")
 const ENEMY := preload("res://Enemies/enemy.tscn")
+
+@export var art_profile: DoganaArtProfile = preload("res://Levels/Scenes/Dogana/dogana_art_profile.tres")
 
 const PALACE_BOUNDS := Rect2(2020, -1500, 1300, 1400)
 const PLATFORMS: Array[Rect2] = [
@@ -111,17 +112,17 @@ func _build_platform_art() -> void:
 	add_child(art)
 	for rect in PLATFORMS:
 		var sprite := Sprite2D.new()
-		sprite.texture = PLATFORM_TEXTURE
+		sprite.texture = art_profile.walkable_platform
 		sprite.centered = false
 		sprite.position = rect.position
-		var scale_x := rect.size.x / float(PLATFORM_TEXTURE.get_width())
+		var scale_x := rect.size.x / float(art_profile.walkable_platform.get_width())
 		sprite.scale = Vector2(scale_x, scale_x * 0.72)
 		sprite.modulate = Color(0.64, 0.72, 0.7, 1.0)
 		sprite.set_meta("walkable_rect", rect)
 		art.add_child(sprite)
 		var rim := Line2D.new()
 		rim.points = PackedVector2Array([rect.position, Vector2(rect.end.x, rect.position.y)])
-		rim.width = 4.0
+		rim.width = 2.8
 		rim.default_color = Color(0.82, 0.76, 0.57, 0.82)
 		rim.antialiased = true
 		rim.z_index = 7
@@ -145,10 +146,10 @@ func _build_platform_art() -> void:
 
 func _add_vertical_wall_art(parent: Node2D, rect: Rect2) -> void:
 	var sprite := Sprite2D.new()
-	sprite.texture = PLATFORM_TEXTURE
+	sprite.texture = art_profile.walkable_platform
 	sprite.position = rect.get_center()
 	sprite.rotation = PI * 0.5
-	sprite.scale = Vector2(rect.size.y / float(PLATFORM_TEXTURE.get_width()), rect.size.x / float(PLATFORM_TEXTURE.get_height()))
+	sprite.scale = Vector2(rect.size.y / float(art_profile.walkable_platform.get_width()), rect.size.x / float(art_profile.walkable_platform.get_height()))
 	sprite.modulate = Color(0.58, 0.68, 0.65, 0.96)
 	parent.add_child(sprite)
 	var edge := Line2D.new()
@@ -163,10 +164,10 @@ func _add_vertical_wall_art(parent: Node2D, rect: Rect2) -> void:
 
 func _add_ornate_lintel(parent: Node2D, rect: Rect2) -> void:
 	var sprite := Sprite2D.new()
-	sprite.texture = PLATFORM_TEXTURE
+	sprite.texture = art_profile.walkable_platform
 	sprite.centered = false
 	sprite.position = rect.position
-	var scale_x := rect.size.x / float(PLATFORM_TEXTURE.get_width())
+	var scale_x := rect.size.x / float(art_profile.walkable_platform.get_width())
 	sprite.scale = Vector2(scale_x, scale_x * 0.55)
 	sprite.modulate = Color(0.63, 0.71, 0.68, 0.98)
 	parent.add_child(sprite)
@@ -247,6 +248,7 @@ func _build_breakables() -> void:
 		var cache := BREAKABLE_PROP.instantiate() as Node2D
 		cache.name = "PalaceCache%02d" % index
 		cache.position = caches[index]
+		cache.set("visual_variant", index % 3)
 		if index % 3 == 0:
 			cache.set("hits_required", 2)
 		container.add_child(cache)

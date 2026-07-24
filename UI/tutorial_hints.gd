@@ -43,6 +43,8 @@ var _observed: Dictionary = {}
 var _current_step: Step = Step.MOVE
 var _completion_started := false
 var _player_signal_connected := false
+var _fish_signal_connected := false
+var _step_transition: Tween
 
 
 func _ready() -> void:
@@ -71,6 +73,9 @@ func _process(_delta: float) -> void:
 	if not _player_signal_connected and _player.has_signal("tutorial_action_performed"):
 		_player.connect("tutorial_action_performed", _on_player_tutorial_action)
 		_player_signal_connected = true
+	if not _fish_signal_connected and _player.has_signal("fish_caught"):
+		_player.connect("fish_caught", _on_fish_caught)
+		_fish_signal_connected = true
 	if _current_step == Step.MOVE:
 		var moved := absf(_player.global_position.x - _start_position.x) >= 72.0
 		if moved:
@@ -100,8 +105,10 @@ func _on_player_tutorial_action(action: StringName) -> void:
 			_observe_step(Step.DASH)
 		&"cast":
 			_observe_step(Step.CAST)
-		&"reel":
-			_observe_step(Step.REEL)
+
+
+func _on_fish_caught(_health_restored: int) -> void:
+	_observe_step(Step.REEL)
 
 
 func _on_grace_activated(_site_id: String) -> void:
@@ -142,16 +149,43 @@ func _refresh_step() -> void:
 func _apply_step_copy(step: Step) -> void:
 	var touch := OS.get_name() == "Android"
 	var copy := _get_step_copy(step, touch)
-	_eyebrow.text = "ADDESTRAMENTO  ·  %02d / %02d" % [_completed_count() + 1, STEP_ORDER.size()]
+	if _step_transition and _step_transition.is_valid():
+		_step_transition.kill()
+	_step_transition = create_tween()
+	if _title.text.is_empty():
+		_panel.modulate.a = 0.0
+	else:
+		_step_transition.tween_property(_panel, "modulate:a", 0.0, 0.24).set_trans(Tween.TRANS_SINE)
+	_step_transition.tween_callback(_set_step_copy.bind(step, copy))
+	_step_transition.tween_property(_panel, "modulate:a", 1.0, 0.38).set_trans(Tween.TRANS_SINE)
+
+
+func _set_step_copy(step: Step, copy: Dictionary) -> void:
+	_eyebrow.text = "%s  ·  %02d / %02d" % [
+		_get_section_label(step),
+		_completed_count() + 1,
+		STEP_ORDER.size(),
+	]
 	_title.text = str(copy.title)
 	_instruction.text = str(copy.instruction)
 	_key_label.text = str(copy.key)
 	_progress.text = _build_progress_text()
 	_panel.visible = true
-	_panel.modulate.a = 1.0
 	var pulse := create_tween()
 	pulse.tween_property(_key_label, "modulate", Color(1.35, 1.2, 0.72, 1.0), 0.12)
 	pulse.tween_property(_key_label, "modulate", Color.WHITE, 0.22)
+
+
+func _get_section_label(step: Step) -> String:
+	if step in [Step.MOVE, Step.INTERACT]:
+		return "SEZIONE I  ·  IL PONTILE"
+	if step in [Step.JUMP, Step.DOUBLE_JUMP, Step.DASH]:
+		return "SEZIONE II  ·  MOVIMENTO"
+	if step == Step.ATTACK:
+		return "SEZIONE III  ·  OGGETTI FRAGILI"
+	if step in [Step.CAST, Step.REEL]:
+		return "SEZIONE IV  ·  PESCA"
+	return "SEZIONE V  ·  ORIENTAMENTO"
 
 
 func _get_step_copy(step: Step, touch: bool) -> Dictionary:

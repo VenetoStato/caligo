@@ -2,7 +2,10 @@ extends StaticBody2D
 
 signal wall_broken
 
+const PARTICLE_BURST := preload("res://Fx/particle_burst.gd")
+
 @export_range(1, 5, 1) var hits_required := 2
+@export var art_profile: DoganaArtProfile = preload("res://Levels/Scenes/Dogana/dogana_art_profile.tres")
 
 @onready var _solid: CollisionShape2D = $CollisionShape2D
 @onready var _hurtbox: Area2D = $Hurtbox
@@ -14,6 +17,8 @@ var _broken := false
 
 func _ready() -> void:
 	_hits_left = hits_required
+	if art_profile and art_profile.fishbone_wall:
+		_visual.texture = art_profile.fishbone_wall
 	_hurtbox.collision_layer = 2
 	_hurtbox.collision_mask = 4
 	_hurtbox.area_entered.connect(_on_hurtbox_entered)
@@ -48,7 +53,17 @@ func _break() -> void:
 
 
 func _spawn_debris() -> void:
-	for index in 12:
+	PARTICLE_BURST.spawn(
+		get_tree().current_scene,
+		global_position,
+		Color(0.22, 0.72, 0.63, 0.9),
+		22,
+		Vector2.UP,
+		55.0,
+		170.0,
+		0.86
+	)
+	for index in 6:
 		var shard := Polygon2D.new()
 		var size := randf_range(3.0, 7.0)
 		shard.polygon = PackedVector2Array([

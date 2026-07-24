@@ -6,6 +6,7 @@ var _redraw_accumulator := 0.0
 
 func _ready() -> void:
 	z_index = -8
+	_build_ambient_particles()
 
 
 func _process(delta: float) -> void:
@@ -51,3 +52,40 @@ func _draw_distant_gulls() -> void:
 		var color := Color(0.68, 0.75, 0.75, 0.22)
 		draw_arc(center + Vector2(-wing, 0), wing, PI * 1.15, PI * 1.88, 7, color, 1.2, true)
 		draw_arc(center + Vector2(wing, 0), wing, PI * 1.12, PI * 1.85, 7, color, 1.2, true)
+
+
+func _build_ambient_particles() -> void:
+	var soft_dot := GradientTexture2D.new()
+	var gradient := Gradient.new()
+	gradient.colors = PackedColorArray([
+		Color(0.44, 0.9, 0.82, 0.0),
+		Color(0.44, 0.9, 0.82, 0.72),
+		Color(0.44, 0.9, 0.82, 0.0),
+	])
+	soft_dot.gradient = gradient
+	soft_dot.width = 24
+	soft_dot.height = 24
+	soft_dot.fill = GradientTexture2D.FILL_RADIAL
+	soft_dot.fill_from = Vector2(0.5, 0.5)
+	soft_dot.fill_to = Vector2(1.0, 0.5)
+
+	var particles := CPUParticles2D.new()
+	particles.name = "LagoonDrift"
+	particles.texture = soft_dot
+	particles.position = Vector2(3000, 390)
+	particles.amount = 34 if OS.get_name() == "Android" else 68
+	particles.lifetime = 9.0
+	particles.preprocess = 9.0
+	particles.randomness = 0.88
+	particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	particles.emission_rect_extents = Vector2(3050, 430)
+	particles.direction = Vector2(-0.25, -1.0)
+	particles.spread = 58.0
+	particles.initial_velocity_min = 3.0
+	particles.initial_velocity_max = 12.0
+	particles.gravity = Vector2(-2.0, -4.0)
+	particles.scale_amount_min = 0.08
+	particles.scale_amount_max = 0.24
+	particles.color = Color(0.5, 0.92, 0.84, 0.28)
+	particles.z_index = 1
+	add_child(particles)

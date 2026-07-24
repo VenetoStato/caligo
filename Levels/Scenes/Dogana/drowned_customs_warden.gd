@@ -3,6 +3,8 @@ extends CharacterBody2D
 signal boss_awakened
 signal boss_defeated
 
+const PARTICLE_BURST := preload("res://Fx/particle_burst.gd")
+
 @export var max_health := 18
 @export var move_speed := 74.0
 @export var lunge_speed := 310.0
@@ -182,8 +184,33 @@ func _die() -> void:
 	tween.chain().tween_callback(queue_free)
 
 
+func restore_defeated() -> void:
+	state = State.DEAD
+	current_health = 0
+	velocity = Vector2.ZERO
+	collision_layer = 0
+	collision_mask = 0
+	_hurtbox.set_deferred("monitoring", false)
+	_attack_hitbox.set_deferred("monitoring", false)
+	_attack_hitbox.set_deferred("monitorable", false)
+	_sprite.hide()
+	if _health_layer:
+		_health_layer.queue_free()
+	set_physics_process(false)
+
+
 func _spawn_death_motes() -> void:
-	for index in 18:
+	PARTICLE_BURST.spawn(
+		get_tree().current_scene,
+		global_position + Vector2(0, -52),
+		Color(0.22, 0.86, 0.74, 0.92),
+		34,
+		Vector2.UP,
+		70.0,
+		220.0,
+		1.1
+	)
+	for index in 8:
 		var mote := Polygon2D.new()
 		var radius := randf_range(3.0, 8.0)
 		mote.polygon = PackedVector2Array([
