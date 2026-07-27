@@ -30,7 +30,7 @@ const MAX_TRANSIENT_ATTACKS := 48
 @export var knockback_duration: float = 0.35
 
 @export_category("Archetype")
-enum AttackPattern { MELEE, TIDE_AREA, AIMED_VOLLEY, RADIAL_BARRAGE }
+enum AttackPattern { MELEE, TIDE_AREA, AIMED_VOLLEY, RADIAL_BARRAGE, HEAVY_LEAP }
 @export var attack_pattern: AttackPattern = AttackPattern.MELEE
 @export var variant_texture: Texture2D
 @export var variant_scale_multiplier := 1.0
@@ -43,6 +43,9 @@ enum AttackPattern { MELEE, TIDE_AREA, AIMED_VOLLEY, RADIAL_BARRAGE }
 @export var projectile_speed := 135.0
 @export var leash_distance := 460.0
 @export var disengage_range := 560.0
+@export_range(0.0, 1.0) var heavy_melee_chance := 0.32
+@export var heavy_melee_damage := 2
+@export var heavy_leap_damage := 2
 
 @export_category("Respawn")
 @export var respawn_enabled := true
@@ -88,6 +91,9 @@ var _respawn_generation := 0
 var _respawn_timer: Timer
 var _base_sprite_position := Vector2.ZERO
 var _attack_kick := 0.0
+var _pending_melee_damage := 1
+var _leap_slam_armed := false
+var _leap_slam_timer := 0.0
 
 func _ready():
 	add_to_group("enemy")
@@ -224,6 +230,7 @@ func _physics_process(delta: float) -> void:
 				_anim.play("Jump")
 
 	_update_special_attack(delta, to_player)
+	_update_leap_slam(delta)
 
 	# Attacco se vicino
 	attack_timer -= delta
@@ -235,8 +242,13 @@ func _physics_process(delta: float) -> void:
 	if dist <= attack_range and attack_timer <= 0.0 and _attack_hitbox and _attack_hitbox_disable_timer <= 0.0:
 		attack_timer = attack_cooldown
 		_attack_has_hit = false
+		var heavy := attack_pattern == AttackPattern.MELEE and randf() < heavy_melee_chance
+		_pending_melee_damage = heavy_melee_damage if heavy else attack_damage
 		_attack_hitbox.monitoring = true
-		_attack_hitbox_disable_timer = 0.25
+		_attack_hitbox_disable_timer = 0.32 if heavy else 0.22
+		_hit_flash_timer = 0.12 if heavy else 0.0
+		if heavy and sprite_node:
+			sprite_node.modulate = Color(1.35, 0.45, 0.35, 1.0)
 		if _anim and _anim.has_animation("Attack"):
 			_anim.play("Attack")
 
@@ -262,11 +274,13 @@ func _update_special_attack(delta: float, to_player: Vector2) -> void:
 	var can_start := distance <= special_attack_range
 	if attack_pattern == AttackPattern.TIDE_AREA:
 		can_start = distance <= area_attack_radius + 52.0
+	elif attack_pattern == AttackPattern.HEAVY_LEAP:
+		can_start = distance <= 210.0 and distance >= 48.0
 	if can_start and _special_timer <= 0.0:
 		_special_target_direction = to_player.normalized() if distance > 0.01 else Vector2.RIGHT
-		_special_windup_remaining = special_windup
+		_special_windup_remaining = special_windup * (0.75 if attack_pattern == AttackPattern.HEAVY_LEAP else 1.0)
 		_special_timer = special_attack_cooldown
-		velocity.x *= 0.2
+		velocity.x *= 0.15
 		queue_redraw()
 
 
@@ -274,10 +288,20 @@ func _fire_special_attack() -> void:
 	_attack_kick = 1.0
 	queue_redraw()
 	if attack_pattern == AttackPattern.TIDE_AREA:
+		# Windup già fatto sul nemico: l'area esplode subito (solo breve flash).
 		var area := AREA_ATTACK_SCRIPT.new() as Area2D
-		area.call("setup", area_attack_radius, attack_damage, Color(0.24, 0.92, 0.78, 1.0), special_windup)
+		area.call("setup", area_attack_radius, maxi(attack_damage, 2), Color(0.24, 0.92, 0.78, 1.0), 0.12)
 		get_tree().current_scene.add_child(area)
 		area.global_position = global_position
+		_shake_camera(0.28)
+		return
+	if attack_pattern == AttackPattern.HEAVY_LEAP:
+		velocity = Vector2(_special_target_direction.x * 260.0, -240.0)
+		_leap_slam_armed = true
+		# Tempo minimo in aria prima dello slam (evita detonazione a terra nello stesso frame).
+		_leap_slam_timer = 0.18
+		if sprite_node:
+			sprite_node.modulate = Color(1.4, 0.5, 0.4, 1.0)
 		return
 	if attack_pattern == AttackPattern.AIMED_VOLLEY:
 		var count := maxi(3, projectile_count)
@@ -295,6 +319,32 @@ func _fire_special_attack() -> void:
 			_spawn_projectile(direction, projectile_speed * speed_scale, Color(0.42, 0.82, 1.0, 1.0), 5.0)
 
 
+func _update_leap_slam(delta: float) -> void:
+	if not _leap_slam_armed:
+		return
+	_leap_slam_timer -= delta
+	if _leap_slam_timer > 0.0:
+		return
+	# Dopo il delay minimo: slam al contatto col suolo, o fallback hard a 0.55s totali.
+	if not is_on_floor() and _leap_slam_timer > -0.37:
+		return
+	_leap_slam_armed = false
+	_leap_slam_timer = 0.0
+	var slam := AREA_ATTACK_SCRIPT.new() as Area2D
+	slam.call("setup", 72.0, heavy_leap_damage, Color(0.95, 0.45, 0.32, 1.0), 0.08)
+	get_tree().current_scene.add_child(slam)
+	slam.global_position = global_position + Vector2(0, 8)
+	_shake_camera(0.42)
+	if sprite_node:
+		sprite_node.modulate = _original_modulate
+
+
+func _shake_camera(intensity: float) -> void:
+	var cam := get_tree().get_first_node_in_group("camera")
+	if cam and cam.has_method("add_shake"):
+		cam.call("add_shake", intensity)
+
+
 func _spawn_projectile(direction: Vector2, shot_speed: float, color: Color, shot_radius: float) -> void:
 	if get_tree().get_nodes_in_group("enemy_transient_attack").size() >= MAX_TRANSIENT_ATTACKS:
 		return
@@ -307,13 +357,23 @@ func _spawn_projectile(direction: Vector2, shot_speed: float, color: Color, shot
 func _draw() -> void:
 	if _special_windup_remaining <= 0.0 or special_windup <= 0.0:
 		return
-	var progress := 1.0 - _special_windup_remaining / special_windup
+	var windup_total := special_windup * (0.75 if attack_pattern == AttackPattern.HEAVY_LEAP else 1.0)
+	var progress := 1.0 - _special_windup_remaining / maxf(windup_total, 0.01)
 	var color := Color(0.3, 0.95, 0.78, 0.32 + progress * 0.55)
+	if attack_pattern == AttackPattern.HEAVY_LEAP:
+		color = Color(0.95, 0.42, 0.28, 0.35 + progress * 0.55)
+	elif attack_pattern == AttackPattern.TIDE_AREA:
+		color = Color(0.22, 0.9, 0.82, 0.28 + progress * 0.5)
 	var radius := lerpf(18.0, 34.0, progress)
+	if attack_pattern == AttackPattern.TIDE_AREA:
+		radius = lerpf(area_attack_radius * 0.35, area_attack_radius, progress)
 	draw_arc(Vector2.ZERO, radius, -PI * 0.5, -PI * 0.5 + TAU * progress, 30, color, 2.0 + progress * 2.0, true)
 	for ray in 6:
 		var direction := Vector2.from_angle(float(ray) / 6.0 * TAU)
 		draw_line(direction * 12.0, direction * radius, Color(color.r, color.g, color.b, color.a * 0.55), 1.4, true)
+	if attack_pattern == AttackPattern.HEAVY_LEAP:
+		var leap_dir := _special_target_direction if _special_target_direction.length_squared() > 0.01 else Vector2.RIGHT
+		draw_line(Vector2.ZERO, leap_dir * lerpf(28.0, 70.0, progress), color, 2.4, true)
 
 
 func _update_variant_animation(delta: float) -> void:
@@ -350,6 +410,8 @@ func _on_hurtbox_area_entered(area: Area2D) -> void:
 	pass
 
 func take_damage(amount: int = 1, source_position: Vector2 = Vector2.ZERO) -> void:
+	if state == State.DEAD:
+		return
 	current_health = max(0, current_health - amount)
 	# Flash colore per far vedere che è stato colpito
 	_hit_flash_timer = hit_flash_duration
@@ -430,10 +492,16 @@ func _spawn_hit_particles(source_position: Vector2) -> void:
 		p.call("play")
 
 func _die() -> void:
+	if state == State.DEAD:
+		return
 	state = State.DEAD
+	if _respawn_timer:
+		_respawn_timer.stop()
 	if _hurtbox:
+		_hurtbox.monitoring = false
 		_hurtbox.set_deferred("monitoring", false)
 	if _attack_hitbox:
+		_attack_hitbox.monitoring = false
 		_attack_hitbox.set_deferred("monitoring", false)
 	collision_layer = 0
 	collision_mask = 0
@@ -489,14 +557,26 @@ func _die() -> void:
 
 
 func _schedule_respawn() -> void:
+	if state != State.DEAD:
+		return
 	_respawn_generation += 1
+	var generation := _respawn_generation
+	_respawn_timer.stop()
 	_respawn_timer.start(respawn_delay)
+	# Token: se reset_to_home interrompe, la generazione cambia e il timeout viene ignorato.
+	_respawn_timer.set_meta("generation", generation)
 
 
 func _on_respawn_timeout() -> void:
+	if state != State.DEAD:
+		return
+	if _respawn_timer and int(_respawn_timer.get_meta("generation", -1)) != _respawn_generation:
+		return
 	var current_player := get_tree().get_first_node_in_group("player") as Node2D
 	if current_player and current_player.global_position.distance_to(_home_position) < respawn_safe_distance:
 		_respawn_timer.start(0.75)
+		if _respawn_timer:
+			_respawn_timer.set_meta("generation", _respawn_generation)
 		return
 	reset_to_home()
 
@@ -563,8 +643,11 @@ func _on_attack_hit_body(body: Node2D) -> void:
 	if not body.is_in_group("player"):
 		return
 	_attack_has_hit = true
+	var dealt := maxi(1, _pending_melee_damage)
 	# Deferred evita mutazioni del player/death sequence durante il flush della query fisica.
 	if body.has_method("take_damage"):
-		body.call_deferred("take_damage", attack_damage, global_position)
+		body.call_deferred("take_damage", dealt, global_position)
 	elif "current_health" in body:
-		body.set_deferred("current_health", maxi(0, int(body.get("current_health")) - attack_damage))
+		body.set_deferred("current_health", maxi(0, int(body.get("current_health")) - dealt))
+	_shake_camera(0.22 if dealt >= 2 else 0.12)
+	_pending_melee_damage = attack_damage

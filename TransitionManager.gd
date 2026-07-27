@@ -15,8 +15,8 @@ static var instance: TransitionManager
 
 @export_category("Fade Settings")
 @export var fade_color: Color = Color(0, 0, 0, 1)
-@export var fade_in_duration: float = 1.0
-@export var fade_out_duration: float = 0.8
+@export var fade_in_duration: float = 2.2
+@export var fade_out_duration: float = 1.4
 @export var death_freeze_time: float = 1.4
 @export var death_fade_delay: float = 0.5
 
@@ -40,12 +40,12 @@ signal death_sequence_completed
 func _ready():
 	instance = self
 	add_to_group("transition_manager")
-	layer = 100  # Sopra tutto
+	layer = 100
 	_create_fade_rect()
-	
-	# Fade in all'avvio del gioco
-	await get_tree().process_frame
-	fade_in()
+	# Niente fade nero al boot: splash/prologo gestiscono il velo.
+	# I fade si usano in livello (morte/respawn/menu).
+	fade_rect.color.a = 0.0
+	fade_rect.visible = false
 
 func _create_fade_rect():
 	fade_rect = ColorRect.new()
@@ -152,9 +152,9 @@ func play_death_sequence(player: Node2D, respawn_pos: Vector2) -> void:
 		player.call("_on_respawn")
 	
 	# 9. Pausa al nero (death cam più lunga)
-	await get_tree().create_timer(0.5).timeout
+	await get_tree().create_timer(0.35).timeout
 	
-	# 10. Fade in
+	# 10. Fade in mentre parte il risveglio all'altare
 	await fade_in()
 	
 	death_sequence_completed.emit()

@@ -2,7 +2,7 @@ extends Node2D
 
 const WORLD_TOP := -1500.0
 const WORLD_BOTTOM := 940.0
-const LEFT_EDGE := -55.0
+const LEFT_EDGE := -560.0
 const RIGHT_EDGE := 6135.0
 
 @export var art_profile: DoganaArtProfile = preload("res://Levels/Scenes/Dogana/dogana_art_profile.tres")

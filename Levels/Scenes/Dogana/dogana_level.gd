@@ -2,6 +2,8 @@ extends Node2D
 
 signal grace_activated(site_id: String)
 
+const DoganaFx := preload("res://Levels/Scenes/Dogana/dogana_fx.gd")
+
 @export var player_path: NodePath = NodePath("Player")
 @export var spawn_path: NodePath = NodePath("Gameplay/Spawn")
 @export var persistence_enabled := true
@@ -142,6 +144,8 @@ func _on_player_respawned() -> void:
 	for corpse in get_tree().get_nodes_in_group("dead_enemy"):
 		if is_instance_valid(corpse):
 			corpse.queue_free()
+	# Reset Souls-style solo dei vivi / in attesa: i timer di respawn vengono
+	# invalidati da reset_to_home via _respawn_generation.
 	for enemy in get_tree().get_nodes_in_group("enemy"):
 		if enemy.has_method("reset_to_home"):
 			enemy.call("reset_to_home")
@@ -203,30 +207,64 @@ func _on_interactable_entered(body: Node2D, interactable: Area2D) -> void:
 	if body != _player:
 		return
 	_nearby_interactable = interactable
+	_set_interactable_aura(interactable, true)
+	DoganaFx.burst(
+		get_tree().current_scene,
+		interactable.global_position + Vector2(0, -20),
+		Color(0.85, 0.75, 0.4, 0.65),
+		6,
+		Vector2.UP,
+		10.0,
+		32.0,
+		0.4
+	)
 	var prompt := str(interactable.get_meta("prompt", "[E] Interagisci"))
 	_show_message(prompt)
 
 
 func _on_interactable_exited(body: Node2D, interactable: Area2D) -> void:
 	if body == _player and _nearby_interactable == interactable:
+		_set_interactable_aura(interactable, false)
 		_nearby_interactable = null
 
 
 func _activate_interactable(interactable: Area2D) -> void:
 	var action := str(interactable.get_meta("action", "lore"))
+	var origin := interactable.global_position + Vector2(0, -24)
+	var scene := get_tree().current_scene
 	if action == "open_gate":
 		_open_canal_gate(interactable)
+		DoganaFx.pulse_ring(scene, origin, Color(0.45, 0.9, 0.85, 0.9))
+		DoganaFx.burst(scene, origin, Color(0.4, 0.95, 0.85, 0.9), 16, Vector2.UP, 30.0, 100.0, 0.7)
 	elif action in ["palace_enter", "palace_exit", "palace_lift"]:
 		_use_palace_passage(interactable)
 	elif action == "palace_seal":
 		_collect_palace_seal(interactable)
+		DoganaFx.pulse_ring(scene, origin, Color(0.95, 0.8, 0.35, 0.95))
+		DoganaFx.burst(scene, origin, Color(0.95, 0.78, 0.35, 0.95), 18, Vector2.UP, 35.0, 110.0, 0.75)
 	elif action == "bell":
 		var camera := get_tree().get_first_node_in_group("camera")
 		if camera and camera.has_method("add_shake"):
-			camera.call("add_shake", 0.28)
+			camera.call("add_shake", 0.28 if not DoganaFx.is_mobile() else 0.18)
+		DoganaFx.pulse_ring(scene, origin, Color(0.95, 0.82, 0.4, 0.9))
+		DoganaFx.burst(scene, origin, Color(0.95, 0.85, 0.45, 0.9), 14, Vector2.UP, 25.0, 90.0, 0.65)
 		_show_message("LA CAMPANA DELLA FORTUNA RISPONDE ALLA LAGUNA")
 	else:
+		DoganaFx.pulse_ring(scene, origin, Color(0.55, 0.85, 0.8, 0.75))
+		DoganaFx.burst(scene, origin, Color(0.7, 0.9, 0.85, 0.8), 10, Vector2.UP, 18.0, 55.0, 0.55)
 		_show_message(str(interactable.get_meta("message", "Le pietre conservano una storia dimenticata.")))
+
+
+func _set_interactable_aura(interactable: Area2D, on: bool) -> void:
+	var aura := interactable.get_node_or_null("SoftAura") as CPUParticles2D
+	if aura == null:
+		aura = DoganaFx.make_soft_aura(
+			interactable,
+			Vector2(0, -18),
+			Color(0.85, 0.75, 0.4, 0.5),
+			7
+		)
+	aura.emitting = on
 
 
 func _open_canal_gate(interactable: Area2D) -> void:
@@ -263,6 +301,9 @@ func _use_palace_passage(interactable: Area2D) -> void:
 	var camera := _player.get_node_or_null("Camera2D") as Camera2D
 	if camera:
 		camera.reset_smoothing()
+	var palace := get_tree().get_first_node_in_group("dogana_vertical_palace")
+	if palace and palace.has_method("set_encounters_active"):
+		palace.call("set_encounters_active", target.y < -100.0)
 	if target.y < -100.0:
 		_mark_region_discovered("palace")
 		_mark_access_open("palace")
@@ -332,7 +373,13 @@ func _on_boss_defeated() -> void:
 
 
 func _on_hidden_area_entered(body: Node2D, hidden_area: Area2D) -> void:
-	if body != _player or hidden_area.get_meta("revealed", false):
+	if body != _player:
+		return
+	_reveal_hidden_area(hidden_area)
+
+
+func _reveal_hidden_area(hidden_area: Area2D) -> void:
+	if hidden_area.get_meta("revealed", false):
 		return
 	hidden_area.set_meta("revealed", true)
 	var veil := hidden_area.get_node_or_null("Veil") as CanvasItem
@@ -354,7 +401,18 @@ func _on_hidden_area_entered(body: Node2D, hidden_area: Area2D) -> void:
 
 
 func _on_secret_wall_broken(wall: Node2D) -> void:
-	_mark_access_open("ossuary" if wall.global_position.x > 3500.0 else "archive")
+	var access_id := str(wall.get_meta("secret_id", ""))
+	if access_id.is_empty():
+		access_id = "ossuary" if wall.global_position.x > 3500.0 else "archive"
+	_mark_access_open(access_id)
+	# Rompere il muro apre il velo subito: il passaggio deve leggersi.
+	for hidden_area in get_tree().get_nodes_in_group("dogana_hidden_reveal"):
+		if not hidden_area is Area2D:
+			continue
+		if str(hidden_area.get_meta("secret_id", "")) != access_id:
+			continue
+		_reveal_hidden_area(hidden_area as Area2D)
+		return
 	_show_message("UN VARCO NASCOSTO SI È APERTO")
 
 
@@ -379,6 +437,7 @@ func _on_grace_exited(body: Node2D, grace: Area2D) -> void:
 
 func _activate_grace(grace: Area2D, show_message := true) -> void:
 	var site_id := str(grace.get("site_id"))
+	var already := bool(_activated_graces.get(site_id, false))
 	_activated_graces[site_id] = true
 	_current_grace = site_id
 	grace.call("set_activated", true)
@@ -388,8 +447,17 @@ func _activate_grace(grace: Area2D, show_message := true) -> void:
 	_save_graces()
 	_sync_map()
 	if show_message:
-		grace_activated.emit(site_id)
-		_show_message("ALTARE RISVEGLIATO  •  %s" % str(grace.get("display_name")).to_upper())
+		if already and grace.has_method("play_rest_fx"):
+			grace.call("play_rest_fx")
+			_show_message("RIPOSO  •  %s" % str(grace.get("display_name")).to_upper())
+		else:
+			if grace.has_method("play_activation_fx"):
+				grace.call("play_activation_fx")
+			grace_activated.emit(site_id)
+			_show_message("ALTARE RISVEGLIATO  •  %s" % str(grace.get("display_name")).to_upper())
+		var tutorial := get_node_or_null("TutorialHints")
+		if tutorial and tutorial.has_method("notify_altar_used"):
+			tutorial.call("notify_altar_used")
 
 
 func _initialize_graces() -> void:

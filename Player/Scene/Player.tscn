@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" uid="uid://o7x1gjykk2h6" path="res://Fx/ambient_particle.tscn" id="6_ambient"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_186t8"]
+size = Vector2(22, 38)
 
 [sub_resource type="Animation" id="Animation_f50pn"]
 resource_name = "Attack_fast"
@@ -173,14 +174,14 @@ ambient_trail_scene = ExtResource("6_ambient")
 death_frame = 37
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
-position = Vector2(3, -7)
-scale = Vector2(0.1, 0.1)
+position = Vector2(3, -8)
+scale = Vector2(0.12, 0.12)
 texture = ExtResource("1_gqxai")
 hframes = 5
 vframes = 8
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(0, -5)
+position = Vector2(0, -6)
 shape = SubResource("RectangleShape2D_186t8")
 
 [node name="FishingLine" type="Line2D" parent="."]

@@ -1,91 +1,176 @@
 extends Node2D
+## Nebbia di laguna: nuvole soft (CPUParticles) + interazione col player.
+## Niente polyline/rettangoli bianchi.
 
 var _time := 0.0
-var _redraw_accumulator := 0.0
+var _player: Node2D
+var _fog_layers: Array[CPUParticles2D] = []
+var _wake_cooldown := 0.0
+var _mobile := false
+var _soft_tex: GradientTexture2D
 
 
 func _ready() -> void:
-	z_index = -8
-	_build_ambient_particles()
+	z_index = 2
+	_mobile = OS.get_name() == "Android" or OS.has_feature("mobile")
+	_soft_tex = _make_soft_cloud_texture()
+	_build_fog_layers()
+	set_process(true)
 
 
 func _process(delta: float) -> void:
 	_time += delta
-	_redraw_accumulator += delta
-	if _redraw_accumulator >= 1.0 / 24.0:
-		_redraw_accumulator = 0.0
-		queue_redraw()
+	_wake_cooldown = maxf(0.0, _wake_cooldown - delta)
+	if _player == null or not is_instance_valid(_player):
+		_player = get_tree().get_first_node_in_group("player") as Node2D
+	_interact_with_player(delta)
 
 
-func _draw() -> void:
-	_draw_fog_banks()
-	_draw_lagoon_motes()
-	_draw_distant_gulls()
-
-
-func _draw_fog_banks() -> void:
-	for bank in 8:
-		var points := PackedVector2Array()
-		var base_y := 260.0 + bank * 52.0
-		var drift := fmod(_time * (5.0 + bank), 460.0)
-		for sample in 28:
-			var x := -320.0 + sample * 210.0 + drift
-			var y := base_y + sin(sample * 0.63 + bank * 1.7 + _time * 0.18) * (13.0 + bank * 1.5)
-			points.append(Vector2(x, y))
-		var alpha := 0.026 + bank * 0.004
-		draw_polyline(points, Color(0.66, 0.81, 0.82, alpha), 24.0 + bank * 5.0, true)
-
-
-func _draw_lagoon_motes() -> void:
-	for index in 34:
-		var seed := float(index * 149)
-		var x := fmod(seed * 13.17 + _time * (2.0 + index % 4), 5120.0)
-		var y := 80.0 + fmod(seed * 5.71, 760.0)
-		var pulse := (sin(_time * 1.2 + index * 0.77) + 1.0) * 0.5
-		draw_circle(Vector2(x, y), 0.8 + pulse * 1.4, Color(0.32, 0.88, 0.78, 0.08 + pulse * 0.12))
-
-
-func _draw_distant_gulls() -> void:
-	for index in 7:
-		var center := Vector2(430.0 + index * 690.0, 130.0 + (index % 3) * 42.0)
-		var wing := 5.0 + sin(_time * 2.0 + index) * 2.0
-		var color := Color(0.68, 0.75, 0.75, 0.22)
-		draw_arc(center + Vector2(-wing, 0), wing, PI * 1.15, PI * 1.88, 7, color, 1.2, true)
-		draw_arc(center + Vector2(wing, 0), wing, PI * 1.12, PI * 1.85, 7, color, 1.2, true)
-
-
-func _build_ambient_particles() -> void:
-	var soft_dot := GradientTexture2D.new()
+func _make_soft_cloud_texture() -> GradientTexture2D:
+	# Texture radiale soft: aspetto "piuma di nebbia", non rettangolo.
 	var gradient := Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 0.35, 0.7, 1.0])
 	gradient.colors = PackedColorArray([
-		Color(0.44, 0.9, 0.82, 0.0),
-		Color(0.44, 0.9, 0.82, 0.72),
-		Color(0.44, 0.9, 0.82, 0.0),
+		Color(0.78, 0.88, 0.9, 0.55),
+		Color(0.62, 0.78, 0.82, 0.28),
+		Color(0.45, 0.62, 0.68, 0.08),
+		Color(0.3, 0.4, 0.45, 0.0),
 	])
-	soft_dot.gradient = gradient
-	soft_dot.width = 24
-	soft_dot.height = 24
-	soft_dot.fill = GradientTexture2D.FILL_RADIAL
-	soft_dot.fill_from = Vector2(0.5, 0.5)
-	soft_dot.fill_to = Vector2(1.0, 0.5)
+	var tex := GradientTexture2D.new()
+	tex.gradient = gradient
+	tex.width = 64 if _mobile else 96
+	tex.height = 64 if _mobile else 96
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(1.0, 0.5)
+	return tex
 
-	var particles := CPUParticles2D.new()
-	particles.name = "LagoonDrift"
-	particles.texture = soft_dot
-	particles.position = Vector2(3000, 390)
-	particles.amount = 34 if OS.get_name() == "Android" else 68
-	particles.lifetime = 9.0
-	particles.preprocess = 9.0
-	particles.randomness = 0.88
-	particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	particles.emission_rect_extents = Vector2(3050, 430)
-	particles.direction = Vector2(-0.25, -1.0)
-	particles.spread = 58.0
-	particles.initial_velocity_min = 3.0
-	particles.initial_velocity_max = 12.0
-	particles.gravity = Vector2(-2.0, -4.0)
-	particles.scale_amount_min = 0.08
-	particles.scale_amount_max = 0.24
-	particles.color = Color(0.5, 0.92, 0.84, 0.28)
-	particles.z_index = 1
-	add_child(particles)
+
+func _build_fog_layers() -> void:
+	# Tre fasce di nebbia a quote diverse (bassa / media / alta), lente e dense.
+	var configs := [
+		{"y": 520.0, "amount": 28, "scale": 2.8, "speed": 8.0, "alpha": 0.22, "z": 1},
+		{"y": 430.0, "amount": 22, "scale": 3.4, "speed": 12.0, "alpha": 0.16, "z": 2},
+		{"y": 300.0, "amount": 16, "scale": 4.0, "speed": 6.0, "alpha": 0.12, "z": 0},
+	]
+	for cfg in configs:
+		var amount: int = int(cfg.amount)
+		if _mobile:
+			amount = maxi(10, amount / 2)
+		var fog := CPUParticles2D.new()
+		fog.name = "FogBand"
+		fog.texture = _soft_tex
+		fog.z_index = int(cfg.z)
+		fog.amount = amount
+		fog.lifetime = 14.0
+		fog.preprocess = 14.0
+		fog.explosiveness = 0.0
+		fog.randomness = 0.85
+		fog.local_coords = false
+		fog.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+		fog.emission_rect_extents = Vector2(3200.0, 70.0)
+		fog.position = Vector2(2800.0, float(cfg.y))
+		fog.direction = Vector2(1.0, 0.05)
+		fog.spread = 18.0
+		fog.gravity = Vector2(0.0, -1.5)
+		fog.initial_velocity_min = float(cfg.speed) * 0.55
+		fog.initial_velocity_max = float(cfg.speed)
+		fog.angular_velocity_min = -4.0
+		fog.angular_velocity_max = 4.0
+		fog.scale_amount_min = float(cfg.scale) * 0.75
+		fog.scale_amount_max = float(cfg.scale) * 1.35
+		fog.color = Color(0.72, 0.84, 0.86, float(cfg.alpha))
+		# Fade in/out vita particella
+		var color_ramp := Gradient.new()
+		color_ramp.offsets = PackedFloat32Array([0.0, 0.15, 0.75, 1.0])
+		color_ramp.colors = PackedColorArray([
+			Color(1, 1, 1, 0.0),
+			Color(1, 1, 1, 1.0),
+			Color(1, 1, 1, 0.85),
+			Color(1, 1, 1, 0.0),
+		])
+		fog.color_ramp = color_ramp
+		add_child(fog)
+		_fog_layers.append(fog)
+
+	# Mote lagunari molto discreti (non "rettangoli").
+	var motes := CPUParticles2D.new()
+	motes.name = "LagoonMotes"
+	motes.texture = _soft_tex
+	motes.z_index = 3
+	motes.amount = 18 if _mobile else 36
+	motes.lifetime = 7.0
+	motes.preprocess = 7.0
+	motes.randomness = 0.9
+	motes.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	motes.emission_rect_extents = Vector2(3000.0, 380.0)
+	motes.position = Vector2(2800.0, 360.0)
+	motes.direction = Vector2(-0.2, -1.0)
+	motes.spread = 50.0
+	motes.gravity = Vector2(-1.0, -3.0)
+	motes.initial_velocity_min = 2.0
+	motes.initial_velocity_max = 9.0
+	motes.scale_amount_min = 0.12
+	motes.scale_amount_max = 0.35
+	motes.color = Color(0.45, 0.85, 0.8, 0.14)
+	add_child(motes)
+
+
+func _interact_with_player(_delta: float) -> void:
+	if _player == null or _fog_layers.is_empty():
+		return
+	var speed := 0.0
+	if _player is CharacterBody2D:
+		speed = (_player as CharacterBody2D).velocity.length()
+	# Correndo nella nebbia: le bande basse si aprono / accelerano (wake).
+	var near_ground_fog := _player.global_position.y > 380.0
+	if near_ground_fog and speed > 40.0:
+		for fog in _fog_layers:
+			if fog.position.y < 480.0:
+				continue
+			# Leggero "soffio" nella direzione del movimento.
+			var facing := 1.0
+			if _player is CharacterBody2D:
+				facing = signf((_player as CharacterBody2D).velocity.x)
+				if is_zero_approx(facing):
+					facing = 1.0
+			fog.direction = Vector2(facing, -0.15).normalized()
+			fog.initial_velocity_min = 14.0
+			fog.initial_velocity_max = 28.0
+		if _wake_cooldown <= 0.0:
+			_spawn_player_wake()
+			_wake_cooldown = 0.18 if _mobile else 0.12
+	else:
+		# Riposo: deriva lenta costante.
+		for i in _fog_layers.size():
+			var fog := _fog_layers[i]
+			var base_speed := 8.0 + float(i) * 2.0
+			fog.direction = Vector2(1.0, 0.04)
+			fog.initial_velocity_min = base_speed * 0.55
+			fog.initial_velocity_max = base_speed
+
+
+func _spawn_player_wake() -> void:
+	if _player == null:
+		return
+	var puff := CPUParticles2D.new()
+	puff.texture = _soft_tex
+	puff.one_shot = true
+	puff.explosiveness = 0.85
+	puff.amount = 4 if _mobile else 7
+	puff.lifetime = 0.7
+	puff.emitting = true
+	puff.z_index = 4
+	puff.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+	puff.emission_sphere_radius = 10.0
+	puff.direction = Vector2(0, -1)
+	puff.spread = 160.0
+	puff.gravity = Vector2(0, -8)
+	puff.initial_velocity_min = 12.0
+	puff.initial_velocity_max = 34.0
+	puff.scale_amount_min = 1.2
+	puff.scale_amount_max = 2.4
+	puff.color = Color(0.75, 0.88, 0.9, 0.28)
+	add_child(puff)
+	puff.global_position = _player.global_position + Vector2(0, -8)
+	get_tree().create_timer(1.0).timeout.connect(puff.queue_free)

@@ -3,10 +3,11 @@ extends CanvasLayer
 const DISPLAY_FONT := preload("res://UI/Fonts/CormorantGaramond.ttf")
 const BODY_FONT := preload("res://UI/Fonts/SourceSans3.ttf")
 const ARRIVAL_ART := preload("res://Landscape/Dogana/Illustrated/arrival.png")
+const VEIL_COLOR := Color(0.003, 0.014, 0.02, 1.0)
 
 @export_category("Timing")
-@export var auto_advance_time: float = 15.0
-@export var fade_duration: float = 2.1
+@export var auto_advance_time: float = 18.0
+@export var fade_duration: float = 3.4
 
 @export_category("Visual")
 @export var background_color: Color = Color(0.003, 0.014, 0.02, 0.84)
@@ -21,26 +22,23 @@ var _frame_style: StyleBoxFlat
 var _primary_line: Label
 var _veneto_line: Label
 var _fade_tween: Tween
+var _content_root: Control
 
 func _ready():
-	layer = 200  # Sopra tutto
+	layer = 200
+	AsyncSceneLoader.preload_scene("res://Levels/Scenes/punta_della_dogana.tscn")
 	_create_background()
 	_create_text_display()
 	get_viewport().size_changed.connect(_apply_responsive_layout)
 	_apply_responsive_layout()
-	
-	# Fade in
 	await get_tree().process_frame
 	_fade_in()
-	
-	# Timer per skip automatico
 	skip_timer = auto_advance_time
 
 func _process(delta):
 	if _advancing:
 		return
 	skip_timer -= delta
-	# Skip automatico
 	if skip_timer <= 0:
 		_go_to_game()
 
@@ -57,6 +55,20 @@ func _input(event: InputEvent) -> void:
 		_go_to_game()
 
 func _create_background():
+	background = ColorRect.new()
+	background.name = "Background"
+	background.color = VEIL_COLOR
+	background.set_anchors_preset(Control.PRESET_FULL_RECT)
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(background)
+
+	_content_root = Control.new()
+	_content_root.name = "ContentRoot"
+	_content_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_content_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_content_root.modulate.a = 0.0
+	add_child(_content_root)
+
 	var backdrop := TextureRect.new()
 	backdrop.name = "IllustratedBackdrop"
 	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -65,20 +77,21 @@ func _create_background():
 	backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	backdrop.modulate = Color(0.22, 0.34, 0.35, 0.48)
 	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(backdrop)
-	background = ColorRect.new()
-	background.name = "Background"
-	background.color = background_color
-	background.set_anchors_preset(Control.PRESET_FULL_RECT)
-	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(background)
+	_content_root.add_child(backdrop)
+
+	var soft_veil := ColorRect.new()
+	soft_veil.name = "SoftVeil"
+	soft_veil.color = Color(background_color.r, background_color.g, background_color.b, 0.72)
+	soft_veil.set_anchors_preset(Control.PRESET_FULL_RECT)
+	soft_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_content_root.add_child(soft_veil)
 
 func _create_text_display():
 	var main_container = CenterContainer.new()
 	main_container.name = "MainContainer"
 	main_container.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(main_container)
-	
+	_content_root.add_child(main_container)
+
 	_frame = PanelContainer.new()
 	_frame_style = StyleBoxFlat.new()
 	_frame_style.bg_color = Color(0.006, 0.025, 0.032, 0.9)
@@ -117,11 +130,11 @@ func _create_text_display():
 	poetic_text_english.add_theme_constant_override("outline_size", 4)
 	text_container.add_child(poetic_text_english)
 	_primary_line = poetic_text_english
-	
+
 	var spacer1 = Control.new()
 	spacer1.custom_minimum_size = Vector2(0, 8)
 	text_container.add_child(spacer1)
-	
+
 	var poetic_text_veneto = Label.new()
 	poetic_text_veneto.name = "PoeticTextVeneto"
 	poetic_text_veneto.text = "Un manuin in te la paude, in mexo al caligo, taco a movarse"
@@ -134,11 +147,11 @@ func _create_text_display():
 	poetic_text_veneto.add_theme_constant_override("outline_size", 3)
 	text_container.add_child(poetic_text_veneto)
 	_veneto_line = poetic_text_veneto
-	
+
 	var spacer2 = Control.new()
 	spacer2.custom_minimum_size = Vector2(0, 4)
 	text_container.add_child(spacer2)
-	
+
 	var poetic_text_english_normal = Label.new()
 	poetic_text_english_normal.name = "PoeticTextEnglishNormal"
 	poetic_text_english_normal.text = "From the fog of the swamp, a bundle began to move"
@@ -150,11 +163,11 @@ func _create_text_display():
 	poetic_text_english_normal.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 	poetic_text_english_normal.add_theme_constant_override("outline_size", 2)
 	text_container.add_child(poetic_text_english_normal)
-	
+
 	var spacer3 = Control.new()
 	spacer3.custom_minimum_size = Vector2(0, 22)
 	text_container.add_child(spacer3)
-	
+
 	var instruction = Label.new()
 	instruction.name = "Instruction"
 	instruction.text = "PREMI UN TASTO PER ENTRARE NEL CALIGO"
@@ -163,9 +176,6 @@ func _create_text_display():
 	instruction.add_theme_font_size_override("font_size", 13)
 	instruction.add_theme_color_override("font_color", Color(0.74, 0.72, 0.61, 0.72))
 	text_container.add_child(instruction)
-	
-	# Inizia invisibile per fade in
-	text_container.modulate.a = 0.0
 
 
 func _apply_responsive_layout() -> void:
@@ -185,16 +195,15 @@ func _apply_responsive_layout() -> void:
 
 func _fade_in():
 	_fade_tween = create_tween()
-	_fade_tween.tween_property(text_container, "modulate:a", 1.0, fade_duration).set_trans(Tween.TRANS_SINE)
+	_fade_tween.tween_property(_content_root, "modulate:a", 1.0, fade_duration).set_trans(Tween.TRANS_SINE)
 	await _fade_tween.finished
 
-func _fade_out():
+func _fade_content_out():
 	if _fade_tween and _fade_tween.is_valid():
 		_fade_tween.kill()
 	_fade_tween = create_tween()
-	_fade_tween.set_parallel(true)
-	_fade_tween.tween_property(text_container, "modulate:a", 0.0, fade_duration).set_trans(Tween.TRANS_SINE)
-	_fade_tween.tween_property(background, "color:a", 0.0, fade_duration)
+	# Solo contenuto: il velo opaco resta per il passaggio al loader.
+	_fade_tween.tween_property(_content_root, "modulate:a", 0.0, fade_duration * 0.55).set_trans(Tween.TRANS_SINE)
 	await _fade_tween.finished
 
 func _go_to_game():
@@ -203,5 +212,6 @@ func _go_to_game():
 	_advancing = true
 	set_process(false)
 	set_process_input(false)
-	await _fade_out()
-	AsyncSceneLoader.load_scene("res://Levels/Scenes/punta_della_dogana.tscn")
+	await _fade_content_out()
+	# Copertura istantanea: nessun buco tra prologo e loading.
+	AsyncSceneLoader.load_scene("res://Levels/Scenes/punta_della_dogana.tscn", true)

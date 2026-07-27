@@ -421,6 +421,14 @@ func _update_body_interactions(delta: float) -> void:
 func _apply_character_buoyancy(body: CharacterBody2D, delta: float) -> void:
 	var surface_y := get_surface_height(body.global_position.x)
 	var submersion := clampf((body.global_position.y - surface_y + 18.0) / 72.0, 0.0, 1.0)
+	# Ribattono sulla superficie (cadendo): nuovo bounce + salto/doppio salto.
+	if body.velocity.y > 40.0 and body.global_position.y >= surface_y - 10.0 and body.global_position.y <= surface_y + 28.0:
+		var id := body.get_instance_id()
+		var cooldown: float = float(_body_splash_cooldowns.get(id, 0.0))
+		if cooldown <= 0.05 and body.has_method("refresh_jumps_from_water_surface"):
+			body.call("refresh_jumps_from_water_surface")
+			_emit_body_splash(body, true)
+			_body_splash_cooldowns[id] = maxf(interaction_interval, 0.22)
 	if submersion <= 0.0:
 		return
 	var buoyancy := character_buoyancy_acceleration * submersion

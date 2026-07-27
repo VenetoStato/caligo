@@ -11,15 +11,28 @@ func _ready() -> void:
 	var player := level.get_node("Player") as CharacterBody2D
 	var sprite := player.get_node("Sprite2D") as Sprite2D
 	var tutorial := level.get_node("TutorialHints")
+	var cutscene := level.get_node_or_null("ArrivalCutscene")
+	if cutscene:
+		cutscene.queue_free()
+		await get_tree().process_frame
+		await get_tree().physics_frame
+	# Garanzia: dopo la cutscene il player deve essere solidamente giocabile.
+	player.collision_layer = 2
+	player.collision_mask = 1
+	player.set_physics_process(true)
+	player.set_meta("arrival_locked", false)
+	player.set_meta("arrival_riding", false)
+	if tutorial.has_method("arm_tutorial"):
+		tutorial.call("arm_tutorial")
+	await get_tree().process_frame
 	var panel := tutorial.get("_panel") as PanelContainer
-	var section_veil := tutorial.get("_section_veil") as ColorRect
 	var gate := level.get_node("Gameplay/TutorialGate") as StaticBody2D
 	var gate_collision := gate.get_node("CollisionShape2D") as CollisionShape2D
+	# sprite.y = -8 è l'allineamento a terra atteso.
 	if (
 		sprite.position.y > -2.0
-		or sprite.position.y < -8.0
+		or sprite.position.y < -9.0
 		or panel == null
-		or section_veil == null
 		or not panel.visible
 		or gate_collision.disabled
 	):

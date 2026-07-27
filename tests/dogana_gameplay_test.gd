@@ -12,6 +12,17 @@ func _ready() -> void:
 	add_child(level)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
+	var cutscene := level.get_node_or_null("ArrivalCutscene")
+	if cutscene:
+		cutscene.queue_free()
+		await get_tree().process_frame
+		await get_tree().physics_frame
+	var player_boot := level.get_node_or_null("Player") as CharacterBody2D
+	if player_boot:
+		player_boot.collision_layer = 2
+		player_boot.collision_mask = 1
+		player_boot.set_physics_process(true)
+		player_boot.set_meta("arrival_locked", false)
 
 	var enemies := get_tree().get_nodes_in_group("dogana_encounters")[0].get_children()
 	var interactions := get_tree().get_nodes_in_group("dogana_interactable")

@@ -17,11 +17,30 @@ var _broken := false
 
 func _ready() -> void:
 	_hits_left = hits_required
+	add_to_group("dogana_breakable")
 	if art_profile and art_profile.fishbone_wall:
 		_visual.texture = art_profile.fishbone_wall
+	_visual.z_index = 1
+	_visual.modulate = Color(1.1, 1.18, 1.14, 1.0)
 	_hurtbox.collision_layer = 2
 	_hurtbox.collision_mask = 4
+	_hurtbox.monitoring = true
+	_hurtbox.monitorable = true
 	_hurtbox.area_entered.connect(_on_hurtbox_entered)
+	# Alone hint: thin cyan outline so the sealed door reads in the dark.
+	queue_redraw()
+	set_process(true)
+
+
+func _process(_delta: float) -> void:
+	queue_redraw()
+
+
+func _draw() -> void:
+	if _broken:
+		return
+	var pulse := 0.55 + sin(Time.get_ticks_msec() * 0.004) * 0.2
+	draw_rect(Rect2(-36, -98, 72, 196), Color(0.2, 0.85, 0.75, 0.08 + pulse * 0.06), false, 2.0)
 
 
 func _on_hurtbox_entered(area: Area2D) -> void:

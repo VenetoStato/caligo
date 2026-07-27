@@ -1,7 +1,9 @@
 extends CanvasLayer
 
-const MIN_VISIBLE_TIME := 1.2
+const MIN_VISIBLE_TIME := 2.4
 const READY_FRAMES := 3
+const OVERLAY_FADE_IN := 1.4
+const OVERLAY_FADE_OUT := 2.1
 const DISPLAY_FONT := preload("res://UI/Fonts/CormorantGaramond.ttf")
 const BODY_FONT := preload("res://UI/Fonts/SourceSans3.ttf")
 const ARRIVAL_ART := preload("res://Landscape/Dogana/Illustrated/arrival.png")
@@ -28,7 +30,7 @@ func _ready() -> void:
 	set_process(false)
 
 
-func load_scene(scene_path: String) -> void:
+func load_scene(scene_path: String, instant_cover: bool = false) -> void:
 	if _loading:
 		return
 	if scene_path.is_empty() or not ResourceLoader.exists(scene_path):
@@ -42,10 +44,14 @@ func load_scene(scene_path: String) -> void:
 	_loading = true
 	_elapsed = 0.0
 	_overlay.visible = true
-	_overlay.modulate.a = 0.0
 	_progress.value = 0.0
 	_status.text = "APRENDO LE ACQUE DELLA LAGUNA…"
-	create_tween().tween_property(_overlay, "modulate:a", 1.0, 0.75).set_trans(Tween.TRANS_SINE)
+	if instant_cover:
+		# La schermata precedente è già un velo opaco: niente fade-in da zero.
+		_overlay.modulate.a = 1.0
+	else:
+		_overlay.modulate.a = 0.0
+		create_tween().tween_property(_overlay, "modulate:a", 1.0, OVERLAY_FADE_IN).set_trans(Tween.TRANS_SINE)
 
 	if scene_path == _prepared_path:
 		if _prepared_scene:
@@ -133,7 +139,7 @@ func _finish_loading() -> void:
 	_status.text = "LA DOGANA È PRONTA"
 	await get_tree().process_frame
 	var tween := create_tween()
-	tween.tween_property(_overlay, "modulate:a", 0.0, 1.25).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(_overlay, "modulate:a", 0.0, OVERLAY_FADE_OUT).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 	await tween.finished
 	_overlay.visible = false
 	_loading = false

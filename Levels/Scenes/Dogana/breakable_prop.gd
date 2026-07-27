@@ -72,17 +72,18 @@ func _break() -> void:
 
 
 func _spawn_debris() -> void:
+	var mobile := OS.get_name() == "Android" or OS.has_feature("mobile")
 	PARTICLE_BURST.spawn(
 		get_tree().current_scene,
 		global_position + Vector2(0, -36),
 		Color(0.2, 0.67, 0.58, 0.88),
-		16,
+		10 if mobile else 16,
 		Vector2.UP,
 		45.0,
 		145.0,
 		0.72
 	)
-	for index in 5:
+	for index in (3 if mobile else 5):
 		var shard := Polygon2D.new()
 		var size := randf_range(3.0, 8.0)
 		shard.polygon = PackedVector2Array([

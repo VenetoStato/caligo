@@ -67,10 +67,18 @@ func _ready():
 
 	_find_point_light()
 	_setup_fish_detection()
+	_apply_fishing_pass_through()
 
 	contact_monitor = true
 	max_contacts_reported = 4
 	z_index = 14
+
+
+func _apply_fishing_pass_through() -> void:
+	# L'amo da pesca non deve rimbalzare sul pontile/pavimento:
+	# se sotto c'è acqua, attraversa il deck e affonda.
+	collision_layer = 0
+	collision_mask = 0
 
 func _find_sprite():
 	if sprite_node_name != "":
@@ -199,6 +207,8 @@ func orient_to_line(line_origin: Vector2):
 # ===========================================
 func set_hook_type(type: String):
 	hook_type = type
+	if hook_type == "fishing":
+		_apply_fishing_pass_through()
 
 func get_hook_type() -> String:
 	return hook_type

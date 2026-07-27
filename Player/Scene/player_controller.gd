@@ -364,8 +364,12 @@ func _disable_attack_hitbox():
 		_attack_hitbox.monitoring = false
 
 func _on_attack_hitbox_area_entered(area: Area2D) -> void:
+	if is_dead:
+		return
 	var parent: Node = area.get_parent()
 	if parent.is_in_group("enemy") and parent not in _attack_hit_enemies:
+		if "state" in parent and int(parent.get("state")) == 2:
+			return
 		_attack_hit_enemies.append(parent)
 		if parent.has_method("take_damage"):
 			parent.take_damage(_current_attack_damage, global_position)
@@ -625,6 +629,9 @@ func _input(event):
 func _physics_process(delta: float):
 	# Non processare se morto
 	if is_dead:
+		return
+	if get_meta("arrival_locked", false):
+		velocity = Vector2.ZERO
 		return
 	
 	_update_dash_timers(delta)
@@ -903,7 +910,7 @@ func jump_logic():
 	elif jump_amount > 0 and Input.is_action_just_pressed("ui_accept"):
 		jump_amount -= 1
 		velocity.y -= lerp(jump_speed, jump_acceleration, 1.0)
-		tutorial_action_performed.emit(&"double_jump")
+		tutorial_action_performed.emit(&"double_jump" if jump_amount == 0 else &"jump")
 		if particles_on_jump and black_particle_scene:
 			_spawn_particles(global_position, Vector2.DOWN, 0.2)
 		if particles_on_jump and ambient_trail_scene:
@@ -917,6 +924,8 @@ func take_damage(
 	source_position: Vector2 = Vector2.ZERO,
 	ignore_invincibility: bool = false
 ):
+	if get_meta("arrival_locked", false):
+		return
 	if (is_invincible and not ignore_invincibility) or is_dead:
 		return
 	
@@ -971,6 +980,13 @@ func _on_death():
 	
 	is_dead = true
 	velocity = Vector2.ZERO
+	# Chiudi subito l'hitbox: altrimenti durante la death-cam si colpiscono
+	# nemici quasi morti e al respawn risultano "già rinati".
+	_disable_attack_hitbox()
+	_attack_hit_enemies.clear()
+	is_charging = false
+	if line_extended or hook_instance != null:
+		_destroy_hook()
 	
 	print("☠️ MORTE!")
 	
@@ -1131,7 +1147,57 @@ func _on_respawn():
 	_show_health_ui()
 	respawned.emit()
 	
+	# Stessa animazione di risveglio di character_beginning (altare / respawn).
+	if not bool(get_meta("skip_wake_animation", false)):
+		call_deferred("play_altar_wake_animation")
+	else:
+		set_meta("skip_wake_animation", false)
+	
 	print("🔄 Respawn!")
+
+
+func play_altar_wake_animation() -> void:
+	## Usa Spritesbarcaerisveglio frame 6→24 come in character_beginning "intro".
+	if not is_inside_tree() or is_dead:
+		return
+	if bool(get_meta("wake_animation_playing", false)):
+		return
+	set_meta("wake_animation_playing", true)
+	set_meta("arrival_locked", true)
+	velocity = Vector2.ZERO
+	if anim:
+		anim.stop()
+	var body_sprite := sprite_node if sprite_node else get_node_or_null("Sprite2D") as Sprite2D
+	if body_sprite:
+		body_sprite.visible = false
+	var wake := Sprite2D.new()
+	wake.name = "AltarWakeSprite"
+	wake.texture = preload("res://Spritesbarcaerisveglio.png")
+	wake.hframes = 6
+	wake.vframes = 5
+	wake.frame = 6
+	wake.centered = true
+	wake.position = Vector2(3, -19)
+	wake.scale = Vector2(0.1, 0.1)
+	wake.z_index = 8
+	add_child(wake)
+	# Frame 6..24 come intro originale (~3.8s, step 0.2).
+	for frame_i in range(6, 25):
+		if not is_instance_valid(wake) or is_dead:
+			break
+		wake.frame = frame_i
+		await get_tree().create_timer(0.2).timeout
+	if is_instance_valid(wake):
+		wake.queue_free()
+	if body_sprite and is_instance_valid(body_sprite):
+		body_sprite.visible = true
+		body_sprite.modulate = Color(1, 1, 1, 1)
+	if anim and anim.has_animation("Idle") and not is_dead:
+		anim.play("Idle")
+	set_meta("arrival_locked", false)
+	set_meta("wake_animation_playing", false)
+	is_invincible = true
+	invincibility_timer = maxf(invincibility_timer, 1.0)
 
 # ===========================================
 # OFFSETS
@@ -1785,10 +1851,28 @@ func set_in_water(in_w: bool, grav_red: float = 0.3, water_owner: Node = null):
 	water_gravity_multiplier = clampf(grav_red, 0.0, 1.0) if in_w else 1.0
 	if in_w and not was:
 		_water_owner = water_owner
-		velocity.y = -water_bounce_speed
+		_bounce_off_water()
 		take_damage(1, Vector2.ZERO, true)
 	elif not in_w:
 		_water_owner = null
+
+
+func _bounce_off_water() -> void:
+	## Come toccare il suolo: rimbalzo + salto e doppio salto di nuovo disponibili.
+	velocity.y = -water_bounce_speed
+	jump_amount = 2
+	if particles_on_jump and black_particle_scene:
+		_spawn_particles(global_position, Vector2.UP, 0.22, 3)
+	if particles_on_land and ambient_trail_scene:
+		_spawn_trail(global_position, Vector2.UP)
+
+
+func refresh_jumps_from_water_surface() -> void:
+	## Chiamato dall'acqua se si ribatte sulla superficie restando in overlap.
+	if is_dead or get_meta("arrival_locked", false):
+		return
+	_bounce_off_water()
+
 
 func in_water(water_owner: Node = null):
 	set_in_water(true, 0.3, water_owner)

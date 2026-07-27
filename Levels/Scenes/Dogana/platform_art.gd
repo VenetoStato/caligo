@@ -7,8 +7,10 @@ func _ready() -> void:
 	add_to_group("dogana_generated_platform_art")
 	z_index = -1
 
-	# Atto I: approdo tranquillo, primo combattimento e salita sulla Dogana.
-	_add_ledge(Rect2(15, 460, 1010, 96), 0.78)
+	# Atto I: pontile lungo con varco di pesca (acqua visibile sotto, amo può passare).
+	_add_ledge(Rect2(-435, 460, 700, 96), 0.78)  # -435 → 265
+	_add_ledge(Rect2(395, 460, 630, 96), 0.78)   # 395 → 1025 (gap 265–395)
+
 	_add_ledge(Rect2(1190, 485, 790, 110), 0.82)
 	_add_central_wedge()
 	for rect in [
@@ -40,7 +42,8 @@ func _ready() -> void:
 	# Discesa visibile sul lato destro del muro segreto: il giocatore può
 	# scendere dal cuneo, atterrare e colpire la parete dall'esterno.
 	_add_ledge(Rect2(1975, 686, 190, 28), 0.72)
-	_add_ledge(Rect2(1905, 806, 190, 28), 0.72)
+	_add_ledge(Rect2(1990, 746, 190, 28), 0.72)
+	_add_ledge(Rect2(2000, 806, 190, 28), 0.72)
 	_add_ledge(Rect2(3615, 20, 430, 30), 0.48)
 	_add_ledge(Rect2(3615, 235, 430, 30), 0.48)
 

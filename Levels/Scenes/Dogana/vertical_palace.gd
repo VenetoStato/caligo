@@ -302,11 +302,12 @@ func _build_enemy_encounters() -> void:
 
 	var activation := Area2D.new()
 	activation.name = "PalaceActivation"
-	activation.position = Vector2(2670, -630)
+	activation.position = Vector2(2670, -560)
 	activation.collision_layer = 0
 	activation.collision_mask = 2
 	var shape := RectangleShape2D.new()
-	shape.size = Vector2(1260, 1040)
+	# Include l'atterraggio ingresso (y≈-190) così il teleport attiva i nemici.
+	shape.size = Vector2(1260, 1180)
 	var collision := CollisionShape2D.new()
 	collision.shape = shape
 	activation.add_child(collision)
@@ -315,20 +316,25 @@ func _build_enemy_encounters() -> void:
 	add_child(activation)
 
 
+func set_encounters_active(active: bool) -> void:
+	for enemy in _palace_enemies:
+		if not is_instance_valid(enemy):
+			continue
+		if active and int(enemy.get("state")) == 2:
+			continue
+		enemy.set_physics_process(active)
+
+
 func _on_palace_activation_entered(body: Node2D) -> void:
 	if not body.is_in_group("player"):
 		return
-	for enemy in _palace_enemies:
-		if is_instance_valid(enemy):
-			enemy.set_physics_process(true)
+	set_encounters_active(true)
 
 
 func _on_palace_activation_exited(body: Node2D) -> void:
 	if not body.is_in_group("player"):
 		return
-	for enemy in _palace_enemies:
-		if is_instance_valid(enemy):
-			enemy.set_physics_process(false)
+	set_encounters_active(false)
 
 
 func _draw_door(at: Vector2, scale_factor: float) -> void:

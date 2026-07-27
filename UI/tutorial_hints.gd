@@ -45,12 +45,15 @@ var _completion_started := false
 var _player_signal_connected := false
 var _fish_signal_connected := false
 var _step_transition: Tween
+var _section_tween: Tween
 var _section_veil: ColorRect
 var _last_section := ""
+var _armed := false
 
 
 func _ready() -> void:
-	layer = 15
+	# Sopra PostFX/vignetta (20), sotto HUD (60) e mappa (90)
+	layer = 45
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	for step in STEP_ORDER:
 		_completed[step] = false
@@ -59,16 +62,45 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_apply_responsive_layout)
 	_apply_responsive_layout()
 	_fishing_panel = _panel
+	if _panel:
+		_panel.visible = false
 	var level := get_tree().current_scene
 	if level and level.has_signal("grace_activated"):
 		level.connect("grace_activated", _on_grace_activated)
 	var training_cache := level.get_node_or_null("Gameplay/Breakables/ArrivalCache") if level else null
 	if training_cache and training_cache.has_signal("prop_broken"):
 		training_cache.connect("prop_broken", _on_training_cache_broken)
+	# Dopo tutti i _ready: se non c'è cutscene di arrivo, arma subito.
+	call_deferred("_maybe_auto_arm")
+
+
+func _maybe_auto_arm() -> void:
+	if _armed:
+		return
+	if get_tree().get_first_node_in_group("dogana_arrival_cutscene") != null:
+		return
+	arm_tutorial()
+
+
+func set_armed(armed: bool) -> void:
+	_armed = armed
+	if _panel and not armed:
+		_panel.visible = false
+
+
+func arm_tutorial() -> void:
+	if _armed:
+		return
+	_armed = true
+	_player = get_tree().get_first_node_in_group("player") as CharacterBody2D
+	if _player:
+		_start_position = _player.global_position
 	_refresh_step()
 
 
 func _process(_delta: float) -> void:
+	if not _armed:
+		return
 	if _player == null:
 		_player = get_tree().get_first_node_in_group("player") as CharacterBody2D
 		if _player == null:
@@ -123,25 +155,34 @@ func _on_training_cache_broken() -> void:
 	_observe_step(Step.ATTACK)
 
 
+func notify_altar_used() -> void:
+	_observe_step(Step.INTERACT)
+
+
 func _observe_step(step: Step) -> void:
+	if not _armed:
+		return
+	# Solo lo step corrente avanza: niente salti in avanti.
+	if step != _current_step:
+		return
 	_observed[step] = true
-	if step == _current_step:
-		_mark_completed(step)
+	_mark_completed(step)
 
 
 func _mark_completed(step: Step) -> void:
+	if not _armed:
+		return
+	if step != _current_step:
+		return
 	if bool(_completed.get(step, false)):
 		return
 	_completed[step] = true
-	_refresh_step()
+	_advance_to_next_step()
 
 
-func _refresh_step() -> void:
+func _advance_to_next_step() -> void:
 	for step in STEP_ORDER:
 		if not bool(_completed.get(step, false)):
-			if bool(_observed.get(step, false)):
-				_completed[step] = true
-				continue
 			_current_step = step
 			_apply_step_copy(step)
 			return
@@ -150,38 +191,33 @@ func _refresh_step() -> void:
 	_show_completion()
 
 
+func _refresh_step() -> void:
+	_advance_to_next_step()
+
+
 func _apply_step_copy(step: Step) -> void:
 	var touch := OS.get_name() == "Android"
 	var copy := _get_step_copy(step, touch)
 	if _step_transition and _step_transition.is_valid():
 		_step_transition.kill()
+	_panel.visible = true
 	_step_transition = create_tween()
 	if _title.text.is_empty():
 		_panel.modulate.a = 0.0
 	else:
-		_step_transition.tween_property(_panel, "modulate:a", 0.0, 0.45).set_trans(Tween.TRANS_SINE)
+		_step_transition.tween_property(_panel, "modulate:a", 0.0, 0.18).set_trans(Tween.TRANS_SINE)
 	_step_transition.tween_callback(_set_step_copy.bind(step, copy))
-	_step_transition.tween_property(_panel, "modulate:a", 1.0, 0.75).set_trans(Tween.TRANS_SINE)
+	_step_transition.tween_property(_panel, "modulate:a", 0.82, 0.28).set_trans(Tween.TRANS_SINE)
 
 
 func _set_step_copy(step: Step, copy: Dictionary) -> void:
-	var section := _get_section_label(step)
-	if not _last_section.is_empty() and section != _last_section:
-		_play_section_dissolve()
-	_last_section = section
-	_eyebrow.text = "%s  ·  %02d / %02d" % [
-		section,
-		_completed_count() + 1,
-		STEP_ORDER.size(),
-	]
+	_last_section = _get_section_label(step)
+	_eyebrow.text = "%02d / %02d" % [_completed_count() + 1, STEP_ORDER.size()]
 	_title.text = str(copy.title)
 	_instruction.text = str(copy.instruction)
 	_key_label.text = str(copy.key)
 	_progress.text = _build_progress_text()
 	_panel.visible = true
-	var pulse := create_tween()
-	pulse.tween_property(_key_label, "modulate", Color(1.35, 1.2, 0.72, 1.0), 0.12)
-	pulse.tween_property(_key_label, "modulate", Color.WHITE, 0.22)
 
 
 func _get_section_label(step: Step) -> String:
@@ -196,68 +232,60 @@ func _get_section_label(step: Step) -> String:
 	return "SEZIONE V  ·  ORIENTAMENTO"
 
 
-func _play_section_dissolve() -> void:
-	if _section_veil == null:
-		return
-	var tween := create_tween()
-	tween.tween_property(_section_veil, "modulate:a", 0.2, 0.28).set_trans(Tween.TRANS_SINE)
-	tween.tween_property(_section_veil, "modulate:a", 0.0, 0.85).set_trans(Tween.TRANS_SINE)
-
-
 func _get_step_copy(step: Step, touch: bool) -> Dictionary:
 	match step:
 		Step.MOVE:
 			return {
-				"title": "Prendi confidenza col pontile",
-				"instruction": "Muoviti fino all'altare. Il pannello resta visibile finché l'azione non è completata.",
-				"key": "◀  ▶" if touch else "A   /   D",
+				"title": "Muoviti",
+				"instruction": "Vai verso l'altare sul pontile.",
+				"key": "◀ ▶" if touch else "A / D",
 			}
 		Step.INTERACT:
 			return {
-				"title": "Risveglia e usa gli altari",
-				"instruction": "Avvicinati all'altare luminoso e interagisci. Qui riposi, curi e imposti il respawn.",
+				"title": "Altare",
+				"instruction": "Interagisci per riposare e salvare il respawn.",
 				"key": "✦" if touch else "E",
 			}
 		Step.JUMP:
 			return {
-				"title": "Supera gli ostacoli bassi",
-				"instruction": "Prova un salto sul pontile. Il comando risponde appena viene premuto.",
+				"title": "Salto",
+				"instruction": "Salta una volta sul pontile.",
 				"key": "↑" if touch else "SPAZIO",
 			}
 		Step.DOUBLE_JUMP:
 			return {
-				"title": "Resta sospeso un istante",
-				"instruction": "Premi salto una seconda volta mentre sei in aria per effettuare il doppio salto.",
-				"key": "↑   ↑" if touch else "SPAZIO  × 2",
+				"title": "Doppio salto",
+				"instruction": "In aria, salta di nuovo.",
+				"key": "↑↑" if touch else "SPAZIO ×2",
 			}
 		Step.DASH:
 			return {
-				"title": "Attraversa rapidamente il pericolo",
-				"instruction": "Esegui uno scatto. Puoi usarlo a terra o durante un salto.",
-				"key": "D" if touch else "SHIFT",
+				"title": "Scatto",
+				"instruction": "Esegui uno scatto a terra o in aria.",
+				"key": "⚡" if touch else "SHIFT",
 			}
 		Step.ATTACK:
 			return {
-				"title": "Rompi la cassa da pesca",
-				"instruction": "Colpisci la cassa illustrata sul pontile. Gli oggetti crepati nascondono spesso passaggi.",
-				"key": "Z" if touch else "CLICK SINISTRO",
+				"title": "Attacco",
+				"instruction": "Rompi la cassa sul pontile.",
+				"key": "⚔" if touch else "CLICK",
 			}
 		Step.CAST:
 			return {
-				"title": "La pesca è il tuo nutrimento",
-				"instruction": "Tieni premuto per mirare e lancia la lenza verso i pesci sotto il pontile.",
+				"title": "Pesca",
+				"instruction": "Lancia la lenza nel varco d'acqua.",
 				"key": "LENZA" if touch else "F",
 			}
 		Step.REEL:
 			return {
-				"title": "Recupera la preda",
-				"instruction": "Quando un pesce abbocca, tira a impulsi. Ogni cattura restituisce un punto vita.",
+				"title": "Tira",
+				"instruction": "Recupera il pesce quando abborda.",
 				"key": "TIRA" if touch else "R",
 			}
 		Step.MAP:
 			return {
-				"title": "Consulta la mappa della laguna",
-				"instruction": "Apri la mappa: mostra stanze scoperte, altari attivi e passaggi nascosti trovati.",
+				"title": "Mappa",
+				"instruction": "Apri la mappa della laguna.",
 				"key": "MAPPA" if touch else "M",
 			}
 	return {"title": "", "instruction": "", "key": ""}
@@ -282,21 +310,27 @@ func _unlock_tutorial_gate() -> void:
 	var gate := get_tree().get_first_node_in_group("dogana_tutorial_gate")
 	if gate and gate.has_method("unlock"):
 		gate.call("unlock")
+	var cam := get_tree().get_first_node_in_group("camera")
+	if cam and cam.has_method("add_shake"):
+		cam.call("add_shake", 0.38)
+	var level := get_tree().current_scene
+	if level and level.has_method("_show_message"):
+		level.call("_show_message", "IL VARCO È APERTO — prosegui sul pontile")
 
 
 func _show_completion() -> void:
 	if _completion_started:
 		return
 	_completion_started = true
-	_eyebrow.text = "ADDESTRAMENTO COMPLETATO"
-	_title.text = "La Dogana è davanti a te"
-	_instruction.text = "Pesca per curarti, osserva i telegraph nemici e cerca crepe nelle pareti."
-	_key_label.text = "IL VARCO È APERTO"
-	_progress.text = "◆  ◆  ◆  ◆  ◆  ◆  ◆  ◆  ◆"
+	_eyebrow.text = "OK"
+	_title.text = "Varco aperto"
+	_instruction.text = "Puoi lasciare il pontile."
+	_key_label.text = ""
+	_progress.text = ""
 	tutorial_completed.emit()
 	var completion_timer := Timer.new()
 	completion_timer.one_shot = true
-	completion_timer.wait_time = 5.5
+	completion_timer.wait_time = 3.5
 	completion_timer.process_callback = Timer.TIMER_PROCESS_IDLE
 	completion_timer.timeout.connect(_fade_completed_tutorial)
 	add_child(completion_timer)
@@ -310,70 +344,60 @@ func _fade_completed_tutorial() -> void:
 
 
 func _build_panel() -> void:
-	_section_veil = ColorRect.new()
-	_section_veil.name = "SectionDissolve"
-	_section_veil.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_section_veil.color = Color(0.005, 0.024, 0.03, 0.86)
-	_section_veil.modulate.a = 0.0
-	_section_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_section_veil)
+	# Niente velo a tutto schermo: troppo invasivo.
+	_section_veil = null
 
 	_panel = PanelContainer.new()
 	_panel.name = "GuidedTutorial"
-	_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	_panel.offset_left = 24.0
-	_panel.offset_top = 108.0
-	_panel.custom_minimum_size = Vector2(390.0, 0.0)
+	_panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_panel.offset_left = 16.0
+	_panel.offset_bottom = -16.0
+	_panel.offset_top = -96.0
+	_panel.custom_minimum_size = Vector2(240.0, 0.0)
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.006, 0.025, 0.032, 0.985)
-	style.border_color = Color(0.78, 0.66, 0.36, 0.94)
+	style.bg_color = Color(0.01, 0.03, 0.04, 0.72)
+	style.border_color = Color(0.55, 0.5, 0.32, 0.55)
 	style.set_border_width_all(1)
-	style.set_corner_radius_all(7)
-	style.set_content_margin_all(14)
-	style.shadow_color = Color(0, 0, 0, 0.62)
-	style.shadow_size = 10
+	style.set_corner_radius_all(6)
+	style.set_content_margin_all(10)
+	style.shadow_color = Color(0, 0, 0, 0.35)
+	style.shadow_size = 4
 	_panel.add_theme_stylebox_override("panel", style)
+	_panel.modulate.a = 0.82
 	add_child(_panel)
 
 	var content := VBoxContainer.new()
-	content.add_theme_constant_override("separation", 5)
+	content.add_theme_constant_override("separation", 2)
 	_panel.add_child(content)
 	_eyebrow = Label.new()
 	_eyebrow.add_theme_font_override("font", BODY_FONT)
-	_eyebrow.add_theme_font_size_override("font_size", 12)
-	_eyebrow.add_theme_color_override("font_color", Color(0.56, 1.0, 0.88, 1.0))
-	_eyebrow.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
-	_eyebrow.add_theme_constant_override("outline_size", 1)
+	_eyebrow.add_theme_font_size_override("font_size", 11)
+	_eyebrow.add_theme_color_override("font_color", Color(0.55, 0.85, 0.78, 0.85))
 	content.add_child(_eyebrow)
 	_title = Label.new()
 	_title.add_theme_font_override("font", DISPLAY_FONT)
-	_title.add_theme_font_size_override("font_size", 27)
-	_title.add_theme_color_override("font_color", Color(1.0, 0.92, 0.7, 1.0))
-	_title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1.0))
-	_title.add_theme_constant_override("outline_size", 2)
+	_title.add_theme_font_size_override("font_size", 18)
+	_title.add_theme_color_override("font_color", Color(0.95, 0.9, 0.72, 0.95))
 	content.add_child(_title)
 	_instruction = Label.new()
 	_instruction.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_instruction.add_theme_font_override("font", BODY_FONT)
-	_instruction.add_theme_font_size_override("font_size", 14)
-	_instruction.add_theme_color_override("font_color", Color(0.92, 0.96, 0.92, 1.0))
-	_instruction.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
-	_instruction.add_theme_constant_override("outline_size", 1)
+	_instruction.add_theme_font_size_override("font_size", 12)
+	_instruction.add_theme_color_override("font_color", Color(0.86, 0.9, 0.88, 0.9))
 	content.add_child(_instruction)
 	_key_label = Label.new()
-	_key_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_key_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_key_label.add_theme_font_override("font", BODY_FONT)
-	_key_label.add_theme_font_size_override("font_size", 16)
-	_key_label.add_theme_color_override("font_color", Color(0.56, 1.0, 0.86, 1.0))
-	_key_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1.0))
-	_key_label.add_theme_constant_override("outline_size", 2)
+	_key_label.add_theme_font_size_override("font_size", 13)
+	_key_label.add_theme_color_override("font_color", Color(0.5, 0.92, 0.8, 0.95))
 	content.add_child(_key_label)
 	_progress = Label.new()
-	_progress.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_progress.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_progress.add_theme_font_override("font", BODY_FONT)
-	_progress.add_theme_font_size_override("font_size", 12)
-	_progress.add_theme_color_override("font_color", Color(0.9, 0.82, 0.55, 0.9))
+	_progress.add_theme_font_size_override("font_size", 10)
+	_progress.add_theme_color_override("font_color", Color(0.75, 0.7, 0.5, 0.7))
 	content.add_child(_progress)
 
 
@@ -382,9 +406,10 @@ func _apply_responsive_layout() -> void:
 		return
 	var viewport_size := CaligoResponsiveLayout.viewport_size(self)
 	var compact := CaligoResponsiveLayout.is_compact(viewport_size)
-	var margin := clampf(viewport_size.x * 0.025, 12.0, 24.0)
+	var margin := clampf(viewport_size.x * 0.02, 10.0, 18.0)
 	_panel.offset_left = margin
-	_panel.offset_top = clampf(viewport_size.y * 0.12, 58.0, 108.0)
-	_panel.custom_minimum_size.x = clampf(viewport_size.x - margin * 2.0, 280.0, 390.0)
-	_title.add_theme_font_size_override("font_size", 22 if compact else 27)
-	_instruction.add_theme_font_size_override("font_size", 13 if compact else 14)
+	_panel.offset_bottom = -margin
+	_panel.offset_top = - (88.0 if compact else 100.0)
+	_panel.custom_minimum_size.x = clampf(viewport_size.x * 0.28, 200.0, 280.0)
+	_title.add_theme_font_size_override("font_size", 16 if compact else 18)
+	_instruction.add_theme_font_size_override("font_size", 11 if compact else 12)

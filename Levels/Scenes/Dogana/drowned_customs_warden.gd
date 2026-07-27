@@ -4,24 +4,29 @@ signal boss_awakened
 signal boss_defeated
 
 const PARTICLE_BURST := preload("res://Fx/particle_burst.gd")
+const AREA_ATTACK_SCRIPT := preload("res://Enemies/enemy_area_attack.gd")
+const PROJECTILE_SCRIPT := preload("res://Enemies/enemy_projectile.gd")
+const TELEGRAPH_SCRIPT := preload("res://Levels/Scenes/Dogana/boss_telegraph.gd")
 
-@export var max_health := 18
-@export var move_speed := 74.0
-@export var lunge_speed := 310.0
+@export var max_health := 22
+@export var move_speed := 78.0
+@export var lunge_speed := 330.0
 @export var aggro_range := 520.0
-@export var attack_range := 150.0
-@export var attack_cooldown := 2.1
+@export var attack_range := 190.0
+@export var attack_cooldown := 1.55
 @export var attack_damage := 1
+@export var heavy_attack_damage := 2
 @export var gravity := 620.0
 
-enum State { DORMANT, CHASE, WINDUP, LUNGE, RECOVER, DEAD }
+enum State { DORMANT, CHASE, WINDUP, LUNGE, SLAM, WAVE, SWEEP, RECOVER, DEAD }
+enum AttackKind { LUNGE, SLAM, WAVE, SWEEP }
 
 @onready var _sprite: Sprite2D = $Sprite2D
 @onready var _hurtbox: Area2D = $Hurtbox
 @onready var _attack_hitbox: Area2D = $AttackHitbox
 
 var state := State.DORMANT
-var current_health := 18
+var current_health := 22
 var player: Node2D
 var _state_timer := 0.0
 var _attack_timer := 0.0
@@ -31,6 +36,13 @@ var _base_scale := Vector2.ONE
 var _health_layer: CanvasLayer
 var _health_bar: ProgressBar
 var _health_panel: PanelContainer
+var _pending_kind := AttackKind.LUNGE
+var _pending_damage := 1
+var _wave_shots_left := 0
+var _wave_shot_timer := 0.0
+var _slam_armed := false
+var _slam_air_timer := 0.0
+var _telegraph: Node2D
 
 
 func _ready() -> void:
@@ -42,7 +54,9 @@ func _ready() -> void:
 	_attack_hitbox.body_entered.connect(_on_attack_hit_body)
 	_attack_hitbox.monitoring = false
 	_attack_hitbox.monitorable = false
+	_attack_hitbox.collision_mask = 2
 	_build_health_ui()
+	_build_telegraph()
 
 
 func _physics_process(delta: float) -> void:
@@ -61,6 +75,7 @@ func _physics_process(delta: float) -> void:
 
 	var to_player := player.global_position - global_position
 	_sprite.flip_h = to_player.x > 0.0
+	_update_telegraph(to_player)
 
 	match state:
 		State.DORMANT:
@@ -69,19 +84,32 @@ func _physics_process(delta: float) -> void:
 			if absf(to_player.x) <= aggro_range:
 				_awaken()
 		State.CHASE:
-			velocity.x = signf(to_player.x) * move_speed
+			var chase_speed := move_speed * (1.22 if _is_enraged() else 1.0)
+			velocity.x = signf(to_player.x) * chase_speed
 			_sprite.rotation = sin(Time.get_ticks_msec() * 0.009) * 0.018
 			if _attack_timer <= 0.0 and absf(to_player.x) <= attack_range:
-				_begin_windup()
+				_begin_windup(to_player)
 		State.WINDUP:
-			velocity.x = move_toward(velocity.x, 0.0, 1100.0 * delta)
-			var pulse := 1.0 + sin(_state_timer * 38.0) * 0.035
+			velocity.x = move_toward(velocity.x, 0.0, 1200.0 * delta)
+			var pulse := 1.0 + sin(_state_timer * 40.0) * 0.04
 			_sprite.scale = _base_scale * Vector2(1.0 / pulse, pulse)
 			if _state_timer <= 0.0:
-				_begin_lunge(to_player)
+				_commit_attack(to_player)
 		State.LUNGE:
 			if _state_timer <= 0.0:
-				_begin_recovery()
+				_begin_recovery(0.72)
+		State.SLAM:
+			_slam_air_timer = maxf(0.0, _slam_air_timer - delta)
+			if _slam_armed and _slam_air_timer <= 0.0 and (is_on_floor() or _state_timer <= 0.0):
+				_slam_impact()
+		State.WAVE:
+			_update_wave(delta, to_player)
+			velocity.x = move_toward(velocity.x, 0.0, 900.0 * delta)
+			if _wave_shots_left <= 0 and _state_timer <= 0.0:
+				_begin_recovery(0.7)
+		State.SWEEP:
+			if _state_timer <= 0.0:
+				_begin_recovery(0.95)
 		State.RECOVER:
 			velocity.x = move_toward(velocity.x, 0.0, 760.0 * delta)
 			_sprite.rotation = lerpf(_sprite.rotation, 0.0, delta * 8.0)
@@ -92,9 +120,13 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 
+func _is_enraged() -> bool:
+	return current_health <= max_health / 2
+
+
 func _awaken() -> void:
 	state = State.CHASE
-	_attack_timer = 1.35
+	_attack_timer = 1.1
 	if _health_layer:
 		_health_layer.visible = true
 	boss_awakened.emit()
@@ -103,29 +135,174 @@ func _awaken() -> void:
 	tween.tween_property(_sprite, "modulate", Color.WHITE, 0.36)
 
 
-func _begin_windup() -> void:
+func _begin_windup(to_player: Vector2) -> void:
+	_pending_kind = _pick_attack(to_player)
 	state = State.WINDUP
-	_state_timer = 0.62
 	_attack_has_hit = false
-	_sprite.modulate = Color(0.58, 1.0, 0.9, 1.0)
+	match _pending_kind:
+		AttackKind.LUNGE:
+			_state_timer = 0.48
+			_pending_damage = attack_damage
+			_sprite.modulate = Color(0.62, 1.05, 0.92, 1.0)
+		AttackKind.SLAM:
+			_state_timer = 0.72
+			_pending_damage = heavy_attack_damage
+			_sprite.modulate = Color(1.15, 0.55, 0.4, 1.0)
+		AttackKind.WAVE:
+			_state_timer = 0.58
+			_pending_damage = attack_damage
+			_sprite.modulate = Color(0.45, 0.9, 1.15, 1.0)
+		AttackKind.SWEEP:
+			_state_timer = 0.66
+			_pending_damage = heavy_attack_damage
+			_sprite.modulate = Color(0.95, 0.75, 0.35, 1.0)
+
+
+func _pick_attack(to_player: Vector2) -> AttackKind:
+	var dist := absf(to_player.x)
+	var options: Array[AttackKind] = []
+	if dist <= 120.0:
+		options.append(AttackKind.SWEEP)
+		options.append(AttackKind.LUNGE)
+		options.append(AttackKind.SLAM)
+	elif dist <= 220.0:
+		options.append(AttackKind.LUNGE)
+		options.append(AttackKind.SLAM)
+		options.append(AttackKind.WAVE)
+	else:
+		options.append(AttackKind.WAVE)
+		options.append(AttackKind.LUNGE)
+		if _is_enraged():
+			options.append(AttackKind.SLAM)
+	if _is_enraged():
+		options.append(AttackKind.SWEEP)
+		options.append(AttackKind.WAVE)
+	return options[randi() % options.size()]
+
+
+func _commit_attack(to_player: Vector2) -> void:
+	_sprite.modulate = Color.WHITE
+	match _pending_kind:
+		AttackKind.LUNGE:
+			_begin_lunge(to_player)
+		AttackKind.SLAM:
+			_begin_slam(to_player)
+		AttackKind.WAVE:
+			_begin_wave(to_player)
+		AttackKind.SWEEP:
+			_begin_sweep(to_player)
 
 
 func _begin_lunge(to_player: Vector2) -> void:
 	state = State.LUNGE
-	_state_timer = 0.38
-	velocity.x = signf(to_player.x) * lunge_speed
-	velocity.y = -75.0
-	_attack_hitbox.monitorable = true
-	_attack_hitbox.monitoring = true
+	_state_timer = 0.36
+	velocity.x = signf(to_player.x) * lunge_speed * (1.15 if _is_enraged() else 1.0)
+	velocity.y = -70.0
+	_enable_melee_hitbox(1.0)
+
+
+func _begin_slam(to_player: Vector2) -> void:
+	state = State.SLAM
+	_state_timer = 0.85
+	_slam_armed = true
+	# Piccolo delay per non considerare "atterrato" il frame del salto.
+	_slam_air_timer = 0.12
+	velocity.x = signf(to_player.x) * 90.0
+	velocity.y = -320.0
+	_disable_melee_hitbox()
+	_shake_camera(0.18)
+
+
+func _slam_impact() -> void:
+	_slam_armed = false
+	_state_timer = 0.05
+	var radius := 118.0 if _is_enraged() else 96.0
+	var area := AREA_ATTACK_SCRIPT.new() as Area2D
+	area.call("setup", radius, heavy_attack_damage, Color(0.95, 0.48, 0.34, 1.0), 0.06)
+	get_tree().current_scene.add_child(area)
+	area.global_position = global_position + Vector2(0, 10)
+	_shake_camera(0.55)
+	PARTICLE_BURST.spawn(
+		get_tree().current_scene,
+		global_position + Vector2(0, 8),
+		Color(0.28, 0.85, 0.72, 0.9),
+		28,
+		Vector2.UP,
+		55.0,
+		160.0,
+		0.75
+	)
+	_begin_recovery(0.9)
+
+
+func _begin_wave(to_player: Vector2) -> void:
+	state = State.WAVE
+	_wave_shots_left = 5 if _is_enraged() else 3
+	_wave_shot_timer = 0.0
+	_state_timer = 0.12 + float(_wave_shots_left) * 0.16
+	velocity.x = 0.0
+	_disable_melee_hitbox()
+	_fire_wave_shot(to_player)
+	_wave_shots_left -= 1
+
+
+func _update_wave(delta: float, to_player: Vector2) -> void:
+	if _wave_shots_left <= 0:
+		return
+	_wave_shot_timer -= delta
+	if _wave_shot_timer > 0.0:
+		return
+	_wave_shot_timer = 0.16
+	_fire_wave_shot(to_player)
+	_wave_shots_left -= 1
+
+
+func _fire_wave_shot(to_player: Vector2) -> void:
+	var base_dir := to_player.normalized() if to_player.length_squared() > 0.01 else Vector2.RIGHT
+	base_dir.y = clampf(base_dir.y, -0.35, 0.15)
+	base_dir = base_dir.normalized()
+	var offsets := [-0.22, 0.0, 0.22] if _is_enraged() else [-0.14, 0.14]
+	for offset in offsets:
+		var projectile := PROJECTILE_SCRIPT.new() as Area2D
+		var dmg := heavy_attack_damage if absf(offset) < 0.01 and _is_enraged() else attack_damage
+		projectile.call("setup", base_dir.rotated(offset), 155.0 if _is_enraged() else 132.0, dmg, Color(0.35, 0.92, 0.86, 1.0), 6.5, 3.4)
+		get_tree().current_scene.add_child(projectile)
+		projectile.global_position = global_position + Vector2(0, -70) + base_dir * 36.0
+	_shake_camera(0.12)
+
+
+func _begin_sweep(to_player: Vector2) -> void:
+	state = State.SWEEP
+	_state_timer = 0.42
+	velocity.x = signf(to_player.x) * 140.0
+	_enable_melee_hitbox(1.35)
+	_sprite.rotation = signf(to_player.x) * 0.18
+	_shake_camera(0.2)
+
+
+func _begin_recovery(duration: float) -> void:
+	state = State.RECOVER
+	_state_timer = duration * (0.78 if _is_enraged() else 1.0)
+	_attack_timer = attack_cooldown * (0.72 if _is_enraged() else 1.0)
+	_disable_melee_hitbox()
+	_slam_armed = false
+	_wave_shots_left = 0
 	_sprite.modulate = Color.WHITE
 
 
-func _begin_recovery() -> void:
-	state = State.RECOVER
-	_state_timer = 0.92
-	_attack_timer = attack_cooldown
+func _enable_melee_hitbox(scale_x: float) -> void:
+	_attack_has_hit = false
+	_attack_hitbox.monitoring = true
+	_attack_hitbox.monitorable = true
+	_attack_hitbox.scale = Vector2(scale_x, 1.0)
+	var facing := 1.0 if _sprite.flip_h else -1.0
+	_attack_hitbox.position.x = 36.0 * facing
+
+
+func _disable_melee_hitbox() -> void:
 	_attack_hitbox.set_deferred("monitoring", false)
 	_attack_hitbox.set_deferred("monitorable", false)
+	_attack_hitbox.scale = Vector2.ONE
 
 
 func _on_hurtbox_area_entered(area: Area2D) -> void:
@@ -142,7 +319,7 @@ func take_damage(amount: int = 1, source_position: Vector2 = Vector2.ZERO) -> vo
 		return
 	if state == State.DORMANT:
 		_awaken()
-	_invulnerability_timer = 0.16
+	_invulnerability_timer = 0.14
 	current_health = maxi(0, current_health - amount)
 	if _health_bar:
 		_health_bar.value = current_health
@@ -151,16 +328,20 @@ func take_damage(amount: int = 1, source_position: Vector2 = Vector2.ZERO) -> vo
 	var tween := create_tween()
 	tween.tween_property(_sprite, "modulate", Color(1.6, 0.34, 0.28, 1.0), 0.05)
 	tween.tween_property(_sprite, "modulate", Color.WHITE, 0.15)
+	_shake_camera(0.16)
 	if current_health <= 0:
 		_die()
 
 
 func _on_attack_hit_body(body: Node2D) -> void:
-	if state != State.LUNGE or _attack_has_hit or not body.is_in_group("player"):
+	if state != State.LUNGE and state != State.SWEEP:
+		return
+	if _attack_has_hit or not body.is_in_group("player"):
 		return
 	_attack_has_hit = true
 	if body.has_method("take_damage"):
-		body.call_deferred("take_damage", attack_damage, global_position)
+		body.call_deferred("take_damage", _pending_damage, global_position)
+	_shake_camera(0.28 if _pending_damage >= 2 else 0.16)
 
 
 func _die() -> void:
@@ -170,6 +351,8 @@ func _die() -> void:
 	collision_mask = 0
 	_hurtbox.set_deferred("monitoring", false)
 	_attack_hitbox.set_deferred("monitoring", false)
+	if _telegraph:
+		_telegraph.visible = false
 	_spawn_death_motes()
 	boss_defeated.emit()
 	if _health_panel:
@@ -194,9 +377,35 @@ func restore_defeated() -> void:
 	_attack_hitbox.set_deferred("monitoring", false)
 	_attack_hitbox.set_deferred("monitorable", false)
 	_sprite.hide()
+	if _telegraph:
+		_telegraph.visible = false
 	if _health_layer:
 		_health_layer.queue_free()
 	set_physics_process(false)
+
+
+func _shake_camera(intensity: float) -> void:
+	var cam := get_tree().get_first_node_in_group("camera")
+	if cam and cam.has_method("add_shake"):
+		cam.call("add_shake", intensity)
+
+
+func _build_telegraph() -> void:
+	_telegraph = Node2D.new()
+	_telegraph.name = "Telegraph"
+	_telegraph.z_index = 8
+	_telegraph.set_script(TELEGRAPH_SCRIPT)
+	add_child(_telegraph)
+
+
+func _update_telegraph(to_player: Vector2) -> void:
+	if _telegraph == null or not _telegraph.has_method("set_preview"):
+		return
+	if state != State.WINDUP:
+		_telegraph.call("set_preview", -1, Vector2.ZERO, 0.0)
+		return
+	var progress := 1.0 - clampf(_state_timer / 0.72, 0.0, 1.0)
+	_telegraph.call("set_preview", int(_pending_kind), to_player.normalized(), progress)
 
 
 func _spawn_death_motes() -> void:
