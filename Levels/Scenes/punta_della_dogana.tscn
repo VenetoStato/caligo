@@ -128,6 +128,7 @@ visible = false
 [node name="GeneratedPlatformArt" parent="Gameplay" instance=ExtResource("17_platform_art")]
 
 [node name="EldritchFishingProps" parent="Gameplay" instance=ExtResource("15_props")]
+visible = false
 
 [node name="VerticalPalace" parent="Gameplay" instance=ExtResource("21_palace")]
 
@@ -645,6 +646,7 @@ collision_mask = 2
 shape = SubResource("CheckpointShape")
 
 [node name="Beacon" type="Polygon2D" parent="Gameplay/Checkpoints/DoganaWedge"]
+visible = false
 polygon = PackedVector2Array(-8, 40, 0, -42, 8, 40)
 color = Color(0.38, 0.55, 0.58, 0.42)
 
@@ -657,6 +659,7 @@ collision_mask = 2
 shape = SubResource("CheckpointShape")
 
 [node name="Beacon" type="Polygon2D" parent="Gameplay/Checkpoints/TowerApproach"]
+visible = false
 polygon = PackedVector2Array(-8, 40, 0, -42, 8, 40)
 color = Color(0.38, 0.55, 0.58, 0.42)
 
