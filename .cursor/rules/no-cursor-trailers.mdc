@@ -1,0 +1,3 @@
+# No Cursor git trailers
+- Never add `Co-authored-by: Cursor` or `Made-with: Cursor` to commit messages.
+- If a commit message would include those trailers, strip them before committing.
