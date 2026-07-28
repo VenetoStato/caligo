@@ -994,6 +994,37 @@ projectile_count = 5
 projectile_speed = 108.0
 spiral_spin = 2.1
 
+[node name="SaltPoolBloater" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(3100, 360)
+scale = Vector2(0.056, 0.056)
+move_speed = 42.0
+max_health = 9
+aggro_range = 220.0
+wake_delay = 2.0
+attack_damage = 1
+attack_pattern = 8
+variant_texture = ExtResource("24_bloater")
+variant_scale_multiplier = 0.76
+special_attack_range = 270.0
+special_attack_cooldown = 3.6
+special_windup = 0.7
+area_attack_radius = 86.0
+
+[node name="HarpoonGambero" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(4450, 180)
+scale = Vector2(0.038, 0.038)
+move_speed = 68.0
+max_health = 8
+aggro_range = 250.0
+wake_delay = 1.9
+attack_damage = 1
+attack_pattern = 9
+special_attack_range = 320.0
+special_attack_cooldown = 3.1
+special_windup = 0.55
+projectile_speed = 160.0
+heavy_melee_chance = 0.35
+
 [node name="GamberoArchiveA" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
 position = Vector2(1580, 795)
 scale = Vector2(0.04, 0.04)
@@ -1046,19 +1077,19 @@ deadzone_y = 46.0
 use_room_limits = true
 room_limits = Rect2(-520, -1200, 6600, 2120)
 postfx_colorrect_path = NodePath("PostFX/Overlay")
-vignette_strength = 0.78
-vignette_softness = 0.48
-vignette_radius = 0.98
-grain_amount = 0.085
-grain_size = 1.45
-desaturate = 0.08
-contrast = 1.07
-saturation = 0.9
-grade_strength = 0.32
-chroma = 0.7
-bloom = 0.26
-bloom_threshold = 0.58
-haze = 0.1
+vignette_strength = 0.72
+vignette_softness = 0.52
+vignette_radius = 1.02
+grain_amount = 0.07
+grain_size = 1.55
+desaturate = 0.06
+contrast = 1.08
+saturation = 0.94
+grade_strength = 0.34
+chroma = 0.85
+bloom = 0.32
+bloom_threshold = 0.52
+haze = 0.12
 
 [node name="PostFX" type="CanvasLayer" parent="Player/Camera2D"]
 layer = 20

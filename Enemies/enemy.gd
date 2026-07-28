@@ -2,6 +2,7 @@ extends CharacterBody2D
 
 const PROJECTILE_SCRIPT := preload("res://Enemies/enemy_projectile.gd")
 const AREA_ATTACK_SCRIPT := preload("res://Enemies/enemy_area_attack.gd")
+const HARPOON_SCRIPT := preload("res://Enemies/enemy_harpoon.gd")
 const PARTICLE_BURST := preload("res://Fx/particle_burst.gd")
 const MAX_TRANSIENT_ATTACKS := 64
 
@@ -39,6 +40,8 @@ enum AttackPattern {
 	CHARGE_BURST,
 	MARKED_STRIKE,
 	SPIRAL_SHOT,
+	SALT_POOL,
+	HARPOON_LINE,
 }
 @export var attack_pattern: AttackPattern = AttackPattern.MELEE
 @export var variant_texture: Texture2D
@@ -291,7 +294,11 @@ func _update_special_attack(delta: float, to_player: Vector2) -> void:
 	_spiral_phase += delta
 	if _special_windup_remaining > 0.0:
 		_special_windup_remaining -= delta
-		if attack_pattern == AttackPattern.MARKED_STRIKE and player and is_instance_valid(player):
+		if (
+			(attack_pattern == AttackPattern.MARKED_STRIKE or attack_pattern == AttackPattern.SALT_POOL)
+			and player
+			and is_instance_valid(player)
+		):
 			_mark_position = player.global_position + Vector2(0, 10)
 		queue_redraw()
 		if _special_windup_remaining <= 0.0:
@@ -309,15 +316,21 @@ func _update_special_attack(delta: float, to_player: Vector2) -> void:
 		can_start = distance <= special_attack_range and distance >= 60.0
 	elif attack_pattern == AttackPattern.SPIRAL_SHOT:
 		can_start = distance <= special_attack_range
+	elif attack_pattern == AttackPattern.SALT_POOL:
+		can_start = distance <= special_attack_range and distance >= 40.0
+	elif attack_pattern == AttackPattern.HARPOON_LINE:
+		can_start = distance <= special_attack_range and distance >= 70.0
 	if can_start and _special_timer <= 0.0:
 		_special_target_direction = to_player.normalized() if distance > 0.01 else Vector2.RIGHT
-		if attack_pattern == AttackPattern.MARKED_STRIKE:
+		if attack_pattern == AttackPattern.MARKED_STRIKE or attack_pattern == AttackPattern.SALT_POOL:
 			_mark_position = player.global_position + Vector2(0, 10)
 		var windup_scale := 1.0
 		if attack_pattern == AttackPattern.HEAVY_LEAP:
 			windup_scale = 0.75
 		elif attack_pattern == AttackPattern.CHARGE_BURST:
 			windup_scale = 0.85
+		elif attack_pattern == AttackPattern.HARPOON_LINE:
+			windup_scale = 0.7
 		_special_windup_remaining = special_windup * windup_scale
 		_special_timer = special_attack_cooldown
 		velocity.x *= 0.15
@@ -397,6 +410,30 @@ func _fire_special_attack() -> void:
 					1
 				)
 		_shake_camera(0.16)
+		return
+	if attack_pattern == AttackPattern.SALT_POOL:
+		var pool := AREA_ATTACK_SCRIPT.new() as Area2D
+		pool.call("setup", area_attack_radius * 0.9, attack_damage, Color(0.75, 0.85, 0.55, 1.0), 0.35, 1.35)
+		get_tree().current_scene.add_child(pool)
+		pool.global_position = _mark_position
+		_shake_camera(0.18)
+		return
+	if attack_pattern == AttackPattern.HARPOON_LINE:
+		if get_tree().get_nodes_in_group("enemy_transient_attack").size() >= MAX_TRANSIENT_ATTACKS:
+			return
+		var harpoon := HARPOON_SCRIPT.new() as Area2D
+		harpoon.call(
+			"setup",
+			_special_target_direction,
+			projectile_speed * 1.55,
+			attack_damage,
+			global_position + Vector2(0, -20),
+			Color(0.95, 0.78, 0.35, 1.0),
+			460.0
+		)
+		get_tree().current_scene.add_child(harpoon)
+		harpoon.global_position = global_position + _special_target_direction * 28.0 + Vector2(0, -20)
+		_shake_camera(0.2)
 
 
 func _update_leap_slam(delta: float) -> void:
@@ -463,6 +500,10 @@ func _draw() -> void:
 		color = Color(0.95, 0.5, 0.25, 0.35 + progress * 0.5)
 	elif attack_pattern == AttackPattern.SPIRAL_SHOT:
 		color = Color(0.45, 0.7, 1.0, 0.32 + progress * 0.55)
+	elif attack_pattern == AttackPattern.SALT_POOL:
+		color = Color(0.75, 0.85, 0.45, 0.35 + progress * 0.5)
+	elif attack_pattern == AttackPattern.HARPOON_LINE:
+		color = Color(0.95, 0.75, 0.3, 0.35 + progress * 0.55)
 	var radius := lerpf(18.0, 34.0, progress)
 	if attack_pattern == AttackPattern.TIDE_AREA:
 		radius = lerpf(area_attack_radius * 0.35, area_attack_radius, progress)
@@ -473,16 +514,20 @@ func _draw() -> void:
 	if attack_pattern == AttackPattern.HEAVY_LEAP or attack_pattern == AttackPattern.CHARGE_BURST:
 		var leap_dir := _special_target_direction if _special_target_direction.length_squared() > 0.01 else Vector2.RIGHT
 		draw_line(Vector2.ZERO, leap_dir * lerpf(28.0, 90.0, progress), color, 2.4, true)
-	if attack_pattern == AttackPattern.MARKED_STRIKE:
+	if attack_pattern == AttackPattern.MARKED_STRIKE or attack_pattern == AttackPattern.SALT_POOL:
 		var mark_local := to_local(_mark_position)
 		var mark_r := lerpf(18.0, area_attack_radius * 0.85, progress)
-		draw_arc(mark_local, mark_r, 0.0, TAU, 36, Color(0.95, 0.5, 0.25, 0.25 + progress * 0.45), 2.0, true)
-		draw_circle(mark_local, 4.0 + progress * 3.0, Color(0.95, 0.55, 0.3, 0.55))
+		draw_arc(mark_local, mark_r, 0.0, TAU, 36, Color(color.r, color.g, color.b, 0.25 + progress * 0.45), 2.0, true)
+		draw_circle(mark_local, 4.0 + progress * 3.0, Color(color.r, color.g, color.b, 0.55))
+	if attack_pattern == AttackPattern.HARPOON_LINE:
+		var tip := _special_target_direction * lerpf(40.0, 160.0, progress)
+		draw_line(Vector2(0, -16), tip + Vector2(0, -16), color, 2.4, true)
+		draw_circle(tip + Vector2(0, -16), 5.0 + progress * 3.0, color)
 	if attack_pattern == AttackPattern.SPIRAL_SHOT:
 		for arm in 3:
 			var ang := _spiral_phase * 1.4 + TAU * float(arm) / 3.0
-			var tip := Vector2.from_angle(ang) * lerpf(24.0, 70.0, progress)
-			draw_line(Vector2.ZERO, tip, color, 1.8, true)
+			var tip2 := Vector2.from_angle(ang) * lerpf(24.0, 70.0, progress)
+			draw_line(Vector2.ZERO, tip2, color, 1.8, true)
 
 
 func _update_variant_animation(delta: float) -> void:

@@ -77,27 +77,38 @@ void fragment() {
 	float b = sample_screen(SCREEN_UV - dir * ca).b;
 	vec3 col = vec3(r, g, b) * u_tint.rgb;
 
-	// Soft bloom a basso costo (campioni intorno alle luci).
+	// Soft bloom multi-tap più pieno.
 	if (u_bloom > 0.001) {
-		vec3 blur = sample_screen(SCREEN_UV);
-		blur += sample_screen(SCREEN_UV + vec2(px.x * 2.5, 0.0));
-		blur += sample_screen(SCREEN_UV - vec2(px.x * 2.5, 0.0));
-		blur += sample_screen(SCREEN_UV + vec2(0.0, px.y * 2.5));
-		blur += sample_screen(SCREEN_UV - vec2(0.0, px.y * 2.5));
-		blur += sample_screen(SCREEN_UV + vec2(px.x * 4.0, px.y * 3.0));
-		blur += sample_screen(SCREEN_UV - vec2(px.x * 4.0, px.y * 3.0));
-		blur *= 0.142857;
+		vec3 blur = vec3(0.0);
+		blur += sample_screen(SCREEN_UV) * 0.18;
+		blur += sample_screen(SCREEN_UV + vec2(px.x * 2.0, 0.0)) * 0.12;
+		blur += sample_screen(SCREEN_UV - vec2(px.x * 2.0, 0.0)) * 0.12;
+		blur += sample_screen(SCREEN_UV + vec2(0.0, px.y * 2.0)) * 0.12;
+		blur += sample_screen(SCREEN_UV - vec2(0.0, px.y * 2.0)) * 0.12;
+		blur += sample_screen(SCREEN_UV + vec2(px.x * 4.5, px.y * 2.5)) * 0.09;
+		blur += sample_screen(SCREEN_UV - vec2(px.x * 4.5, px.y * 2.5)) * 0.09;
+		blur += sample_screen(SCREEN_UV + vec2(px.x * 2.5, -px.y * 4.5)) * 0.08;
+		blur += sample_screen(SCREEN_UV - vec2(px.x * 2.5, -px.y * 4.5)) * 0.08;
 		float bloom_luma = dot(blur, vec3(0.299, 0.587, 0.114));
-		float bloom_mask = smoothstep(u_bloom_threshold, u_bloom_threshold + 0.25, bloom_luma);
-		col = mix(col, max(col, blur * 1.15), bloom_mask * u_bloom);
+		float bloom_mask = smoothstep(u_bloom_threshold, u_bloom_threshold + 0.28, bloom_luma);
+		col = mix(col, max(col, blur * 1.25), bloom_mask * u_bloom);
 	}
 
 	float luma = dot(col, vec3(0.299, 0.587, 0.114));
 	col = mix(col, col + vec3(u_shadow_lift), (1.0 - luma));
 
 	// Color grade: ombre teal / highlights caldi (laguna / pietra).
-	vec3 graded = mix(u_shadow_tint.rgb * col, u_highlight_tint.rgb * col, luma);
+	vec3 graded = mix(u_shadow_tint.rgb * col, u_highlight_tint.rgb * col, smoothstep(0.15, 0.85, luma));
 	col = mix(col, graded, u_grade_strength);
+
+	// Micro-sharpen sui mezzi toni (legge meglio sprite/animazioni).
+	vec3 sharp = col * 2.0 - (
+		sample_screen(SCREEN_UV + vec2(px.x, 0.0)) +
+		sample_screen(SCREEN_UV - vec2(px.x, 0.0)) +
+		sample_screen(SCREEN_UV + vec2(0.0, px.y)) +
+		sample_screen(SCREEN_UV - vec2(0.0, px.y))
+	) * 0.25;
+	col = mix(col, sharp, 0.12 * (1.0 - abs(luma - 0.5) * 1.6));
 
 	// Contrasto + saturazione.
 	col = (col - vec3(0.5)) * u_contrast + vec3(0.5);
@@ -106,8 +117,8 @@ void fragment() {
 	col = mix(col, vec3(luma), u_desaturate);
 
 	// Haze atmosferica ai bordi / basso schermo.
-	float haze_mask = smoothstep(0.35, 1.05, edge) * 0.65 + smoothstep(0.55, 1.0, SCREEN_UV.y) * 0.45;
-	col = mix(col, mix(col, u_haze_color.rgb, 0.35), haze_mask * u_haze);
+	float haze_mask = smoothstep(0.28, 1.05, edge) * 0.7 + smoothstep(0.5, 1.0, SCREEN_UV.y) * 0.5;
+	col = mix(col, mix(col, u_haze_color.rgb, 0.4), haze_mask * u_haze);
 
 	// Vignette cinematografica.
 	vec2 p = SCREEN_UV - u_center_uv;

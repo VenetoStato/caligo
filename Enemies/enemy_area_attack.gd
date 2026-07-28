@@ -12,11 +12,12 @@ var _fired := false
 var _damaged: Array[Node2D] = []
 
 
-func setup(attack_radius: float, attack_damage: int, attack_tint: Color, attack_windup := 0.68) -> void:
+func setup(attack_radius: float, attack_damage: int, attack_tint: Color, attack_windup := 0.68, attack_active := 0.16) -> void:
 	radius = attack_radius
 	damage = attack_damage
 	tint = attack_tint
 	windup = attack_windup
+	active_time = attack_active
 
 
 func _ready() -> void:
@@ -49,6 +50,10 @@ func _physics_process(delta: float) -> void:
 			135.0,
 			0.7
 		)
+		call_deferred("_damage_overlaps")
+	elif _fired and active_time > 0.35 and fmod(_elapsed, 0.35) < delta:
+		# Pozze persistenti: tick ripetuti.
+		_damaged.clear()
 		call_deferred("_damage_overlaps")
 	if _fired and _elapsed >= windup + active_time:
 		queue_free()

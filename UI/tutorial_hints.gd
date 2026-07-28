@@ -152,6 +152,8 @@ func _on_grace_activated(_site_id: String) -> void:
 
 
 func _on_training_cache_broken() -> void:
+	# Anche se il tutorial non è armato / non è ancora ATTACK: memorizza.
+	_observed[Step.ATTACK] = true
 	_observe_step(Step.ATTACK)
 
 
@@ -160,12 +162,12 @@ func notify_altar_used() -> void:
 
 
 func _observe_step(step: Step) -> void:
+	# Latch sempre: azioni fatte in anticipo non si perdono.
+	_observed[step] = true
 	if not _armed:
 		return
-	# Solo lo step corrente avanza: niente salti in avanti.
 	if step != _current_step:
 		return
-	_observed[step] = true
 	_mark_completed(step)
 
 
@@ -184,11 +186,29 @@ func _advance_to_next_step() -> void:
 	for step in STEP_ORDER:
 		if not bool(_completed.get(step, false)):
 			_current_step = step
+			# Se lo step era già stato fatto in anticipo (es. cassa rotta prima), completa subito.
+			if bool(_observed.get(step, false)):
+				_completed[step] = true
+				continue
+			if step == Step.ATTACK and _is_training_cache_already_broken():
+				_observed[step] = true
+				_completed[step] = true
+				continue
 			_apply_step_copy(step)
 			return
 	_current_step = Step.COMPLETE
 	_unlock_tutorial_gate()
 	_show_completion()
+
+
+func _is_training_cache_already_broken() -> bool:
+	var level := get_tree().current_scene
+	if level == null:
+		return bool(_observed.get(Step.ATTACK, false))
+	var cache := level.get_node_or_null("Gameplay/Breakables/ArrivalCache")
+	if cache == null:
+		return true
+	return bool(cache.get("_broken"))
 
 
 func _refresh_step() -> void:

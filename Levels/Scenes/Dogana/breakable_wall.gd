@@ -39,8 +39,11 @@ func _process(_delta: float) -> void:
 func _draw() -> void:
 	if _broken:
 		return
+	# Alone soft, non un rettangolo pieno.
 	var pulse := 0.55 + sin(Time.get_ticks_msec() * 0.004) * 0.2
-	draw_rect(Rect2(-36, -98, 72, 196), Color(0.2, 0.85, 0.75, 0.08 + pulse * 0.06), false, 2.0)
+	draw_arc(Vector2.ZERO, 42.0 + pulse * 4.0, 0.0, TAU, 36, Color(0.2, 0.85, 0.75, 0.1 + pulse * 0.08), 2.0, true)
+	draw_line(Vector2(-20, -70), Vector2(20, -70), Color(0.25, 0.8, 0.7, 0.25 + pulse * 0.2), 2.0, true)
+	draw_line(Vector2(-24, 70), Vector2(24, 70), Color(0.2, 0.7, 0.65, 0.2), 2.0, true)
 
 
 func _on_hurtbox_entered(area: Area2D) -> void:
