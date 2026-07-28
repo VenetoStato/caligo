@@ -941,6 +941,59 @@ special_attack_cooldown = 3.6
 projectile_count = 12
 projectile_speed = 118.0
 
+[node name="SaltCrabCharger" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(3420, 420)
+scale = Vector2(0.042, 0.042)
+move_speed = 72.0
+max_health = 8
+aggro_range = 200.0
+wake_delay = 1.8
+attack_damage = 1
+attack_pattern = 5
+variant_texture = ExtResource("24_bloater")
+variant_scale_multiplier = 0.7
+special_attack_range = 250.0
+special_attack_cooldown = 2.9
+special_windup = 0.55
+heavy_melee_damage = 2
+charge_speed = 360.0
+charge_duration = 0.45
+
+[node name="TideMarkerWedge" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(2680, 360)
+scale = Vector2(0.055, 0.055)
+move_speed = 44.0
+max_health = 9
+aggro_range = 230.0
+wake_delay = 2.1
+attack_damage = 2
+attack_pattern = 6
+variant_texture = ExtResource("24_bloater")
+variant_scale_multiplier = 0.75
+special_attack_range = 280.0
+special_attack_cooldown = 3.4
+special_windup = 0.85
+area_attack_radius = 78.0
+
+[node name="SpiralOracleCanal" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(3780, 80)
+scale = Vector2(0.05, 0.05)
+move_speed = 54.0
+max_health = 8
+aggro_range = 260.0
+wake_delay = 2.3
+attack_damage = 1
+attack_pattern = 7
+variant_texture = ExtResource("25_oracle")
+variant_scale_multiplier = 0.7
+hovering = true
+special_attack_range = 300.0
+special_attack_cooldown = 3.8
+special_windup = 0.72
+projectile_count = 5
+projectile_speed = 108.0
+spiral_spin = 2.1
+
 [node name="GamberoArchiveA" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
 position = Vector2(1580, 795)
 scale = Vector2(0.04, 0.04)

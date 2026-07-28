@@ -8,6 +8,8 @@ var damage := 1
 var lifetime := 3.0
 var radius := 6.0
 var tint := Color(0.26, 0.94, 0.8, 1.0)
+var angular_velocity := 0.0
+var bounces_left := 0
 var _trail: Array[Vector2] = []
 var _hit := false
 
@@ -18,7 +20,9 @@ func setup(
 	projectile_damage: int,
 	projectile_tint: Color,
 	projectile_radius := 6.0,
-	projectile_lifetime := 3.0
+	projectile_lifetime := 3.0,
+	projectile_spin := 0.0,
+	projectile_bounces := 0
 ) -> void:
 	direction = travel_direction.normalized()
 	speed = projectile_speed
@@ -26,6 +30,8 @@ func setup(
 	tint = projectile_tint
 	radius = projectile_radius
 	lifetime = projectile_lifetime
+	angular_velocity = projectile_spin
+	bounces_left = projectile_bounces
 
 
 func _ready() -> void:
@@ -48,11 +54,21 @@ func _physics_process(delta: float) -> void:
 	if lifetime <= 0.0:
 		queue_free()
 		return
+	if absf(angular_velocity) > 0.001:
+		direction = direction.rotated(angular_velocity * delta)
 	var next_position := global_position + direction * speed * delta
 	var query := PhysicsRayQueryParameters2D.create(global_position, next_position, 1)
 	query.exclude = [get_rid()]
 	var terrain_hit := get_world_2d().direct_space_state.intersect_ray(query)
 	if not terrain_hit.is_empty():
+		if bounces_left > 0:
+			bounces_left -= 1
+			var normal: Vector2 = terrain_hit.normal
+			direction = direction.bounce(normal).normalized()
+			global_position = (terrain_hit.position as Vector2) + normal * (radius + 1.0)
+			lifetime = maxf(lifetime, 0.8)
+			_spawn_impact(terrain_hit.position as Vector2, normal)
+			return
 		_spawn_impact(terrain_hit.position as Vector2, -direction)
 		queue_free()
 		return

@@ -8,25 +8,27 @@ const AREA_ATTACK_SCRIPT := preload("res://Enemies/enemy_area_attack.gd")
 const PROJECTILE_SCRIPT := preload("res://Enemies/enemy_projectile.gd")
 const TELEGRAPH_SCRIPT := preload("res://Levels/Scenes/Dogana/boss_telegraph.gd")
 
-@export var max_health := 22
+const MAX_BOSS_TRANSIENTS := 72
+
+@export var max_health := 28
 @export var move_speed := 78.0
 @export var lunge_speed := 330.0
 @export var aggro_range := 520.0
-@export var attack_range := 190.0
-@export var attack_cooldown := 1.55
+@export var attack_range := 220.0
+@export var attack_cooldown := 1.35
 @export var attack_damage := 1
 @export var heavy_attack_damage := 2
 @export var gravity := 620.0
 
-enum State { DORMANT, CHASE, WINDUP, LUNGE, SLAM, WAVE, SWEEP, RECOVER, DEAD }
-enum AttackKind { LUNGE, SLAM, WAVE, SWEEP }
+enum State { DORMANT, CHASE, WINDUP, LUNGE, SLAM, WAVE, SWEEP, SPIRAL, RING, STREAM, CROSS, RECOVER, DEAD }
+enum AttackKind { LUNGE, SLAM, WAVE, SWEEP, SPIRAL, RING, STREAM, CROSS }
 
 @onready var _sprite: Sprite2D = $Sprite2D
 @onready var _hurtbox: Area2D = $Hurtbox
 @onready var _attack_hitbox: Area2D = $AttackHitbox
 
 var state := State.DORMANT
-var current_health := 22
+var current_health := 28
 var player: Node2D
 var _state_timer := 0.0
 var _attack_timer := 0.0
@@ -43,6 +45,15 @@ var _wave_shot_timer := 0.0
 var _slam_armed := false
 var _slam_air_timer := 0.0
 var _telegraph: Node2D
+var _pattern_phase := 0.0
+var _stream_shots_left := 0
+var _stream_timer := 0.0
+var _ring_bursts_left := 0
+var _ring_timer := 0.0
+var _spiral_shots_left := 0
+var _spiral_timer := 0.0
+var _cross_waves_left := 0
+var _cross_timer := 0.0
 
 
 func _ready() -> void:
@@ -107,6 +118,26 @@ func _physics_process(delta: float) -> void:
 			velocity.x = move_toward(velocity.x, 0.0, 900.0 * delta)
 			if _wave_shots_left <= 0 and _state_timer <= 0.0:
 				_begin_recovery(0.7)
+		State.SPIRAL:
+			_update_spiral(delta)
+			velocity.x = move_toward(velocity.x, 0.0, 900.0 * delta)
+			if _spiral_shots_left <= 0 and _state_timer <= 0.0:
+				_begin_recovery(0.65)
+		State.RING:
+			_update_ring(delta)
+			velocity.x = move_toward(velocity.x, 0.0, 900.0 * delta)
+			if _ring_bursts_left <= 0 and _state_timer <= 0.0:
+				_begin_recovery(0.7)
+		State.STREAM:
+			_update_stream(delta, to_player)
+			velocity.x = move_toward(velocity.x, 0.0, 700.0 * delta)
+			if _stream_shots_left <= 0 and _state_timer <= 0.0:
+				_begin_recovery(0.55)
+		State.CROSS:
+			_update_cross(delta)
+			velocity.x = move_toward(velocity.x, 0.0, 900.0 * delta)
+			if _cross_waves_left <= 0 and _state_timer <= 0.0:
+				_begin_recovery(0.68)
 		State.SWEEP:
 			if _state_timer <= 0.0:
 				_begin_recovery(0.95)
@@ -122,6 +153,10 @@ func _physics_process(delta: float) -> void:
 
 func _is_enraged() -> bool:
 	return current_health <= max_health / 2
+
+
+func _is_desperate() -> bool:
+	return current_health <= maxi(1, max_health / 3)
 
 
 func _awaken() -> void:
@@ -156,6 +191,22 @@ func _begin_windup(to_player: Vector2) -> void:
 			_state_timer = 0.66
 			_pending_damage = heavy_attack_damage
 			_sprite.modulate = Color(0.95, 0.75, 0.35, 1.0)
+		AttackKind.SPIRAL:
+			_state_timer = 0.7
+			_pending_damage = attack_damage
+			_sprite.modulate = Color(0.55, 0.75, 1.2, 1.0)
+		AttackKind.RING:
+			_state_timer = 0.62
+			_pending_damage = attack_damage
+			_sprite.modulate = Color(0.35, 1.05, 0.9, 1.0)
+		AttackKind.STREAM:
+			_state_timer = 0.52
+			_pending_damage = attack_damage
+			_sprite.modulate = Color(0.4, 1.1, 0.95, 1.0)
+		AttackKind.CROSS:
+			_state_timer = 0.68
+			_pending_damage = heavy_attack_damage
+			_sprite.modulate = Color(1.05, 0.72, 0.35, 1.0)
 
 
 func _pick_attack(to_player: Vector2) -> AttackKind:
@@ -165,18 +216,28 @@ func _pick_attack(to_player: Vector2) -> AttackKind:
 		options.append(AttackKind.SWEEP)
 		options.append(AttackKind.LUNGE)
 		options.append(AttackKind.SLAM)
-	elif dist <= 220.0:
+		options.append(AttackKind.RING)
+	elif dist <= 240.0:
 		options.append(AttackKind.LUNGE)
 		options.append(AttackKind.SLAM)
 		options.append(AttackKind.WAVE)
+		options.append(AttackKind.STREAM)
+		options.append(AttackKind.CROSS)
 	else:
 		options.append(AttackKind.WAVE)
-		options.append(AttackKind.LUNGE)
+		options.append(AttackKind.SPIRAL)
+		options.append(AttackKind.STREAM)
+		options.append(AttackKind.CROSS)
 		if _is_enraged():
-			options.append(AttackKind.SLAM)
+			options.append(AttackKind.RING)
 	if _is_enraged():
-		options.append(AttackKind.SWEEP)
-		options.append(AttackKind.WAVE)
+		options.append(AttackKind.SPIRAL)
+		options.append(AttackKind.STREAM)
+		options.append(AttackKind.RING)
+	if _is_desperate():
+		options.append(AttackKind.SPIRAL)
+		options.append(AttackKind.CROSS)
+		options.append(AttackKind.STREAM)
 	return options[randi() % options.size()]
 
 
@@ -191,6 +252,14 @@ func _commit_attack(to_player: Vector2) -> void:
 			_begin_wave(to_player)
 		AttackKind.SWEEP:
 			_begin_sweep(to_player)
+		AttackKind.SPIRAL:
+			_begin_spiral()
+		AttackKind.RING:
+			_begin_ring()
+		AttackKind.STREAM:
+			_begin_stream(to_player)
+		AttackKind.CROSS:
+			_begin_cross()
 
 
 func _begin_lunge(to_player: Vector2) -> void:
@@ -263,12 +332,200 @@ func _fire_wave_shot(to_player: Vector2) -> void:
 	base_dir = base_dir.normalized()
 	var offsets := [-0.22, 0.0, 0.22] if _is_enraged() else [-0.14, 0.14]
 	for offset in offsets:
-		var projectile := PROJECTILE_SCRIPT.new() as Area2D
 		var dmg := heavy_attack_damage if absf(offset) < 0.01 and _is_enraged() else attack_damage
-		projectile.call("setup", base_dir.rotated(offset), 155.0 if _is_enraged() else 132.0, dmg, Color(0.35, 0.92, 0.86, 1.0), 6.5, 3.4)
-		get_tree().current_scene.add_child(projectile)
-		projectile.global_position = global_position + Vector2(0, -70) + base_dir * 36.0
+		_spawn_boss_projectile(
+			base_dir.rotated(offset),
+			155.0 if _is_enraged() else 132.0,
+			dmg,
+			Color(0.35, 0.92, 0.86, 1.0),
+			6.5,
+			3.4
+		)
 	_shake_camera(0.12)
+
+
+func _begin_spiral() -> void:
+	state = State.SPIRAL
+	_spiral_shots_left = 18 if _is_desperate() else (14 if _is_enraged() else 10)
+	_spiral_timer = 0.0
+	_pattern_phase = randf() * TAU
+	_state_timer = 0.1 + float(_spiral_shots_left) * 0.07
+	_disable_melee_hitbox()
+	_fire_spiral_bead()
+	_spiral_shots_left -= 1
+
+
+func _update_spiral(delta: float) -> void:
+	if _spiral_shots_left <= 0:
+		return
+	_spiral_timer -= delta
+	if _spiral_timer > 0.0:
+		return
+	_spiral_timer = 0.065 if _is_enraged() else 0.08
+	_fire_spiral_bead()
+	_spiral_shots_left -= 1
+
+
+func _fire_spiral_bead() -> void:
+	_pattern_phase += 0.55 if _is_enraged() else 0.42
+	var arms := 3 if _is_desperate() else 2
+	for arm in arms:
+		var ang := _pattern_phase + TAU * float(arm) / float(arms)
+		var dir := Vector2.from_angle(ang)
+		_spawn_boss_projectile(
+			dir,
+			118.0 if _is_enraged() else 100.0,
+			attack_damage,
+			Color(0.5, 0.72, 1.0, 1.0) if arm % 2 == 0 else Color(0.3, 0.95, 0.85, 1.0),
+			5.2,
+			3.6,
+			1.4 if arm % 2 == 0 else -1.4,
+			1
+		)
+	_shake_camera(0.08)
+
+
+func _begin_ring() -> void:
+	state = State.RING
+	_ring_bursts_left = 4 if _is_desperate() else (3 if _is_enraged() else 2)
+	_ring_timer = 0.0
+	_state_timer = 0.15 + float(_ring_bursts_left) * 0.28
+	_disable_melee_hitbox()
+	_fire_ring_burst()
+	_ring_bursts_left -= 1
+
+
+func _update_ring(delta: float) -> void:
+	if _ring_bursts_left <= 0:
+		return
+	_ring_timer -= delta
+	if _ring_timer > 0.0:
+		return
+	_ring_timer = 0.26
+	_fire_ring_burst()
+	_ring_bursts_left -= 1
+
+
+func _fire_ring_burst() -> void:
+	var count := 16 if _is_desperate() else (14 if _is_enraged() else 12)
+	var phase := _pattern_phase
+	_pattern_phase += 0.18
+	for index in count:
+		var dir := Vector2.from_angle(phase + TAU * float(index) / float(count))
+		var speed := 95.0 + float(index % 3) * 12.0
+		_spawn_boss_projectile(
+			dir,
+			speed * (1.15 if _is_enraged() else 1.0),
+			attack_damage,
+			Color(0.3, 0.95, 0.82, 1.0),
+			5.0,
+			3.2,
+			0.0,
+			1 if index % 4 == 0 else 0
+		)
+	_shake_camera(0.16)
+
+
+func _begin_stream(to_player: Vector2) -> void:
+	state = State.STREAM
+	_stream_shots_left = 16 if _is_desperate() else (12 if _is_enraged() else 8)
+	_stream_timer = 0.0
+	_state_timer = 0.08 + float(_stream_shots_left) * 0.07
+	_disable_melee_hitbox()
+	_fire_stream_shot(to_player)
+	_stream_shots_left -= 1
+
+
+func _update_stream(delta: float, to_player: Vector2) -> void:
+	if _stream_shots_left <= 0:
+		return
+	_stream_timer -= delta
+	if _stream_timer > 0.0:
+		return
+	_stream_timer = 0.055 if _is_desperate() else 0.07
+	_fire_stream_shot(to_player)
+	_stream_shots_left -= 1
+
+
+func _fire_stream_shot(to_player: Vector2) -> void:
+	var base_dir := to_player.normalized() if to_player.length_squared() > 0.01 else Vector2.RIGHT
+	base_dir.y = clampf(base_dir.y, -0.45, 0.2)
+	base_dir = base_dir.normalized()
+	var wobble := sin(Time.get_ticks_msec() * 0.02) * 0.12
+	_spawn_boss_projectile(
+		base_dir.rotated(wobble),
+		168.0 if _is_enraged() else 148.0,
+		attack_damage,
+		Color(0.4, 1.0, 0.9, 1.0),
+		5.4,
+		2.8
+	)
+	if _is_enraged() and _stream_shots_left % 3 == 0:
+		_spawn_boss_projectile(
+			base_dir.rotated(wobble + 0.22),
+			150.0,
+			attack_damage,
+			Color(0.55, 0.9, 1.0, 1.0),
+			4.8,
+			2.6
+		)
+	_shake_camera(0.06)
+
+
+func _begin_cross() -> void:
+	state = State.CROSS
+	_cross_waves_left = 4 if _is_desperate() else (3 if _is_enraged() else 2)
+	_cross_timer = 0.0
+	_pattern_phase = 0.0
+	_state_timer = 0.12 + float(_cross_waves_left) * 0.3
+	_disable_melee_hitbox()
+	_fire_cross_wave()
+	_cross_waves_left -= 1
+
+
+func _update_cross(delta: float) -> void:
+	if _cross_waves_left <= 0:
+		return
+	_cross_timer -= delta
+	if _cross_timer > 0.0:
+		return
+	_cross_timer = 0.28
+	_fire_cross_wave()
+	_cross_waves_left -= 1
+
+
+func _fire_cross_wave() -> void:
+	_pattern_phase += PI * 0.25
+	for arm in 4:
+		var dir := Vector2.from_angle(_pattern_phase + float(arm) * PI * 0.5)
+		for bead in 3:
+			_spawn_boss_projectile(
+				dir,
+				110.0 + float(bead) * 18.0,
+				heavy_attack_damage if bead == 1 else attack_damage,
+				Color(0.95, 0.72, 0.35, 1.0) if bead == 1 else Color(0.9, 0.85, 0.45, 1.0),
+				5.6 if bead == 1 else 4.8,
+				3.0
+			)
+	_shake_camera(0.14)
+
+
+func _spawn_boss_projectile(
+	direction: Vector2,
+	shot_speed: float,
+	dmg: int,
+	color: Color,
+	shot_radius: float,
+	shot_lifetime: float,
+	spin := 0.0,
+	bounces := 0
+) -> void:
+	if get_tree().get_nodes_in_group("enemy_transient_attack").size() >= MAX_BOSS_TRANSIENTS:
+		return
+	var projectile := PROJECTILE_SCRIPT.new() as Area2D
+	projectile.call("setup", direction, shot_speed, dmg, color, shot_radius, shot_lifetime, spin, bounces)
+	get_tree().current_scene.add_child(projectile)
+	projectile.global_position = global_position + Vector2(0, -70) + direction * 36.0
 
 
 func _begin_sweep(to_player: Vector2) -> void:
@@ -282,11 +539,15 @@ func _begin_sweep(to_player: Vector2) -> void:
 
 func _begin_recovery(duration: float) -> void:
 	state = State.RECOVER
-	_state_timer = duration * (0.78 if _is_enraged() else 1.0)
-	_attack_timer = attack_cooldown * (0.72 if _is_enraged() else 1.0)
+	_state_timer = duration * (0.7 if _is_desperate() else (0.78 if _is_enraged() else 1.0))
+	_attack_timer = attack_cooldown * (0.62 if _is_desperate() else (0.72 if _is_enraged() else 1.0))
 	_disable_melee_hitbox()
 	_slam_armed = false
 	_wave_shots_left = 0
+	_spiral_shots_left = 0
+	_ring_bursts_left = 0
+	_stream_shots_left = 0
+	_cross_waves_left = 0
 	_sprite.modulate = Color.WHITE
 
 

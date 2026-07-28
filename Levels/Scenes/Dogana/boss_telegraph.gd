@@ -1,6 +1,6 @@
 extends Node2D
 
-## kind: -1 none, 0 lunge, 1 slam, 2 wave, 3 sweep
+## kind: -1 none, 0 lunge, 1 slam, 2 wave, 3 sweep, 4 spiral, 5 ring, 6 stream, 7 cross
 var _kind := -1
 var _dir := Vector2.RIGHT
 var _progress := 0.0
@@ -37,3 +37,23 @@ func _draw() -> void:
 			var rect := Rect2(minf(0.0, sweep_dir * width), -110.0, absf(width), 90.0)
 			draw_rect(rect, Color(0.95, 0.75, 0.35, 0.12 + _progress * 0.18), true)
 			draw_rect(rect, Color(0.95, 0.75, 0.35, 0.4 + _progress * 0.4), false, 2.0)
+		4: # SPIRAL
+			for arm in 4:
+				var ang := _progress * TAU * 1.4 + TAU * float(arm) / 4.0
+				var tip3 := Vector2.from_angle(ang) * lerpf(30.0, 120.0, _progress)
+				draw_line(Vector2(0, -60), tip3 + Vector2(0, -60), Color(0.55, 0.75, 1.0, 0.3 + _progress * 0.45), 2.0, true)
+			draw_arc(Vector2(0, -60), lerpf(20.0, 70.0, _progress), 0.0, TAU * _progress, 40, Color(0.55, 0.75, 1.0, 0.35), 2.0, true)
+		5: # RING
+			var r := lerpf(24.0, 110.0, _progress)
+			draw_arc(Vector2(0, -40), r, 0.0, TAU, 56, Color(0.35, 0.95, 0.85, 0.35 + _progress * 0.45), 2.6, true)
+			draw_arc(Vector2(0, -40), r * 0.55, 0.0, TAU, 40, Color(0.35, 0.95, 0.85, 0.18), 1.6, true)
+		6: # STREAM
+			for i in 5:
+				var tip4 := _dir * lerpf(40.0 + float(i) * 18.0, 80.0 + float(i) * 28.0, _progress)
+				draw_circle(tip4 + Vector2(0, -70), 4.0 + _progress * 2.0, Color(0.4, 1.0, 0.9, 0.2 + _progress * 0.35))
+			draw_line(Vector2(0, -70), _dir * lerpf(50.0, 180.0, _progress) + Vector2(0, -70), Color(0.4, 1.0, 0.9, 0.35 + _progress * 0.4), 2.4, true)
+		7: # CROSS
+			for ang_i in 4:
+				var ang2 := float(ang_i) * PI * 0.5 + _progress * 0.35
+				var tip5 := Vector2.from_angle(ang2) * lerpf(40.0, 130.0, _progress)
+				draw_line(Vector2(0, -55), tip5 + Vector2(0, -55), Color(0.95, 0.7, 0.35, 0.3 + _progress * 0.45), 2.2, true)

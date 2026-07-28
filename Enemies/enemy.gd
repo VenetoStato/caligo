@@ -3,7 +3,7 @@ extends CharacterBody2D
 const PROJECTILE_SCRIPT := preload("res://Enemies/enemy_projectile.gd")
 const AREA_ATTACK_SCRIPT := preload("res://Enemies/enemy_area_attack.gd")
 const PARTICLE_BURST := preload("res://Fx/particle_burst.gd")
-const MAX_TRANSIENT_ATTACKS := 48
+const MAX_TRANSIENT_ATTACKS := 64
 
 # ===========================================
 # ENEMY - Nemico che resta idle finché non viene colpito
@@ -30,7 +30,16 @@ const MAX_TRANSIENT_ATTACKS := 48
 @export var knockback_duration: float = 0.35
 
 @export_category("Archetype")
-enum AttackPattern { MELEE, TIDE_AREA, AIMED_VOLLEY, RADIAL_BARRAGE, HEAVY_LEAP }
+enum AttackPattern {
+	MELEE,
+	TIDE_AREA,
+	AIMED_VOLLEY,
+	RADIAL_BARRAGE,
+	HEAVY_LEAP,
+	CHARGE_BURST,
+	MARKED_STRIKE,
+	SPIRAL_SHOT,
+}
 @export var attack_pattern: AttackPattern = AttackPattern.MELEE
 @export var variant_texture: Texture2D
 @export var variant_scale_multiplier := 1.0
@@ -39,13 +48,16 @@ enum AttackPattern { MELEE, TIDE_AREA, AIMED_VOLLEY, RADIAL_BARRAGE, HEAVY_LEAP 
 @export var special_attack_cooldown := 3.2
 @export var special_windup := 0.65
 @export var area_attack_radius := 88.0
-@export_range(3, 12, 1) var projectile_count := 5
+@export_range(3, 16, 1) var projectile_count := 5
 @export var projectile_speed := 135.0
 @export var leash_distance := 460.0
 @export var disengage_range := 560.0
 @export_range(0.0, 1.0) var heavy_melee_chance := 0.32
 @export var heavy_melee_damage := 2
 @export var heavy_leap_damage := 2
+@export var charge_speed := 340.0
+@export var charge_duration := 0.42
+@export var spiral_spin := 1.8
 
 @export_category("Respawn")
 @export var respawn_enabled := true
@@ -94,6 +106,9 @@ var _attack_kick := 0.0
 var _pending_melee_damage := 1
 var _leap_slam_armed := false
 var _leap_slam_timer := 0.0
+var _charge_timer := 0.0
+var _mark_position := Vector2.ZERO
+var _spiral_phase := 0.0
 
 func _ready():
 	add_to_group("enemy")
@@ -200,7 +215,16 @@ func _physics_process(delta: float) -> void:
 		_disengage()
 		return
 	var dir_x: float = sign(to_player.x)
-	velocity.x = dir_x * move_speed * (0.28 if _special_windup_remaining > 0.0 else 1.0)
+	if _charge_timer > 0.0:
+		_charge_timer -= delta
+		velocity.x = signf(_special_target_direction.x) * charge_speed
+		if _charge_timer <= 0.0 and _attack_hitbox:
+			_attack_hitbox.set_deferred("monitoring", false)
+			_attack_hitbox.set_deferred("monitorable", false)
+			if sprite_node and _hit_flash_timer <= 0.0:
+				sprite_node.modulate = _original_modulate
+	else:
+		velocity.x = dir_x * move_speed * (0.28 if _special_windup_remaining > 0.0 else 1.0)
 
 	# Flip verso il player solo dopo cooldown (evita glitch avanti/indietro)
 	_flip_cooldown -= delta
@@ -264,8 +288,11 @@ func _update_special_attack(delta: float, to_player: Vector2) -> void:
 	if attack_pattern == AttackPattern.MELEE:
 		return
 	_special_timer = maxf(0.0, _special_timer - delta)
+	_spiral_phase += delta
 	if _special_windup_remaining > 0.0:
 		_special_windup_remaining -= delta
+		if attack_pattern == AttackPattern.MARKED_STRIKE and player and is_instance_valid(player):
+			_mark_position = player.global_position + Vector2(0, 10)
 		queue_redraw()
 		if _special_windup_remaining <= 0.0:
 			_fire_special_attack()
@@ -276,9 +303,22 @@ func _update_special_attack(delta: float, to_player: Vector2) -> void:
 		can_start = distance <= area_attack_radius + 52.0
 	elif attack_pattern == AttackPattern.HEAVY_LEAP:
 		can_start = distance <= 210.0 and distance >= 48.0
+	elif attack_pattern == AttackPattern.CHARGE_BURST:
+		can_start = distance <= 240.0 and distance >= 40.0 and _charge_timer <= 0.0
+	elif attack_pattern == AttackPattern.MARKED_STRIKE:
+		can_start = distance <= special_attack_range and distance >= 60.0
+	elif attack_pattern == AttackPattern.SPIRAL_SHOT:
+		can_start = distance <= special_attack_range
 	if can_start and _special_timer <= 0.0:
 		_special_target_direction = to_player.normalized() if distance > 0.01 else Vector2.RIGHT
-		_special_windup_remaining = special_windup * (0.75 if attack_pattern == AttackPattern.HEAVY_LEAP else 1.0)
+		if attack_pattern == AttackPattern.MARKED_STRIKE:
+			_mark_position = player.global_position + Vector2(0, 10)
+		var windup_scale := 1.0
+		if attack_pattern == AttackPattern.HEAVY_LEAP:
+			windup_scale = 0.75
+		elif attack_pattern == AttackPattern.CHARGE_BURST:
+			windup_scale = 0.85
+		_special_windup_remaining = special_windup * windup_scale
 		_special_timer = special_attack_cooldown
 		velocity.x *= 0.15
 		queue_redraw()
@@ -303,6 +343,26 @@ func _fire_special_attack() -> void:
 		if sprite_node:
 			sprite_node.modulate = Color(1.4, 0.5, 0.4, 1.0)
 		return
+	if attack_pattern == AttackPattern.CHARGE_BURST:
+		_charge_timer = charge_duration
+		velocity = Vector2(signf(_special_target_direction.x) * charge_speed, -40.0)
+		_pending_melee_damage = heavy_melee_damage
+		_attack_has_hit = false
+		if _attack_hitbox:
+			_attack_hitbox.monitoring = true
+			_attack_hitbox.monitorable = true
+			_attack_hitbox.position.x = 22 if facing_right else -22
+		_shake_camera(0.22)
+		if sprite_node:
+			sprite_node.modulate = Color(1.25, 0.85, 0.35, 1.0)
+		return
+	if attack_pattern == AttackPattern.MARKED_STRIKE:
+		var strike := AREA_ATTACK_SCRIPT.new() as Area2D
+		strike.call("setup", area_attack_radius * 0.85, maxi(attack_damage, 2), Color(0.95, 0.55, 0.28, 1.0), 0.42)
+		get_tree().current_scene.add_child(strike)
+		strike.global_position = _mark_position
+		_shake_camera(0.2)
+		return
 	if attack_pattern == AttackPattern.AIMED_VOLLEY:
 		var count := maxi(3, projectile_count)
 		for index in count:
@@ -317,6 +377,26 @@ func _fire_special_attack() -> void:
 			var direction := Vector2.from_angle(phase + TAU * float(index) / float(count))
 			var speed_scale := 0.82 if index % 2 == 0 else 1.08
 			_spawn_projectile(direction, projectile_speed * speed_scale, Color(0.42, 0.82, 1.0, 1.0), 5.0)
+		return
+	if attack_pattern == AttackPattern.SPIRAL_SHOT:
+		var arms := 3
+		var beads := maxi(4, projectile_count)
+		for arm in arms:
+			var base_ang := _spiral_phase * 1.4 + TAU * float(arm) / float(arms)
+			for bead in beads:
+				var ang := base_ang + float(bead) * 0.28
+				var direction := Vector2.from_angle(ang)
+				var shot_speed := projectile_speed * (0.7 + float(bead) * 0.08)
+				_spawn_projectile(
+					direction,
+					shot_speed,
+					Color(0.55, 0.72, 1.0, 1.0) if arm % 2 == 0 else Color(0.35, 0.95, 0.82, 1.0),
+					4.8,
+					2.8,
+					spiral_spin * (1.0 if arm % 2 == 0 else -1.0),
+					1
+				)
+		_shake_camera(0.16)
 
 
 func _update_leap_slam(delta: float) -> void:
@@ -345,11 +425,19 @@ func _shake_camera(intensity: float) -> void:
 		cam.call("add_shake", intensity)
 
 
-func _spawn_projectile(direction: Vector2, shot_speed: float, color: Color, shot_radius: float) -> void:
+func _spawn_projectile(
+	direction: Vector2,
+	shot_speed: float,
+	color: Color,
+	shot_radius: float,
+	shot_lifetime := 3.2,
+	spin := 0.0,
+	bounces := 0
+) -> void:
 	if get_tree().get_nodes_in_group("enemy_transient_attack").size() >= MAX_TRANSIENT_ATTACKS:
 		return
 	var projectile := PROJECTILE_SCRIPT.new() as Area2D
-	projectile.call("setup", direction, shot_speed, attack_damage, color, shot_radius, 3.2)
+	projectile.call("setup", direction, shot_speed, attack_damage, color, shot_radius, shot_lifetime, spin, bounces)
 	get_tree().current_scene.add_child(projectile)
 	projectile.global_position = global_position + direction * 24.0
 
@@ -357,13 +445,24 @@ func _spawn_projectile(direction: Vector2, shot_speed: float, color: Color, shot
 func _draw() -> void:
 	if _special_windup_remaining <= 0.0 or special_windup <= 0.0:
 		return
-	var windup_total := special_windup * (0.75 if attack_pattern == AttackPattern.HEAVY_LEAP else 1.0)
+	var windup_scale := 1.0
+	if attack_pattern == AttackPattern.HEAVY_LEAP:
+		windup_scale = 0.75
+	elif attack_pattern == AttackPattern.CHARGE_BURST:
+		windup_scale = 0.85
+	var windup_total := special_windup * windup_scale
 	var progress := 1.0 - _special_windup_remaining / maxf(windup_total, 0.01)
 	var color := Color(0.3, 0.95, 0.78, 0.32 + progress * 0.55)
 	if attack_pattern == AttackPattern.HEAVY_LEAP:
 		color = Color(0.95, 0.42, 0.28, 0.35 + progress * 0.55)
 	elif attack_pattern == AttackPattern.TIDE_AREA:
 		color = Color(0.22, 0.9, 0.82, 0.28 + progress * 0.5)
+	elif attack_pattern == AttackPattern.CHARGE_BURST:
+		color = Color(0.95, 0.78, 0.28, 0.35 + progress * 0.55)
+	elif attack_pattern == AttackPattern.MARKED_STRIKE:
+		color = Color(0.95, 0.5, 0.25, 0.35 + progress * 0.5)
+	elif attack_pattern == AttackPattern.SPIRAL_SHOT:
+		color = Color(0.45, 0.7, 1.0, 0.32 + progress * 0.55)
 	var radius := lerpf(18.0, 34.0, progress)
 	if attack_pattern == AttackPattern.TIDE_AREA:
 		radius = lerpf(area_attack_radius * 0.35, area_attack_radius, progress)
@@ -371,9 +470,19 @@ func _draw() -> void:
 	for ray in 6:
 		var direction := Vector2.from_angle(float(ray) / 6.0 * TAU)
 		draw_line(direction * 12.0, direction * radius, Color(color.r, color.g, color.b, color.a * 0.55), 1.4, true)
-	if attack_pattern == AttackPattern.HEAVY_LEAP:
+	if attack_pattern == AttackPattern.HEAVY_LEAP or attack_pattern == AttackPattern.CHARGE_BURST:
 		var leap_dir := _special_target_direction if _special_target_direction.length_squared() > 0.01 else Vector2.RIGHT
-		draw_line(Vector2.ZERO, leap_dir * lerpf(28.0, 70.0, progress), color, 2.4, true)
+		draw_line(Vector2.ZERO, leap_dir * lerpf(28.0, 90.0, progress), color, 2.4, true)
+	if attack_pattern == AttackPattern.MARKED_STRIKE:
+		var mark_local := to_local(_mark_position)
+		var mark_r := lerpf(18.0, area_attack_radius * 0.85, progress)
+		draw_arc(mark_local, mark_r, 0.0, TAU, 36, Color(0.95, 0.5, 0.25, 0.25 + progress * 0.45), 2.0, true)
+		draw_circle(mark_local, 4.0 + progress * 3.0, Color(0.95, 0.55, 0.3, 0.55))
+	if attack_pattern == AttackPattern.SPIRAL_SHOT:
+		for arm in 3:
+			var ang := _spiral_phase * 1.4 + TAU * float(arm) / 3.0
+			var tip := Vector2.from_angle(ang) * lerpf(24.0, 70.0, progress)
+			draw_line(Vector2.ZERO, tip, color, 1.8, true)
 
 
 func _update_variant_animation(delta: float) -> void:
@@ -593,6 +702,9 @@ func reset_to_home() -> void:
 	_wake_timer = post_respawn_wake_delay
 	_special_timer = special_attack_cooldown * 0.65
 	_special_windup_remaining = 0.0
+	_leap_slam_armed = false
+	_leap_slam_timer = 0.0
+	_charge_timer = 0.0
 	_knockback_timer = 0.0
 	_hit_flash_timer = 0.0
 	_attack_has_hit = false

@@ -15,10 +15,16 @@ func _ready() -> void:
 	var bloater := encounters.get_node("TideBloaterCustoms") as CharacterBody2D
 	var volley := encounters.get_node("LagoonOracleWedge") as CharacterBody2D
 	var barrage := encounters.get_node("LagoonOracleFortuna") as CharacterBody2D
+	var charger := encounters.get_node("SaltCrabCharger") as CharacterBody2D
+	var marker := encounters.get_node("TideMarkerWedge") as CharacterBody2D
+	var spiral := encounters.get_node("SpiralOracleCanal") as CharacterBody2D
 	if (
 		int(bloater.get("attack_pattern")) != 1
 		or int(volley.get("attack_pattern")) != 2
 		or int(barrage.get("attack_pattern")) != 3
+		or int(charger.get("attack_pattern")) != 5
+		or int(marker.get("attack_pattern")) != 6
+		or int(spiral.get("attack_pattern")) != 7
 		or bloater.get("variant_texture") == null
 		or volley.get("variant_texture") == null
 	):
@@ -46,17 +52,25 @@ func _ready() -> void:
 	bloater.call("_fire_special_attack")
 	volley.call("_fire_special_attack")
 	barrage.call("_fire_special_attack")
+	marker.call("_fire_special_attack")
+	spiral.call("_fire_special_attack")
 	var attacks := get_tree().get_nodes_in_group("enemy_transient_attack")
-	if attacks.size() < 16:
-		push_error("Area, volley, or radial barrage did not spawn the expected telegraphed attacks.")
+	if attacks.size() < 20:
+		push_error("Area, volley, radial, mark or spiral did not spawn the expected telegraphed attacks.")
 		get_tree().quit(1)
 		return
-	for _burst in 8:
+	for _burst in 10:
 		barrage.call("_fire_special_attack")
+		spiral.call("_fire_special_attack")
 	await get_tree().process_frame
 	attacks = get_tree().get_nodes_in_group("enemy_transient_attack")
-	if attacks.size() > 48:
+	if attacks.size() > 64:
 		push_error("Projectile cap did not protect the mobile frame budget.")
+		get_tree().quit(1)
+		return
+	charger.call("_fire_special_attack")
+	if float(charger.get("_charge_timer")) <= 0.0:
+		push_error("Charge burst enemy did not enter its dash window.")
 		get_tree().quit(1)
 		return
 	var home: Vector2 = bloater.get("_home_position")
@@ -91,7 +105,7 @@ func _ready() -> void:
 	for corpse in get_tree().get_nodes_in_group("dead_enemy"):
 		corpse.queue_free()
 	await get_tree().process_frame
-	print("CALIGO_ENEMY_ARCHETYPES: tide area, aimed volley, radial barrage and safe home respawn OK")
+	print("CALIGO_ENEMY_ARCHETYPES: tide, volley, radial, charge, mark, spiral and safe home respawn OK")
 	level.queue_free()
 	await get_tree().process_frame
 	await get_tree().create_timer(1.1).timeout
