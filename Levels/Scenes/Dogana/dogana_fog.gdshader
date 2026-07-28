@@ -63,23 +63,15 @@ void fragment() {
 	float height_t = clamp((u_ground_y - v_world.y) / max(u_ground_y - u_ceiling_y, 1.0), 0.0, 1.0);
 	float height_mask = mix(1.0 - u_height_soft, 1.0, pow(1.0 - height_t, 1.35));
 
-	// Disturbo locale: il player apre e sposta la nebbia intorno a sé.
+	// Disturbo locale: apre un foro soft. Niente scia colorata.
 	float speed = length(u_player_vel);
 	vec2 to_player = v_world - u_player_world;
 	float dist = length(to_player);
-	float wake_r = u_disturb_radius * (1.0 + clamp(speed / 220.0, 0.0, 1.2));
-	float hole = 1.0 - smoothstep(wake_r * 0.35, wake_r, dist);
-
-	// Sposta il campionamento nella direzione opposta alla corsa (scia dietro).
-	vec2 push = vec2(0.0);
-	if (speed > 12.0) {
-		push = normalize(u_player_vel) * (speed * 0.0018);
-	}
-	float n2 = fbm(coord - push * hole * 4.0 + warp);
-	n = mix(n, n2, hole * 0.65);
+	float wake_r = u_disturb_radius * (1.0 + clamp(speed / 280.0, 0.0, 0.6));
+	float hole = 1.0 - smoothstep(wake_r * 0.4, wake_r, dist);
 
 	float density = smoothstep(0.28, 0.78, n) * u_density * height_mask;
-	density *= 1.0 - hole * u_disturb_strength * (0.55 + u_layer * 0.45);
+	density *= 1.0 - hole * u_disturb_strength * (0.45 + u_layer * 0.35);
 
 	// Bordo soft del volume: evita taglio netto ai limiti del poligono.
 	float edge = min(

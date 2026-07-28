@@ -55,10 +55,26 @@ static func make_soft_aura(parent: Node, local_position: Vector2, tint: Color, a
 	particles.gravity = Vector2(0, -12)
 	particles.initial_velocity_min = 6.0
 	particles.initial_velocity_max = 18.0
-	particles.scale_amount_min = 1.0
-	particles.scale_amount_max = 2.2
+	particles.scale_amount_min = 0.35
+	particles.scale_amount_max = 0.75
 	particles.color = tint
 	particles.z_index = 4
+	# Texture radiale: evita i quadretti bianchi/blu del default CPUParticles.
+	var gradient := Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 0.45, 1.0])
+	gradient.colors = PackedColorArray([
+		Color(1, 1, 1, 1),
+		Color(1, 1, 1, 0.35),
+		Color(1, 1, 1, 0),
+	])
+	var tex := GradientTexture2D.new()
+	tex.gradient = gradient
+	tex.width = 32
+	tex.height = 32
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(1.0, 0.5)
+	particles.texture = tex
 	parent.add_child(particles)
 	return particles
 
