@@ -1046,11 +1046,19 @@ deadzone_y = 46.0
 use_room_limits = true
 room_limits = Rect2(-520, -1200, 6600, 2120)
 postfx_colorrect_path = NodePath("PostFX/Overlay")
-vignette_strength = 0.88
-vignette_softness = 0.42
-vignette_radius = 0.94
-grain_amount = 0.075
-desaturate = 0.13
+vignette_strength = 0.78
+vignette_softness = 0.48
+vignette_radius = 0.98
+grain_amount = 0.085
+grain_size = 1.45
+desaturate = 0.08
+contrast = 1.07
+saturation = 0.9
+grade_strength = 0.32
+chroma = 0.7
+bloom = 0.26
+bloom_threshold = 0.58
+haze = 0.1
 
 [node name="PostFX" type="CanvasLayer" parent="Player/Camera2D"]
 layer = 20

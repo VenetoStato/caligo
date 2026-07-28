@@ -30,6 +30,18 @@ extends Camera2D
 @export var grain_speed: float = 1.5
 @export var desaturate: float = 0.06
 
+# Post-produzione estesa
+@export var contrast: float = 1.06
+@export var saturation: float = 0.92
+@export var grade_strength: float = 0.28
+@export var chroma: float = 0.55
+@export var bloom: float = 0.22
+@export var bloom_threshold: float = 0.62
+@export var haze: float = 0.08
+@export var shadow_tint: Color = Color(0.12, 0.28, 0.32, 1.0)
+@export var highlight_tint: Color = Color(0.95, 0.92, 0.82, 1.0)
+@export var haze_color: Color = Color(0.55, 0.78, 0.82, 1.0)
+
 var _target: Node2D
 var _look_vec: Vector2 = Vector2.ZERO
 
@@ -108,6 +120,16 @@ func _apply_postfx_params() -> void:
 	_post_mat.set_shader_parameter("u_grain_speed", grain_speed)
 
 	_post_mat.set_shader_parameter("u_desaturate", desaturate)
+	_post_mat.set_shader_parameter("u_contrast", contrast)
+	_post_mat.set_shader_parameter("u_saturation", saturation)
+	_post_mat.set_shader_parameter("u_grade_strength", grade_strength)
+	_post_mat.set_shader_parameter("u_chroma", chroma)
+	_post_mat.set_shader_parameter("u_bloom", bloom)
+	_post_mat.set_shader_parameter("u_bloom_threshold", bloom_threshold)
+	_post_mat.set_shader_parameter("u_haze", haze)
+	_post_mat.set_shader_parameter("u_shadow_tint", shadow_tint)
+	_post_mat.set_shader_parameter("u_highlight_tint", highlight_tint)
+	_post_mat.set_shader_parameter("u_haze_color", haze_color)
 
 func _process(delta: float) -> void:
 	if _target == null:
