@@ -64,10 +64,20 @@ func _run() -> void:
 		_fail("reel toward player failed (%.1f -> %.1f)" % [before, after])
 		return
 
-	# 4) Uscita → rientro
+	# 4) Uscita → resta appeso alla lenza (pendolo), poi rientro
 	fish.call("do_catch_jump")
 	if bool(fish.call("is_in_water")):
 		_fail("catch jump should leave water")
+		return
+	var anchor := Vector2(250, 450)
+	fish.call("set_line_tether", anchor, 120.0)
+	# Spingi oltre la lenza: deve restare sul raggio.
+	fish.global_position = anchor + Vector2(200, 200)
+	fish.set("velocity", Vector2(80, 120))
+	fish.call("_apply_line_tether_constraint")
+	var hang_dist := fish.global_position.distance_to(anchor)
+	if hang_dist > 121.0:
+		_fail("hanging fish must stay on line (dist=%.1f)" % hang_dist)
 		return
 	fish.global_position = Vector2(400, 530)
 	var reentered: bool = bool(fish.call("_try_reenter_water"))

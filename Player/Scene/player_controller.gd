@@ -63,6 +63,9 @@ signal locked_skill_requested
 @export var rope_damping: float = 0.95
 @export var rope_tension: float = 0.85
 @export var fish_hooked_slack: float = 0.3
+## Extra peso sulla lenza quando c'e' un pesce agganciato (curva piu' realistica).
+@export var fish_line_weight: float = 1.55
+@export var fish_line_stiffness_extra: int = 8
 
 @export_category("Line Colors")
 @export var line_color_normal: Color = Color(0.2, 0.6, 0.3)
@@ -1360,6 +1363,9 @@ func get_hook_center_position(hook: Node) -> Vector2:
 func get_fish_center_position(fish: Node2D) -> Vector2:
 	if fish == null:
 		return Vector2.ZERO
+	# Fuori acqua: la lenza si attacca alla bocca.
+	if fish.has_method("get_line_attach_point"):
+		return fish.call("get_line_attach_point")
 	var spr = fish.get_node_or_null("Fishes")
 	if spr == null:
 		spr = fish.find_child("Fishes", true, false)
@@ -1510,9 +1516,11 @@ func _process_fishing(delta: float):
 		_simulate_rope(delta)
 		_update_line_color(delta)
 		_update_line_visual()
-	# Lenza tesa sempre (evita caduta nel vuoto); tirata solo mentre reeli.
+	# Aggiorna solo l'ancora della lenza sul pesce.
 	if fish_hooked and is_instance_valid(current_fish):
-		_tether_fish_to_line(get_rod_tip_position(), current_line_length)
+		var rod_tip: Vector2 = get_rod_tip_position()
+		if current_fish.has_method("set_line_tether"):
+			current_fish.call("set_line_tether", rod_tip, current_line_length)
 
 func _update_line_length(delta: float):
 	if not is_reeling and current_line_length < target_line_length:
@@ -1520,7 +1528,14 @@ func _update_line_length(delta: float):
 	if is_reeling:
 		var spd = grab_reel_in_speed if line_mode == LineMode.GRAB else reel_in_speed
 		if fish_hooked and is_instance_valid(current_fish):
-			current_line_length = maxf(24.0, current_line_length - spd * delta)
+			var fish_out_now := (
+				current_fish.has_method("is_hanging") and bool(current_fish.call("is_hanging"))
+			) or (
+				current_fish.has_method("is_in_water") and not bool(current_fish.call("is_in_water"))
+			)
+			# Fuori acqua: accorcia la lenza piu' piano = issaggio smooth.
+			var reel_mul := 0.45 if fish_out_now else 1.0
+			current_line_length = maxf(24.0, current_line_length - spd * reel_mul * delta)
 			_reel_fish_to_player(delta)
 		else:
 			current_line_length -= spd * delta
@@ -1581,17 +1596,31 @@ func _simulate_rope(delta: float):
 	points[points.size() - 1] = end
 	old_points[old_points.size() - 1] = end
 	var dist = rod.distance_to(end)
-	var slack = clamp(dist / current_line_length, 0.5, 1.0) if dist < current_line_length else 1.0
+	# Lasca se piu' corta della lenza; tesa se allungata.
+	var slack := 1.0
+	if dist < current_line_length:
+		slack = clampf(dist / maxf(current_line_length, 1.0), 0.6, 1.0)
 	segment_length = max(1.0, (current_line_length / (points.size() - 1)) * slack)
-	var grav = rope_gravity * (1.0 - _effective_tension)
+	var weight := (fish_line_weight if fish_hooked else 1.0)
+	if fish_hooked and is_instance_valid(current_fish) and current_fish.has_method("is_hanging") and bool(current_fish.call("is_hanging")):
+		weight *= 1.35
+	var taut: bool = dist >= current_line_length * 0.92
+	var tension_factor := clampf(_effective_tension + (0.2 if is_reeling else 0.0) + (0.3 if taut else 0.0), 0.0, 1.0)
+	# Pesce appeso: lenza piu' curva (meno tensione apparente).
+	if fish_hooked and is_instance_valid(current_fish) and current_fish.has_method("is_hanging") and bool(current_fish.call("is_hanging")) and not is_reeling:
+		tension_factor *= 0.55
+	var grav = rope_gravity * weight * (1.0 - tension_factor * 0.7)
 	for i in range(1, points.size() - 1):
 		var cur = points[i]
 		var old = old_points[i]
 		var vel = (cur - old) * rope_damping
 		old_points[i] = cur
 		points[i] = cur + vel + Vector2(0, grav * delta * delta)
-	for _it in range(rope_stiffness):
+	var iters := rope_stiffness + (fish_line_stiffness_extra if (fish_hooked and taut) else 0)
+	for _it in range(iters):
 		_apply_rope_constraints(rod, end)
+	points[points.size() - 1] = end
+	old_points[old_points.size() - 1] = end
 
 func _get_line_end_position() -> Vector2:
 	if fish_hooked and is_instance_valid(current_fish):
@@ -1845,7 +1874,8 @@ func _reel_fish_to_player(delta: float = 0.016) -> void:
 			current_fish.call("do_catch_jump")
 			_fish_catch_jump_done = true
 
-	_tether_fish_to_line(rod, current_line_length)
+	if current_fish.has_method("set_line_tether"):
+		current_fish.call("set_line_tether", rod, current_line_length)
 	fish_pos = get_fish_center_position(current_fish)
 	to_rod = Vector2(rod.x - fish_pos.x, rod.y - fish_pos.y)
 	dist = to_rod.length()
@@ -1861,29 +1891,21 @@ func _reel_fish_to_player(delta: float = 0.016) -> void:
 		current_fish.has_method("is_in_water")
 		and not bool(current_fish.call("is_in_water"))
 	)
-	# Direzione verso la canna.
 	var dir: Vector2 = to_rod.normalized() if to_rod.length_squared() > 0.0001 else Vector2.UP
 	if not can_land and not fish_out:
-		# In acqua: tirata piu' orizzontale (niente levitazione).
 		dir = Vector2(to_rod.x, to_rod.y * 0.4)
 		if dir.length_squared() > 0.0001:
 			dir = dir.normalized()
 
-	var pull: float = reel_pull_force * (1.0 + _fish_reel_progress * 0.45)
-	if can_land or fish_out:
-		pull *= 1.3
+	var pull: float = reel_pull_force * (0.55 + _fish_reel_progress * 0.2)
 	if current_fish.has_method("apply_reel_force"):
 		current_fish.call("apply_reel_force", dir * pull)
 
-	# Sposta il pesce verso la canna mentre tieni R.
-	var haul := reel_in_speed * delta * (1.55 if (can_land or fish_out) else 1.2)
-	var slack := dist - current_line_length
-	if slack > 0.5:
-		haul = maxf(haul, minf(slack, reel_in_speed * delta * 1.7))
+	# Fuori acqua: issaggio ancora piu' calmo (solo accorcia lenza + soft force).
+	var haul_mul := 0.35 if fish_out else 0.55
+	var haul := reel_in_speed * delta * haul_mul
 	if current_fish.has_method("pull_along_line"):
 		current_fish.call("pull_along_line", rod, haul, can_land or fish_out)
-	else:
-		current_fish.global_position = current_fish.global_position.move_toward(rod, haul)
 
 
 func _tether_fish_to_line(rod: Vector2, max_len: float) -> void:
