@@ -27,6 +27,9 @@ var _grab_hook_unlocked := false
 var _encounter_update_timer := 0.0
 var _managed_encounters: Array[CharacterBody2D] = []
 var _managed_waters: Array[Node] = []
+var _grace_charge := 0.0
+var _grace_charge_active := false
+const GRACE_CHARGE_TIME := 3.0
 
 
 func _ready() -> void:
@@ -92,6 +95,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not _player or not is_instance_valid(_player):
 		return
+	_update_grace_charge(delta)
 	_encounter_update_timer -= delta
 	if _encounter_update_timer <= 0.0:
 		_encounter_update_timer = 0.18
@@ -101,6 +105,7 @@ func _process(delta: float) -> void:
 	if region != _last_region:
 		_last_region = region
 		_mark_region_discovered(region)
+		_notify_region_music()
 	var map := get_node_or_null("DoganaMap")
 	if map and map.has_method("set_player_world_position"):
 		map.call("set_player_world_position", _player.global_position)
@@ -112,16 +117,56 @@ func _unhandled_input(event: InputEvent) -> void:
 		and is_instance_valid(_nearby_grace)
 		and event.is_action_pressed("interact")
 	):
-		_activate_grace(_nearby_grace)
+		_grace_charge_active = true
+		_grace_charge = 0.0
+		get_viewport().set_input_as_handled()
+		return
+	if (
+		_nearby_grace
+		and is_instance_valid(_nearby_grace)
+		and event.is_action_released("interact")
+	):
+		_cancel_grace_charge()
 		get_viewport().set_input_as_handled()
 		return
 	if (
 		_nearby_interactable
 		and is_instance_valid(_nearby_interactable)
 		and event.is_action_pressed("interact")
+		and not _grace_charge_active
 	):
 		_activate_interactable(_nearby_interactable)
 		get_viewport().set_input_as_handled()
+
+
+func _update_grace_charge(delta: float) -> void:
+	if not _grace_charge_active:
+		return
+	if (
+		_nearby_grace == null
+		or not is_instance_valid(_nearby_grace)
+		or not Input.is_action_pressed("interact")
+	):
+		_cancel_grace_charge()
+		return
+	_grace_charge = minf(GRACE_CHARGE_TIME, _grace_charge + delta)
+	var progress := _grace_charge / GRACE_CHARGE_TIME
+	if _nearby_grace.has_method("set_charge_progress"):
+		_nearby_grace.call("set_charge_progress", progress)
+	if _grace_charge >= GRACE_CHARGE_TIME:
+		var grace := _nearby_grace
+		_grace_charge_active = false
+		_grace_charge = 0.0
+		_activate_grace(grace)
+		if grace.has_method("cancel_charge"):
+			grace.call("cancel_charge")
+
+
+func _cancel_grace_charge() -> void:
+	_grace_charge_active = false
+	_grace_charge = 0.0
+	if _nearby_grace and is_instance_valid(_nearby_grace) and _nearby_grace.has_method("cancel_charge"):
+		_nearby_grace.call("cancel_charge")
 
 
 func _on_checkpoint_entered(body: Node2D, checkpoint: Area2D) -> void:
@@ -172,8 +217,24 @@ func _update_encounter_culling() -> void:
 		if not is_instance_valid(enemy):
 			continue
 		var dead := int(enemy.get("state")) == 2
-		var near_player := enemy.global_position.distance_squared_to(_player.global_position) <= 900.0 * 900.0
-		enemy.set_physics_process(not dead and near_player and not player_in_palace)
+		var near_player := enemy.global_position.distance_squared_to(_player.global_position) <= 1100.0 * 1100.0
+		var active := not dead and near_player and not player_in_palace
+		enemy.set_physics_process(active)
+		enemy.set_process(active)
+		if dead:
+			enemy.visible = false
+			enemy.process_mode = Node.PROCESS_MODE_DISABLED
+		elif active:
+			enemy.visible = true
+			enemy.process_mode = Node.PROCESS_MODE_INHERIT
+			# Quando rientra in range, assicurati che possa muoversi (patrol/aggro).
+			if int(enemy.get("state")) == 0:
+				var vel: Variant = enemy.get("velocity")
+				if vel is Vector2 and absf((vel as Vector2).x) < 1.0:
+					enemy.set("_patrol_dir", 1.0 if randf() < 0.5 else -1.0)
+		else:
+			enemy.visible = false
+			enemy.process_mode = Node.PROCESS_MODE_DISABLED
 
 
 func _update_water_culling() -> void:
@@ -432,6 +493,7 @@ func _on_grace_entered(body: Node2D, grace: Area2D) -> void:
 
 func _on_grace_exited(body: Node2D, grace: Area2D) -> void:
 	if body == _player and _nearby_grace == grace:
+		_cancel_grace_charge()
 		_nearby_grace = null
 
 
@@ -521,7 +583,7 @@ func _load_graces() -> void:
 	for site_id in ["pontile", "dogana", "fortuna"]:
 		if bool(config.get_value("graces", site_id, false)):
 			_activated_graces[site_id] = true
-	for region_id in ["arrival", "customs", "palace", "canal", "fortuna", "archive", "ossuary", "palace_vault"]:
+	for region_id in ["arrival", "customs", "palace", "canal", "fortuna", "salute", "archive", "ossuary", "palace_vault"]:
 		if bool(config.get_value("map", region_id, region_id == "arrival")):
 			_discovered_regions[region_id] = true
 	_has_palace_seal = bool(config.get_value("progress", "palace_seal", false))
@@ -536,7 +598,7 @@ func _save_graces() -> void:
 	config.set_value("graces", "current", _current_grace)
 	for site_id in ["pontile", "dogana", "fortuna"]:
 		config.set_value("graces", site_id, bool(_activated_graces.get(site_id, false)))
-	for region_id in ["arrival", "customs", "palace", "canal", "fortuna", "archive", "ossuary", "palace_vault"]:
+	for region_id in ["arrival", "customs", "palace", "canal", "fortuna", "salute", "archive", "ossuary", "palace_vault"]:
 		config.set_value("map", region_id, bool(_discovered_regions.get(region_id, false)))
 	config.set_value("progress", "palace_seal", _has_palace_seal)
 	config.set_value("progress", "grab_hook_unlocked", _grab_hook_unlocked)
@@ -597,7 +659,10 @@ func _get_player_region(world_position: Vector2) -> String:
 		return "customs"
 	if world_position.x < 3800.0:
 		return "canal"
-	return "fortuna"
+	# Torre Fortuna + nartece: x 3800–4550. Nave della Salute (boss): oltre.
+	if world_position.x < 4550.0:
+		return "fortuna"
+	return "salute"
 
 
 func _mark_region_discovered(region_id: String) -> void:
@@ -634,6 +699,24 @@ func _apply_respawn(point: Vector2) -> void:
 		_player.call("set_checkpoint", point)
 	if "initial_spawn_position" in _player:
 		_player.set("initial_spawn_position", point)
+
+
+func _notify_region_music() -> void:
+	var director := get_node_or_null("RegionMusicDirector")
+	if director == null:
+		director = get_tree().get_first_node_in_group("region_music_director")
+	if director and director.has_method("set_region"):
+		director.call("set_region", _last_region if not _last_region.is_empty() else "arrival")
+	if director and director.has_method("set_boss_active"):
+		var boss_alive := false
+		for boss in get_tree().get_nodes_in_group("dogana_boss"):
+			if is_instance_valid(boss) and not bool(boss.get("is_defeated")):
+				var st = boss.get("state")
+				# Awake/combat states duck BGM.
+				if st != null and int(st) > 0 and int(st) < 10:
+					boss_alive = true
+					break
+		director.call("set_boss_active", boss_alive and _last_region == "salute")
 
 
 func _show_message(text: String) -> void:

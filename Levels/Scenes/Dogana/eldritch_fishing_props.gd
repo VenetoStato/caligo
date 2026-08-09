@@ -16,6 +16,9 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if not visible:
+		set_process(false)
+		return
 	_time += delta
 	_redraw_accumulator += delta
 	if _redraw_accumulator >= 1.0 / 30.0:

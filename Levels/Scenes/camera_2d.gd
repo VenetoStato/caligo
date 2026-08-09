@@ -56,8 +56,11 @@ const _smooth_attach_follow_speed: float = 1.8  # più basso = transizione più 
 
 var _post_rect: ColorRect
 var _post_mat: ShaderMaterial
+var _postfx_dirty := true
+var _last_postfx_key := ""
 
 func _ready() -> void:
+	_apply_mobile_postfx_budget()
 	if target_path != NodePath():
 		_target = get_node_or_null(target_path) as Node2D
 	else:
@@ -108,9 +111,32 @@ func _setup_postfx() -> void:
 	# Push initial params
 	_apply_postfx_params()
 
+func _apply_mobile_postfx_budget() -> void:
+	var mobile := OS.has_feature("mobile") or OS.get_name() == "Android"
+	if not mobile:
+		return
+	bloom = minf(bloom, 0.12)
+	chroma = minf(chroma, 0.25)
+	grain_amount = minf(grain_amount, 0.06)
+	haze = minf(haze, 0.04)
+	grade_strength = minf(grade_strength, 0.18)
+	_postfx_dirty = true
+
+
 func _apply_postfx_params() -> void:
 	if _post_mat == null:
 		return
+	var key := "%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s" % [
+		str(postfx_enabled),
+		vignette_strength, vignette_softness, vignette_radius,
+		grain_amount, grain_size, grain_speed, desaturate,
+		contrast, saturation, grade_strength, chroma, bloom, bloom_threshold, haze,
+		str(shadow_tint), str(highlight_tint), str(haze_color)
+	]
+	if key == _last_postfx_key and not _postfx_dirty:
+		return
+	_last_postfx_key = key
+	_postfx_dirty = false
 	_post_mat.set_shader_parameter("u_vignette_strength", vignette_strength)
 	_post_mat.set_shader_parameter("u_vignette_softness", vignette_softness)
 	_post_mat.set_shader_parameter("u_vignette_radius", vignette_radius)
@@ -135,7 +161,6 @@ func _process(delta: float) -> void:
 	if _target == null:
 		return
 
-	# se modifichi gli export a runtime dall'Inspector, aggiorna
 	if _post_rect != null:
 		_post_rect.visible = postfx_enabled
 	_apply_postfx_params()

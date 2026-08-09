@@ -1,6 +1,31 @@
 extends RefCounted
 
 
+static var _soft_tex: GradientTexture2D
+
+
+static func _soft_texture() -> GradientTexture2D:
+	if _soft_tex != null:
+		return _soft_tex
+	var gradient := Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 0.4, 0.75, 1.0])
+	gradient.colors = PackedColorArray([
+		Color(1, 1, 1, 1),
+		Color(1, 1, 1, 0.55),
+		Color(1, 1, 1, 0.12),
+		Color(1, 1, 1, 0),
+	])
+	var tex := GradientTexture2D.new()
+	tex.gradient = gradient
+	tex.width = 48
+	tex.height = 48
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(1.0, 0.5)
+	_soft_tex = tex
+	return _soft_tex
+
+
 static func spawn(
 	parent: Node,
 	world_position: Vector2,
@@ -24,10 +49,20 @@ static func spawn(
 	particles.initial_velocity_min = speed_min
 	particles.initial_velocity_max = speed_max
 	particles.gravity = Vector2(0, 70)
-	particles.scale_amount_min = 1.4
-	particles.scale_amount_max = 3.8
+	particles.scale_amount_min = 0.35
+	particles.scale_amount_max = 0.95
 	particles.color = tint
+	particles.texture = _soft_texture()
 	particles.z_index = 8
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.2, 0.75, 1.0])
+	fade.colors = PackedColorArray([
+		Color(1, 1, 1, 0.0),
+		Color(1, 1, 1, 1.0),
+		Color(1, 1, 1, 0.65),
+		Color(1, 1, 1, 0.0),
+	])
+	particles.color_ramp = fade
 	parent.add_child(particles)
 	particles.global_position = world_position
 	particles.emitting = true

@@ -14,6 +14,7 @@ config/name="Caligo"
 run/main_scene="res://splash_screen.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="res://icon.svg"
+run/max_fps=120
 
 [autoload]
 
@@ -161,6 +162,10 @@ theme/custom="res://UI/caligo_ui_theme.tres"
 [plugins]
 
 enabled=PackedStringArray("res://addons/psd_import_plugin/plugin.cfg", "res://addons/parallax_editor_preview/plugin.cfg")
+
+[physics]
+
+common/physics_ticks_per_second=60
 
 [rendering]
 

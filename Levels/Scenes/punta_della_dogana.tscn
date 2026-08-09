@@ -1,4 +1,4 @@
-[gd_scene load_steps=47 format=3]
+[gd_scene load_steps=49 format=3]
 
 [ext_resource type="Script" path="res://Levels/Scenes/Dogana/dogana_level.gd" id="1_level"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/dogana_environment.tscn" id="2_environment"]
@@ -28,6 +28,7 @@
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/tutorial_gate.tscn" id="26_tutorial_gate"]
 [ext_resource type="Script" path="res://Levels/Scenes/Dogana/access_marker.gd" id="27_access_marker"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/arrival_cutscene.tscn" id="28_arrival"]
+[ext_resource type="Script" path="res://Levels/Scenes/Dogana/salute_church.gd" id="29_salute"]
 
 [sub_resource type="RectangleShape2D" id="GroundArrivalWest"]
 size = Vector2(700, 96)
@@ -61,6 +62,9 @@ size = Vector2(1120, 110)
 
 [sub_resource type="RectangleShape2D" id="BossArenaWall"]
 size = Vector2(50, 520)
+
+[sub_resource type="RectangleShape2D" id="ApproachPlatform"]
+size = Vector2(210, 28)
 
 [sub_resource type="CircleShape2D" id="InteractionShape"]
 radius = 78.0
@@ -140,9 +144,10 @@ position = Vector2(1100, 350)
 [node name="AccessMarkers" type="Node2D" parent="Gameplay"]
 
 [node name="ArchiveEntry" type="Node2D" parent="Gameplay/AccessMarkers"]
-position = Vector2(2000, 756)
+position = Vector2(1945, 500)
 script = ExtResource("27_access_marker")
 access_id = "archive"
+marker_scale = 1.15
 
 [node name="PalaceEntry" type="Node2D" parent="Gameplay/AccessMarkers"]
 position = Vector2(2710, 55)
@@ -192,13 +197,13 @@ position = Vector2(1585, 540)
 collision_layer = 1
 collision_mask = 2
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/Quay"]
-shape = SubResource("GroundQuay")
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Gameplay/Geometry/Quay"]
+polygon = PackedVector2Array(-395, -55, 330, -55, 330, 55, -395, 55)
 
 [node name="QuayVisual" type="Polygon2D" parent="Gameplay/Geometry/Quay"]
 visible = false
 z_index = -2
-polygon = PackedVector2Array(-395, -55, 395, -55, 395, 55, -395, 55)
+polygon = PackedVector2Array(-395, -55, 330, -55, 330, 55, -395, 55)
 color = Color(0.18, 0.2, 0.2, 1)
 
 [node name="CentralWedge" type="StaticBody2D" parent="Gameplay/Geometry" groups=["dogana_wedge", "dogana_platform"]]
@@ -206,7 +211,7 @@ collision_layer = 1
 collision_mask = 2
 
 [node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Gameplay/Geometry/CentralWedge"]
-polygon = PackedVector2Array(1980, 538, 2630, 148, 3260, 538, 3260, 650, 2180, 650, 2180, 538)
+polygon = PackedVector2Array(2060, 538, 2630, 148, 3260, 538, 3260, 650, 2180, 650, 2180, 538)
 
 [node name="CanalGate" type="StaticBody2D" parent="Gameplay/Geometry" groups=["dogana_gate"]]
 position = Vector2(3260, 170)
@@ -280,6 +285,13 @@ collision_layer = 1
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/CanalPlatforms/StepC"]
 shape = SubResource("PlatformSmall")
 
+[node name="StepD" type="StaticBody2D" parent="Gameplay/Geometry/CanalPlatforms"]
+position = Vector2(3985, 470)
+collision_layer = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/CanalPlatforms/StepD"]
+shape = SubResource("PlatformSmall")
+
 [node name="TowerRoute" type="Node2D" parent="Gameplay/Geometry" groups=["dogana_tower_route"]]
 
 [node name="TowerBase" type="StaticBody2D" parent="Gameplay/Geometry/TowerRoute"]
@@ -331,7 +343,36 @@ collision_layer = 1
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/TowerRoute/FortunaRoof"]
 shape = SubResource("TowerPlatform")
 
-[node name="BossArena" type="Node2D" parent="Gameplay/Geometry" groups=["dogana_boss_arena"]]
+[node name="BossArena" type="Node2D" parent="Gameplay/Geometry" groups=["dogana_boss_arena", "dogana_salute_nave"]]
+script = ExtResource("29_salute")
+
+[node name="ApproachA" type="StaticBody2D" parent="Gameplay/Geometry/BossArena" groups=["dogana_platform"]]
+position = Vector2(4480, 520)
+collision_layer = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/BossArena/ApproachA"]
+shape = SubResource("ApproachPlatform")
+
+[node name="ApproachB" type="StaticBody2D" parent="Gameplay/Geometry/BossArena" groups=["dogana_platform"]]
+position = Vector2(4720, 520)
+collision_layer = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/BossArena/ApproachB"]
+shape = SubResource("ApproachPlatform")
+
+[node name="ApproachC" type="StaticBody2D" parent="Gameplay/Geometry/BossArena" groups=["dogana_platform"]]
+position = Vector2(4940, 520)
+collision_layer = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/BossArena/ApproachC"]
+shape = SubResource("ApproachPlatform")
+
+[node name="CanalBridge" type="StaticBody2D" parent="Gameplay/Geometry/BossArena" groups=["dogana_platform"]]
+position = Vector2(3990, 505)
+collision_layer = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/BossArena/CanalBridge"]
+shape = SubResource("ApproachPlatform")
 
 [node name="Floor" type="StaticBody2D" parent="Gameplay/Geometry/BossArena" groups=["dogana_platform"]]
 position = Vector2(5180, 540)
@@ -353,12 +394,12 @@ disabled = true
 [node name="Visual" type="Polygon2D" parent="Gameplay/Geometry/BossArena/EntranceSeal"]
 modulate = Color(1, 1, 1, 0)
 polygon = PackedVector2Array(-25, -260, 25, -260, 25, 260, -25, 260)
-color = Color(0.08, 0.25, 0.24, 0.92)
+color = Color(0.28, 0.24, 0.18, 0.94)
 
 [node name="Glyph" type="Line2D" parent="Gameplay/Geometry/BossArena/EntranceSeal/Visual"]
-points = PackedVector2Array(0, -220, 0, 220, -18, 170, 18, 120, -18, 70, 18, 20, -18, -30, 18, -80, -18, -130, 18, -180)
+points = PackedVector2Array(-12, -200, -12, 200, 12, 200, 12, -200, -12, -200, 0, -230, 12, -200)
 width = 4.0
-default_color = Color(0.3, 0.88, 0.75, 0.82)
+default_color = Color(0.78, 0.66, 0.38, 0.85)
 
 [node name="ExitWall" type="StaticBody2D" parent="Gameplay/Geometry/BossArena"]
 position = Vector2(5760, 310)
@@ -442,7 +483,7 @@ default_color = Color(0.38, 0.42, 0.38, 0.38)
 [node name="HiddenArchiveRoute" type="Node2D" parent="Gameplay/Geometry" groups=["dogana_secret_route"]]
 
 [node name="ArchiveCeiling" type="StaticBody2D" parent="Gameplay/Geometry/HiddenArchiveRoute"]
-position = Vector2(1580, 650)
+position = Vector2(1480, 650)
 collision_layer = 1
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/HiddenArchiveRoute/ArchiveCeiling"]
@@ -465,30 +506,51 @@ visible = false
 polygon = PackedVector2Array(-380, -18, 380, -18, 380, 18, -380, 18)
 color = Color(0.16, 0.19, 0.19, 1)
 
-[node name="DescentStep" type="StaticBody2D" parent="Gameplay/Geometry/HiddenArchiveRoute"]
-position = Vector2(2070, 700)
+[node name="AltarDropLip" type="StaticBody2D" parent="Gameplay/Geometry/HiddenArchiveRoute" groups=["dogana_platform"]]
+position = Vector2(1955, 540)
 collision_layer = 1
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/HiddenArchiveRoute/DescentStep"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/HiddenArchiveRoute/AltarDropLip"]
 shape = SubResource("PlatformSmall")
 
-[node name="NotchLedge" type="StaticBody2D" parent="Gameplay/Geometry/HiddenArchiveRoute"]
-position = Vector2(2085, 760)
+[node name="AltarStairA" type="StaticBody2D" parent="Gameplay/Geometry/HiddenArchiveRoute" groups=["dogana_platform"]]
+position = Vector2(1985, 600)
 collision_layer = 1
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/HiddenArchiveRoute/NotchLedge"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/HiddenArchiveRoute/AltarStairA"]
 shape = SubResource("PlatformSmall")
 
-[node name="LowerStep" type="StaticBody2D" parent="Gameplay/Geometry/HiddenArchiveRoute"]
-position = Vector2(2095, 820)
+[node name="AltarStairB" type="StaticBody2D" parent="Gameplay/Geometry/HiddenArchiveRoute" groups=["dogana_platform"]]
+position = Vector2(1935, 660)
 collision_layer = 1
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/HiddenArchiveRoute/LowerStep"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/HiddenArchiveRoute/AltarStairB"]
 shape = SubResource("PlatformSmall")
+
+[node name="AltarStairC" type="StaticBody2D" parent="Gameplay/Geometry/HiddenArchiveRoute" groups=["dogana_platform"]]
+position = Vector2(1860, 720)
+collision_layer = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/HiddenArchiveRoute/AltarStairC"]
+shape = SubResource("PlatformSmall")
+
+[node name="AltarStairD" type="StaticBody2D" parent="Gameplay/Geometry/HiddenArchiveRoute" groups=["dogana_platform"]]
+position = Vector2(1760, 780)
+collision_layer = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/HiddenArchiveRoute/AltarStairD"]
+shape = SubResource("PlatformSmall")
+
+[node name="DropHint" type="Line2D" parent="Gameplay/Geometry/HiddenArchiveRoute"]
+z_index = 6
+position = Vector2(1945, 470)
+points = PackedVector2Array(0, 0, 12, 36, -6, 68, 14, 104, 0, 140, -18, 176)
+width = 3.2
+default_color = Color(0.4, 0.95, 0.78, 0.82)
 
 [node name="ArchiveWall" parent="Gameplay/Geometry/HiddenArchiveRoute" instance=ExtResource("11_wall")]
 z_index = 3
-position = Vector2(1988, 756)
+position = Vector2(1260, 756)
 metadata/secret_id = "archive"
 
 [node name="SecretReveal" type="Area2D" parent="Gameplay/Geometry/HiddenArchiveRoute" groups=["dogana_hidden_reveal"]]
@@ -677,7 +739,7 @@ site_id = "dogana"
 display_name = "Dogana da Mar"
 
 [node name="Fortuna" parent="Gameplay/GraceSites" instance=ExtResource("12_grace")]
-position = Vector2(3830, 331)
+position = Vector2(3910, 331)
 site_id = "fortuna"
 display_name = "Torre della Fortuna"
 
@@ -795,7 +857,7 @@ collision_layer = 0
 collision_mask = 2
 metadata/prompt = "[E] Guarda verso la Salute"
 metadata/action = "lore"
-metadata/message = "\"Di fronte, Santa Maria della Salute. La Punta risponde dalla riva opposta, dove Canal Grande e Giudecca si incontrano.\""
+metadata/message = "\"Santa Maria della Salute: cupola ottagonale di Longhena. Il Custode attende nella nave — oltre la Torre della Fortuna, dentro la basilica.\""
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Interactions/SaluteVista"]
 shape = SubResource("InteractionShape")
@@ -825,18 +887,20 @@ shape = SubResource("InteractionShape")
 [node name="Encounters" type="Node2D" parent="Gameplay" groups=["dogana_encounters"]]
 
 [node name="GamberoArrival" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
-position = Vector2(1880, 455)
-scale = Vector2(0.04, 0.04)
+position = Vector2(2140, 450)
+scale = Vector2(0.068, 0.068)
 wake_delay = 1.45
+patrol_range = 140.0
 
 [node name="GamberoQuay" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
-position = Vector2(2230, 365)
-scale = Vector2(0.042, 0.042)
+position = Vector2(2380, 365)
+scale = Vector2(0.07, 0.07)
 wake_delay = 1.65
+patrol_range = 120.0
 
 [node name="GamberoQuayGuard" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
-position = Vector2(2570, 238)
-scale = Vector2(0.04, 0.04)
+position = Vector2(2520, 238)
+scale = Vector2(0.068, 0.068)
 max_health = 7
 wake_delay = 1.8
 attack_pattern = 4
@@ -845,14 +909,14 @@ special_windup = 0.55
 heavy_melee_chance = 0.45
 
 [node name="GamberoWedge" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
-position = Vector2(2840, 325)
-scale = Vector2(0.038, 0.038)
+position = Vector2(2920, 325)
+scale = Vector2(0.064, 0.064)
 wake_delay = 1.0
 heavy_melee_chance = 0.4
 
 [node name="GamberoWedgeGuard" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
 position = Vector2(3070, 360)
-scale = Vector2(0.04, 0.04)
+scale = Vector2(0.068, 0.068)
 max_health = 8
 wake_delay = 1.4
 attack_damage = 1
@@ -861,14 +925,14 @@ special_attack_cooldown = 3.0
 heavy_leap_damage = 2
 
 [node name="GamberoCanal" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
-position = Vector2(3590, 340)
-scale = Vector2(0.038, 0.038)
+position = Vector2(3520, 340)
+scale = Vector2(0.064, 0.064)
 wake_delay = 1.2
 heavy_melee_chance = 0.38
 
 [node name="GamberoCanalGuard" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
-position = Vector2(3880, 260)
-scale = Vector2(0.038, 0.038)
+position = Vector2(4040, 260)
+scale = Vector2(0.064, 0.064)
 max_health = 7
 wake_delay = 1.5
 attack_pattern = 4
@@ -877,7 +941,7 @@ heavy_melee_chance = 0.5
 
 [node name="GamberoTower" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
 position = Vector2(4300, 188)
-scale = Vector2(0.036, 0.036)
+scale = Vector2(0.095, 0.095)
 max_health = 8
 wake_delay = 1.6
 attack_pattern = 4
@@ -885,8 +949,8 @@ special_attack_cooldown = 2.6
 heavy_leap_damage = 2
 
 [node name="TideBloaterCustoms" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
-position = Vector2(2390, 350)
-scale = Vector2(0.06, 0.06)
+position = Vector2(2480, 350)
+scale = Vector2(0.095, 0.095)
 move_speed = 48.0
 max_health = 8
 aggro_range = 205.0
@@ -899,8 +963,8 @@ special_attack_cooldown = 3.7
 area_attack_radius = 94.0
 
 [node name="LagoonOracleWedge" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
-position = Vector2(2780, 120)
-scale = Vector2(0.055, 0.055)
+position = Vector2(2860, 120)
+scale = Vector2(0.088, 0.088)
 move_speed = 62.0
 max_health = 7
 aggro_range = 245.0
@@ -915,8 +979,8 @@ projectile_count = 6
 projectile_speed = 152.0
 
 [node name="TideBloaterCanal" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
-position = Vector2(3650, 350)
-scale = Vector2(0.058, 0.058)
+position = Vector2(3480, 420)
+scale = Vector2(0.092, 0.092)
 move_speed = 50.0
 max_health = 8
 aggro_range = 210.0
@@ -930,7 +994,7 @@ area_attack_radius = 98.0
 
 [node name="LagoonOracleFortuna" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
 position = Vector2(4160, 90)
-scale = Vector2(0.052, 0.052)
+scale = Vector2(0.084, 0.084)
 move_speed = 58.0
 max_health = 9
 aggro_range = 270.0
@@ -945,8 +1009,8 @@ projectile_count = 12
 projectile_speed = 118.0
 
 [node name="SaltCrabCharger" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
-position = Vector2(3420, 420)
-scale = Vector2(0.042, 0.042)
+position = Vector2(3380, 420)
+scale = Vector2(0.07, 0.07)
 move_speed = 72.0
 max_health = 8
 aggro_range = 200.0
@@ -963,8 +1027,8 @@ charge_speed = 360.0
 charge_duration = 0.45
 
 [node name="TideMarkerWedge" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
-position = Vector2(2680, 360)
-scale = Vector2(0.055, 0.055)
+position = Vector2(2750, 360)
+scale = Vector2(0.088, 0.088)
 move_speed = 44.0
 max_health = 9
 aggro_range = 230.0
@@ -979,8 +1043,8 @@ special_windup = 0.85
 area_attack_radius = 78.0
 
 [node name="SpiralOracleCanal" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
-position = Vector2(3780, 80)
-scale = Vector2(0.05, 0.05)
+position = Vector2(3620, 90)
+scale = Vector2(0.082, 0.082)
 move_speed = 54.0
 max_health = 8
 aggro_range = 260.0
@@ -998,8 +1062,8 @@ projectile_speed = 108.0
 spiral_spin = 2.1
 
 [node name="SaltPoolBloater" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
-position = Vector2(3100, 360)
-scale = Vector2(0.056, 0.056)
+position = Vector2(3180, 360)
+scale = Vector2(0.09, 0.09)
 move_speed = 42.0
 max_health = 9
 aggro_range = 220.0
@@ -1015,7 +1079,7 @@ area_attack_radius = 86.0
 
 [node name="HarpoonGambero" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
 position = Vector2(4450, 180)
-scale = Vector2(0.038, 0.038)
+scale = Vector2(0.064, 0.064)
 move_speed = 68.0
 max_health = 8
 aggro_range = 250.0
@@ -1030,14 +1094,14 @@ heavy_melee_chance = 0.35
 
 [node name="GamberoArchiveA" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
 position = Vector2(1580, 795)
-scale = Vector2(0.04, 0.04)
+scale = Vector2(0.068, 0.068)
 attack_pattern = 4
 special_attack_cooldown = 2.7
 heavy_leap_damage = 2
 
 [node name="GamberoArchiveB" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
 position = Vector2(1770, 795)
-scale = Vector2(0.036, 0.036)
+scale = Vector2(0.064, 0.064)
 heavy_melee_chance = 0.55
 heavy_melee_damage = 2
 

@@ -1,6 +1,6 @@
 extends Area2D
-## Altare / Site of Grace: luce stabile + particelle dorate che convergono verso l'alto.
-## Niente pulse di scala, niente quadretti blu (sempre texture radiale soft).
+## Altare / Site of Grace: luce stabile + particelle dorate.
+## Hold E ~3s per risveglio/riposo: l'effetto si accentua durante la carica.
 
 const DoganaFx := preload("res://Levels/Scenes/Dogana/dogana_fx.gd")
 
@@ -18,6 +18,9 @@ var _inbound_motes: CPUParticles2D
 var _ember_core: CPUParticles2D
 var _mote_tex: GradientTexture2D
 var _mobile := false
+var _charge_progress := 0.0
+var _charging := false
+var _charge_pulse_cd := 0.0
 
 
 func _ready() -> void:
@@ -38,16 +41,21 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	if _light and not _mobile:
-		# Luce calda stabile (micro-variazione, non pulse evidente).
 		var base := 0.95 if activated else (0.35 if _player_near else 0.14)
-		_light.energy = base + sin(_time * 0.7) * 0.03
+		if _charging:
+			base = lerpf(base, 1.55, _charge_progress)
+		_light.energy = base + sin(_time * (0.7 + _charge_progress * 3.0)) * (0.03 + _charge_progress * 0.08)
+		_light.texture_scale = lerpf(1.55, 2.35, _charge_progress)
 	if _illustration:
 		var base_mod := Color(1.05, 0.92, 0.62, 1.0) if activated else Color(0.72, 0.74, 0.7, 0.92)
 		if _player_near and not activated:
 			base_mod = Color(0.88, 0.82, 0.64, 0.96)
+		if _charging:
+			base_mod = base_mod.lerp(Color(1.45, 1.25, 0.7, 1.0), _charge_progress)
 		_illustration.modulate = base_mod
 		var base_scale := art_profile.tide_altar_scale if art_profile else Vector2(0.145, 0.145)
-		_illustration.scale = base_scale
+		var charge_boost := 1.0 + _charge_progress * 0.08
+		_illustration.scale = base_scale * charge_boost
 
 
 func set_activated(value: bool) -> void:
@@ -56,27 +64,67 @@ func set_activated(value: bool) -> void:
 	_refresh_particle_state()
 
 
+func set_charge_progress(progress: float) -> void:
+	var previous := _charge_progress
+	_charge_progress = clampf(progress, 0.0, 1.0)
+	_charging = _charge_progress > 0.001
+	_update_prompt()
+	_refresh_particle_state()
+	_charge_pulse_cd -= 0.016
+	if _charging and _charge_progress > 0.2 and _charge_pulse_cd <= 0.0 and _charge_progress > previous:
+		_charge_pulse_cd = lerpf(0.45, 0.18, _charge_progress)
+		var scene := get_tree().current_scene
+		if scene:
+			DoganaFx.burst(
+				scene,
+				global_position + Vector2(randf_range(-10, 10), -36 + randf_range(-8, 4)),
+				Color(1.0, 0.9, 0.55, 0.55 + _charge_progress * 0.35),
+				3 + int(_charge_progress * 4.0),
+				Vector2.UP,
+				10.0 + _charge_progress * 20.0,
+				28.0 + _charge_progress * 50.0,
+				0.35
+			)
+
+
+func cancel_charge() -> void:
+	if not _charging and _charge_progress <= 0.0:
+		return
+	_charge_progress = 0.0
+	_charging = false
+	_update_prompt()
+	_refresh_particle_state()
+
+
 func play_activation_fx() -> void:
 	var scene := get_tree().current_scene
 	var origin := global_position + Vector2(0, -36)
-	DoganaFx.burst(scene, origin, Color(0.95, 0.82, 0.4, 0.95), 18, Vector2.UP, 35.0, 110.0, 0.8)
-	DoganaFx.burst(scene, origin + Vector2(0, -10), Color(1.0, 0.95, 0.7, 0.9), 10, Vector2.UP, 18.0, 60.0, 0.55)
+	DoganaFx.burst(scene, origin, Color(0.95, 0.82, 0.4, 0.95), 22, Vector2.UP, 35.0, 130.0, 0.9)
+	DoganaFx.burst(scene, origin + Vector2(0, -10), Color(1.0, 0.95, 0.7, 0.9), 14, Vector2.UP, 18.0, 70.0, 0.65)
+	DoganaFx.pulse_ring(scene, origin, Color(0.95, 0.82, 0.4, 0.75))
 	var camera := get_tree().get_first_node_in_group("camera")
 	if camera and camera.has_method("add_shake"):
-		camera.call("add_shake", 0.28 if not _mobile else 0.18)
+		camera.call("add_shake", 0.32 if not _mobile else 0.2)
 	if _illustration:
 		var tween := create_tween()
-		tween.tween_property(_illustration, "modulate", Color(1.35, 1.2, 0.75, 1.0), 0.08)
-		tween.tween_property(_illustration, "modulate", Color(1.05, 0.92, 0.62, 1.0), 0.4)
+		tween.tween_property(_illustration, "modulate", Color(1.45, 1.25, 0.75, 1.0), 0.08)
+		tween.tween_property(_illustration, "modulate", Color(1.05, 0.92, 0.62, 1.0), 0.5)
+	_charge_progress = 0.0
+	_charging = false
+	_refresh_particle_state()
 
 
 func play_rest_fx() -> void:
 	var scene := get_tree().current_scene
 	var origin := global_position + Vector2(0, -36)
-	DoganaFx.burst(scene, origin, Color(0.95, 0.85, 0.5, 0.85), 12, Vector2.UP, 22.0, 70.0, 0.55)
+	DoganaFx.burst(scene, origin, Color(0.95, 0.85, 0.5, 0.9), 16, Vector2.UP, 22.0, 85.0, 0.65)
+	DoganaFx.pulse_ring(scene, origin, Color(0.95, 0.85, 0.5, 0.55))
 	var camera := get_tree().get_first_node_in_group("camera")
 	if camera and camera.has_method("add_shake"):
-		camera.call("add_shake", 0.12)
+		camera.call("add_shake", 0.16)
+	_charge_progress = 0.0
+	_charging = false
+	_refresh_particle_state()
 
 
 func get_respawn_position() -> Vector2:
@@ -93,6 +141,7 @@ func _on_body_entered(body: Node2D) -> void:
 func _on_body_exited(body: Node2D) -> void:
 	if body.is_in_group("player"):
 		_player_near = false
+		cancel_charge()
 		_update_prompt()
 		_refresh_particle_state()
 
@@ -101,7 +150,12 @@ func _update_prompt() -> void:
 	var prompt := get_node_or_null("Prompt") as Label
 	if prompt:
 		prompt.visible = _player_near
-		prompt.text = "E / ✦  RIPOSA" if activated else "E / ✦  RISVEGLIA L'ALTARE"
+		var verb := "RIPOSA" if activated else "RISVEGLIA L'ALTARE"
+		if _charging:
+			var pct := int(round(_charge_progress * 100.0))
+			prompt.text = "E / ✦  %s… %d%%" % [verb, pct]
+		else:
+			prompt.text = "E / ✦  TIENI PER %s" % verb
 	var name_label := get_node_or_null("Name") as Label
 	if name_label:
 		name_label.text = display_name.to_upper()
@@ -109,7 +163,6 @@ func _update_prompt() -> void:
 
 
 func _make_mote_texture() -> GradientTexture2D:
-	# Sempre cerchio soft: niente quadretti CPUParticles default.
 	var gradient := Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.0, 0.35, 0.7, 1.0])
 	gradient.colors = PackedColorArray([
@@ -154,7 +207,6 @@ func _create_light() -> void:
 
 
 func _create_grace_particles() -> void:
-	# Colonna che sale dal suolo (Site of Grace).
 	_rise_column = _make_particles("GraceRise", Vector2(0, -8))
 	_rise_column.amount = 10 if _mobile else 18
 	_rise_column.lifetime = 2.4
@@ -171,7 +223,6 @@ func _create_grace_particles() -> void:
 	_rise_column.color = Color(1.0, 0.88, 0.45, 0.7)
 	_apply_fade_ramp(_rise_column)
 
-	# Mote che arrivano da intorno e convergono verso l'altare / salgono.
 	_inbound_motes = _make_particles("GraceInbound", Vector2(0, -20))
 	_inbound_motes.amount = 14 if _mobile else 26
 	_inbound_motes.lifetime = 2.8
@@ -192,7 +243,6 @@ func _create_grace_particles() -> void:
 	_inbound_motes.color = Color(0.95, 0.8, 0.4, 0.55)
 	_apply_fade_ramp(_inbound_motes)
 
-	# Nucleo caldo vicino alla fiamma.
 	_ember_core = _make_particles("GraceCore", Vector2(0, -34))
 	_ember_core.amount = 6 if _mobile else 10
 	_ember_core.lifetime = 1.6
@@ -237,20 +287,46 @@ func _apply_fade_ramp(p: CPUParticles2D) -> void:
 
 
 func _refresh_particle_state() -> void:
-	# Idle: colonna + inbound leggeri. Vicino/attivo: tutto acceso, più denso.
-	var idle_on := true
-	var full_on := activated or _player_near
+	# Idle lontano = spento (budget 120 Hz / mobile). Solo near/activated/charging.
+	var active := activated or _player_near or _charging
+	var charge := _charge_progress
 	if _rise_column:
-		_rise_column.emitting = idle_on
-		_rise_column.amount = (14 if full_on else 8) if _mobile else (22 if full_on else 14)
-		_rise_column.color = Color(1.0, 0.9, 0.48, 0.85 if activated else 0.55)
+		_rise_column.emitting = active
+		if not active:
+			pass
+		elif _charging:
+			_rise_column.amount = mini(36 if _mobile else 40, (10 if _mobile else 16) + int(charge * 18.0))
+			_rise_column.initial_velocity_min = 12.0 + charge * 30.0
+			_rise_column.initial_velocity_max = 28.0 + charge * 55.0
+			_rise_column.gravity = Vector2(0, -22 - charge * 40.0)
+		else:
+			_rise_column.amount = 8 if _mobile else 14
+			_rise_column.initial_velocity_min = 12.0
+			_rise_column.initial_velocity_max = 28.0
+			_rise_column.gravity = Vector2(0, -22)
+		_rise_column.color = Color(1.0, 0.9, 0.48, 0.85 if activated else lerpf(0.55, 0.95, charge))
 	if _inbound_motes:
-		_inbound_motes.emitting = idle_on
-		_inbound_motes.amount = (18 if full_on else 10) if _mobile else (30 if full_on else 18)
-		_inbound_motes.radial_accel_min = -38.0 if full_on else -22.0
-		_inbound_motes.radial_accel_max = -16.0 if full_on else -10.0
+		_inbound_motes.emitting = active
+		if not active:
+			pass
+		elif _charging:
+			_inbound_motes.amount = mini(40 if _mobile else 48, (12 if _mobile else 20) + int(charge * 22.0))
+			_inbound_motes.emission_sphere_radius = lerpf(78.0, 130.0, charge)
+			_inbound_motes.radial_accel_min = lerpf(-28.0, -70.0, charge)
+			_inbound_motes.radial_accel_max = lerpf(-12.0, -35.0, charge)
+		else:
+			_inbound_motes.amount = 10 if _mobile else 18
+			_inbound_motes.emission_sphere_radius = 78.0
+			_inbound_motes.radial_accel_min = -38.0
+			_inbound_motes.radial_accel_max = -16.0
 	if _ember_core:
-		_ember_core.emitting = activated or _player_near
+		_ember_core.emitting = active
+		if _charging:
+			_ember_core.amount = (8 if _mobile else 14) + int(charge * 10.0)
+			_ember_core.scale_amount_max = lerpf(0.4, 0.85, charge)
+		else:
+			_ember_core.amount = 6 if _mobile else 10
+			_ember_core.scale_amount_max = 0.4
 
 
 func _create_illustrated_visual() -> void:

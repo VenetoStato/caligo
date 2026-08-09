@@ -721,7 +721,7 @@ func _build_health_ui() -> void:
 	column.add_theme_constant_override("separation", 5)
 	_health_panel.add_child(column)
 	var title := Label.new()
-	title.text = "IL CUSTODE SOMMERSO"
+	title.text = "IL CUSTODE DELLA SALUTE"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 16)
 	title.add_theme_color_override("font_color", Color(0.78, 0.73, 0.57, 1.0))

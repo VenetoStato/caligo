@@ -27,22 +27,42 @@ func mark_open() -> void:
 func _draw() -> void:
 	var pulse := 0.7 + sin(_time * 2.4) * 0.22
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * marker_scale)
+	var down := access_id == "archive"
 	for index in 3:
-		var y := -18.0 + index * 12.0
+		var base := -18.0 + index * 12.0
 		var offset := sin(_time * 2.0 + index) * 2.0
+		var points: PackedVector2Array
+		if down:
+			points = PackedVector2Array([
+				Vector2(-10 + offset, base - 10),
+				Vector2(0 + offset, base + 4),
+				Vector2(10 + offset, base - 10),
+			])
+		else:
+			points = PackedVector2Array([
+				Vector2(-18 + offset, base - 6),
+				Vector2(0 + offset, base),
+				Vector2(-18 + offset, base + 6),
+			])
 		draw_polyline(
-			PackedVector2Array([
-				Vector2(-18 + offset, y - 6),
-				Vector2(0 + offset, y),
-				Vector2(-18 + offset, y + 6),
-			]),
+			points,
 			Color(marker_color.r, marker_color.g, marker_color.b, pulse - index * 0.12),
-			2.4,
+			2.6,
 			true
 		)
-	draw_arc(Vector2(9, 0), 13.0 + pulse * 2.0, 0.25, TAU - 0.25, 24, Color(marker_color.r, marker_color.g, marker_color.b, pulse * 0.62), 2.0, true)
+	draw_arc(Vector2(0 if down else 9, 8 if down else 0), 14.0 + pulse * 2.0, 0.25, TAU - 0.25, 24, Color(marker_color.r, marker_color.g, marker_color.b, pulse * 0.62), 2.0, true)
+	if down:
+		draw_string(
+			ThemeDB.fallback_font,
+			Vector2(-34, 36),
+			"SOTTO",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			12,
+			Color(marker_color.r, marker_color.g, marker_color.b, pulse * 0.85)
+		)
 	for index in 4:
 		var phase := _time * (1.1 + index * 0.08) + index * 1.7
-		var mote := Vector2(8 + sin(phase) * 13.0, -25.0 - fmod(_time * 12.0 + index * 13.0, 42.0))
+		var mote := Vector2((0 if down else 8) + sin(phase) * 13.0, (-8.0 if down else -25.0) - fmod(_time * 12.0 + index * 13.0, 42.0))
 		draw_circle(mote, 1.5 + index * 0.25, Color(marker_color.r, marker_color.g, marker_color.b, 0.25 + pulse * 0.25))
 	draw_set_transform(Vector2.ZERO)

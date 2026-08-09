@@ -77,7 +77,11 @@ func _draw_main_regions() -> void:
 		draw_rect(rect, _room_fill("palace"), true)
 		draw_rect(rect, _room_edge("palace"), false, 1.1)
 	_draw_room("canal", Rect2(_p(0.59, 0.48), size * Vector2(0.18, 0.12)), "CANALE")
-	_draw_room("fortuna", Rect2(_p(0.77, 0.29), size * Vector2(0.15, 0.27)), "FORTUNA")
+	_draw_room("fortuna", Rect2(_p(0.74, 0.29), size * Vector2(0.12, 0.27)), "FORTUNA")
+	_draw_room("salute", Rect2(_p(0.86, 0.34), size * Vector2(0.11, 0.28)), "SALUTE")
+	# Cupola semplificata sulla mappa.
+	if bool(_regions.get("salute", false)):
+		draw_arc(_p(0.915, 0.4), 18.0, PI, TAU, 20, Color(0.72, 0.62, 0.4, 0.7), 2.4, true)
 	for step in 4:
 		var rect := Rect2(_p(0.69 + step * 0.035, 0.49 - step * 0.055), size * Vector2(0.05, 0.035))
 		draw_rect(rect, _room_fill("canal"), true)
@@ -100,9 +104,9 @@ func _draw_secret_regions() -> void:
 
 
 func _draw_route() -> void:
-	var route := PackedVector2Array([_p(0.09, 0.64), _p(0.25, 0.61), _p(0.42, 0.49), _p(0.59, 0.55), _p(0.69, 0.52), _p(0.78, 0.44), _p(0.86, 0.32)])
+	var route := PackedVector2Array([_p(0.09, 0.64), _p(0.25, 0.61), _p(0.42, 0.49), _p(0.59, 0.55), _p(0.69, 0.52), _p(0.78, 0.44), _p(0.86, 0.42), _p(0.92, 0.48)])
 	for index in route.size() - 1:
-		var region_id: String = ["arrival", "customs", "customs", "canal", "canal", "fortuna"][index]
+		var region_id: String = ["arrival", "customs", "customs", "canal", "canal", "fortuna", "salute"][index]
 		if bool(_regions.get(region_id, false)):
 			draw_line(route[index], route[index + 1], Color(0.78, 0.65, 0.36, 0.62), 2.4, true)
 	if bool(_regions.get("palace", false)):

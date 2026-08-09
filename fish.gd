@@ -27,7 +27,7 @@ extends RigidBody2D
 ## Distanza minima dalla superficie: i pesci restano più in giù, lontani dal bordo (px sotto superficie)
 @export var min_depth_from_top: float = 70.0
 ## Raggio della "reel zone": vicino al player il pesce ignora limiti acqua e viene solo reelato / può uscire
-@export var reel_zone_radius: float = 100.0
+@export var reel_zone_radius: float = 160.0
 ## Sotto questa profondità dalla superficie il pesce è "vicino al bordo" e può uscire (salto)
 @export var near_surface_depth: float = 70.0
 
@@ -39,13 +39,13 @@ extends RigidBody2D
 @export_category("Struggle")
 @export var struggle_strength: float = 320.0
 @export var struggle_duration: float = 1.5
-@export var reel_resistance: float = 0.95
+@export var reel_resistance: float = 1.0
 ## Resistenza costante verso l'amo quando agganciato (nuota via)
-@export var hooked_resist_strength: float = 24.0
-## Velocità max quando agganciato: più alta = reel avvicina bene il pesce
-@export var hooked_max_speed: float = 130.0
+@export var hooked_resist_strength: float = 22.0
+## Velocità max quando agganciato (più alta in reel così la tirata si sente)
+@export var hooked_max_speed: float = 160.0
 ## Damping più forte quando agganciato (movimento più fluido)
-@export var hooked_damping: float = 0.92
+@export var hooked_damping: float = 0.94
 
 @export_category("Visual")
 ## Colore normale del pesce
@@ -104,6 +104,10 @@ const FLIP_COOLDOWN_TIME: float = 0.35       # secondi tra un flip e l'altro
 var _variant_sprite: bool = false
 # Tirare durante la lotta = pesce rosso (segnalato dal player)
 var _wrong_reel: bool = false
+## Se false (default in lotta): il pesce resta sotto la superficie — niente levitazione.
+var _allow_surface_exit: bool = false
+## True dopo do_catch_jump finche' non rientra in acqua o viene catturato.
+var _catch_jump_active: bool = false
 # Riferimento al water body per restare nei limiti dell'acqua
 var _water_body: Node = null
 ## Margine dai bordi: i pesci restano distanti dai bordi dell'acqua
@@ -237,71 +241,103 @@ func _physics_process(delta: float):
 	var active_scene := get_tree().current_scene
 	if active_scene == null or not active_scene.is_ancestor_of(self):
 		return
-	# Aggiorna cooldown
 	_swim_animation_time += delta * _individual_speed_scale
 	if hook_cooldown > 0:
 		hook_cooldown -= delta
 	if _flip_cooldown > 0:
 		_flip_cooldown -= delta
-	
-	# FORZA: blocca sempre la rotazione
+
 	lock_rotation = true
 	rotation = 0.0
-	
-	# Se agganciato e sopra la superficie (ma non in reel zone): gravità lo riporta in acqua
+	# Sempre physics custom: niente freeze (causa glitch).
+	freeze = false
+	collision_mask = 0
+	gravity_scale = 0.0
+
+	# Se sei sotto la superficie nel bacino → sei in acqua (anche dopo uno scatto fuori).
+	_try_reenter_water()
+
 	var above_surface: bool = _is_above_water_surface()
-	var use_gravity_out_of_water: bool = is_hooked_to_player and above_surface and not _in_reel_zone()
-	var effectively_in_water: bool = in_water and not use_gravity_out_of_water
+	# Fuori acqua solo se sopra superficie o gia' uscito.
+	var out_of_water: bool = is_hooked_to_player and (above_surface or not in_water)
+	var effectively_in_water: bool = in_water and not out_of_water
 
 	if effectively_in_water:
 		if is_escaping:
 			_process_escaping(delta)
 		else:
 			_process_swimming(delta)
+	elif is_hooked_to_player:
+		_process_hooked_out_of_water(delta)
 	else:
-		if is_hooked_to_player:
-			_process_hooked_out_of_water(delta)
-		else:
-			_process_falling(delta)
+		_process_falling(delta)
 
-	# Usa linear_velocity invece di modificare global_position direttamente
 	linear_velocity = velocity
 	_update_sprite_direction()
 	_update_sprite_color()
 	_update_breathing(delta)
-	
-	# Mantieni i pesci vicini alla parte alta dell'acqua (in reel zone non spingiamo giù)
 	_keep_near_top()
-	# Resta dentro i limiti del water body; in reel zone vicino al player non clampare così può uscire / essere reelato
-	if effectively_in_water and not (is_hooked_to_player and _in_reel_zone()):
+
+	# In lotta: resta in acqua. In sbarco: niente clamp cosi' puo' uscire verso la canna.
+	if effectively_in_water and is_hooked_to_player and not _allow_surface_exit:
 		_clamp_to_water_bounds()
-	# Se era sopra superficie e ora è ridisceso in acqua, torna a nuotare (gravity_scale resta 0)
-	if use_gravity_out_of_water and not _is_above_water_surface() and _water_body != null:
-		in_water = true
-		gravity_scale = 0.0
+		_clamp_below_surface(8.0)
+	elif effectively_in_water and not is_hooked_to_player:
+		_clamp_to_water_bounds()
+
+
+## Rientro acqua: sotto superficie + dentro bacino → nuoto normale.
+func _try_reenter_water() -> bool:
+	var surface_y := _get_water_surface_y()
+	if surface_y >= INF:
+		return false
+	if not _is_inside_water_bounds():
+		return false
+	if global_position.y < surface_y + 10.0:
+		return false
+	in_water = true
+	_catch_jump_active = false
+	gravity_scale = 0.0
+	freeze = false
+	return true
 
 func _process_swimming(delta: float):
 	var desired = Vector2.ZERO
 
 	if is_hooked_to_player:
-		# Reel force: smooth per evitare tremolio (direzione non salta frame a frame)
-		if reel_force.length_squared() > 0.01:
+		var reeling_now := reel_force.length_squared() > 0.01
+		# Reel: tirata verso la canna.
+		if reeling_now:
 			_reel_force_smoothed = _reel_force_smoothed.lerp(reel_force, delta * REEL_FORCE_SMOOTH)
-			desired += _reel_force_smoothed * reel_resistance
+			var reel_dir := _reel_force_smoothed.normalized()
+			if not _allow_surface_exit:
+				# In acqua: poco lift (niente levitazione).
+				reel_dir = Vector2(reel_dir.x, clampf(reel_dir.y, -0.55, 0.85)).normalized()
+			var reel_speed := clampf(_reel_force_smoothed.length() * (0.28 if _allow_surface_exit else 0.24), 90.0, 230.0)
+			desired += reel_dir * reel_speed * reel_resistance
 		else:
 			_reel_force_smoothed = _reel_force_smoothed.lerp(Vector2.ZERO, delta * 5.0)
 		reel_force = reel_force.lerp(Vector2.ZERO, delta * 3.0)
 
-		# Resistenza costante: nuota via dall'amo (più sfida)
-		if target_hook != null and is_instance_valid(target_hook):
-			var away = (global_position - target_hook.global_position).normalized()
-			desired += away * hooked_resist_strength
+		# Resistenza: si indebolisce mentre reeli.
+		var resist_mul := 0.25 if reeling_now else 1.0
+		var resist_from: Vector2 = global_position
+		if player_ref != null and is_instance_valid(player_ref):
+			resist_from = (player_ref as Node2D).global_position
+		elif target_hook != null and is_instance_valid(target_hook):
+			resist_from = (target_hook as Node2D).global_position
+		var away := global_position - resist_from
+		away.y *= 0.25
+		if away.length_squared() > 0.01:
+			desired += away.normalized() * hooked_resist_strength * resist_mul
 
 		# Struggle: lotta via dal player
 		if is_struggling:
 			struggle_timer -= delta
 			if struggle_timer > 0.0:
-				desired += struggle_direction * struggle_strength
+				var sdir := Vector2(struggle_direction.x, struggle_direction.y * 0.45)
+				if sdir.length_squared() > 0.01:
+					desired += sdir.normalized() * struggle_strength
 			else:
 				is_struggling = false
 
@@ -339,8 +375,8 @@ func _process_swimming(delta: float):
 		swim_direction = swim_direction.slerp(_target_swim_direction, minf(1.0, delta * 1.35)).normalized()
 		desired = swim_direction * natural_swim_speed * _individual_speed_scale
 
-	# Boundary steering: in reel zone vicino al player non spingere verso i bordi, così il pesce va diritto verso il player
-	if not (is_hooked_to_player and _in_reel_zone()):
+	# Boundary home: disattivato se agganciato, altrimenti combatte il reel e il pesce resta appeso.
+	if not is_hooked_to_player:
 		var offset = global_position - home_position
 		if offset.x > swim_bounds_x:
 			desired.x -= boundary_push
@@ -351,12 +387,14 @@ func _process_swimming(delta: float):
 		elif offset.y < -swim_bounds_y:
 			desired.y += boundary_push
 
-	velocity = velocity.lerp(desired, delta * swim_response)
-	# Quando agganciato: damping più forte e cap velocità per evitare tremolio
+	var response := swim_response * (1.8 if is_hooked_to_player and reel_force.length_squared() > 0.01 else 1.0)
+	velocity = velocity.lerp(desired, delta * response)
+	# Quando agganciato: damping e cap; in reel alza il cap così la tirata si sente.
 	if is_hooked_to_player:
 		velocity *= hooked_damping
-		if velocity.length() > hooked_max_speed:
-			velocity = velocity.normalized() * hooked_max_speed
+		var speed_cap := hooked_max_speed * (1.35 if reel_force.length_squared() > 0.01 else 1.0)
+		if velocity.length() > speed_cap:
+			velocity = velocity.normalized() * speed_cap
 	else:
 		velocity *= water_damping
 
@@ -374,6 +412,22 @@ func _clamp_to_water_bounds():
 	p.x = clampf(p.x, r.position.x, r.position.x + r.size.x)
 	p.y = clampf(p.y, r.position.y, r.position.y + r.size.y)
 	global_position = p
+
+
+func _clamp_below_surface(min_depth: float = 10.0) -> void:
+	var water_area = _find_water_area()
+	if water_area == null:
+		return
+	var surface_y: float = water_area.global_position.y
+	if "target_height" in water_area:
+		surface_y += water_area.target_height
+	var floor_y := surface_y + min_depth
+	if global_position.y < floor_y:
+		global_position.y = floor_y
+		if velocity.y < 0.0:
+			velocity.y = 0.0
+		if linear_velocity.y < 0.0:
+			linear_velocity.y = 0.0
 
 func _process_escaping(delta: float):
 	# Nuota via nella direzione di fuga ma RESTA nei limiti del water body
@@ -409,25 +463,58 @@ func _process_escaping(delta: float):
 		home_position = global_position
 		_pick_new_swim_direction()
 
-## Fuori acqua ma agganciato: peso morto (gravità) + reel verso il player così resta appeso e puoi tirarlo
+## Fuori acqua ma agganciato: gravita' + tirata verso il player; se rientra → acqua.
 func _process_hooked_out_of_water(delta: float):
-	var desired := Vector2.ZERO
-	# Reel: verso il player/amo così puoi reelarlo e mangiarlo
+	velocity.y += 520.0 * delta
+	velocity.y = minf(velocity.y, 360.0)
 	if reel_force.length_squared() > 0.01:
 		_reel_force_smoothed = _reel_force_smoothed.lerp(reel_force, delta * REEL_FORCE_SMOOTH)
-		desired += _reel_force_smoothed * reel_resistance * 1.4
+		var reel_dir := _reel_force_smoothed.normalized()
+		var reel_speed := clampf(_reel_force_smoothed.length() * 0.3, 140.0, 280.0)
+		velocity = velocity.lerp(reel_dir * reel_speed, delta * 7.0)
 	else:
-		_reel_force_smoothed = _reel_force_smoothed.lerp(Vector2.ZERO, delta * 3.0)
-	reel_force = reel_force.lerp(Vector2.ZERO, delta * 2.0)
-	# Peso morto: gravità
-	desired.y += 400.0 * delta
-	velocity = velocity.lerp(desired, delta * 5.0)
-	velocity.y += 280.0 * delta
-	velocity.x *= 0.97
+		_reel_force_smoothed = _reel_force_smoothed.lerp(Vector2.ZERO, delta * 3.5)
+	reel_force = reel_force.lerp(Vector2.ZERO, delta * 2.5)
+	velocity.x *= 0.98
 
+	# Rientro: sempre, anche dopo sbarco (poi torna fisica acqua).
+	if _try_reenter_water():
+		velocity.y = minf(velocity.y, 40.0)
+		return
+
+	# Pavimento solo fuori dal bacino (pontile/vuoto) — non sopra l'acqua, altrimenti non rientra.
+	if not _is_inside_water_bounds() and player_ref != null and is_instance_valid(player_ref):
+		var floor_y: float = (player_ref as Node2D).global_position.y + 48.0
+		if global_position.y > floor_y:
+			global_position.y = floor_y
+			if velocity.y > 0.0:
+				velocity.y = 0.0
+
+
+## Fuori acqua (non agganciato): ricade / rientra nel bacino.
 func _process_falling(delta: float):
 	velocity.y += 980.0 * delta
 	velocity.x *= 0.98
+	if _try_reenter_water():
+		velocity.y = minf(velocity.y, 40.0)
+		_clamp_to_water_bounds()
+
+
+func _get_water_surface_y() -> float:
+	var water_area = _find_water_area()
+	if water_area == null:
+		return INF
+	var surface_y: float = water_area.global_position.y
+	if "target_height" in water_area:
+		surface_y += water_area.target_height
+	return surface_y
+
+
+func _is_inside_water_bounds() -> bool:
+	var r := _get_water_bounds_rect()
+	var expanded := Rect2(r.position - Vector2(20, 12), r.size + Vector2(40, 24))
+	return expanded.has_point(global_position)
+
 
 func _pick_new_swim_direction():
 	# Conserva una rotta coerente e cambia lato solo occasionalmente.
@@ -514,7 +601,6 @@ func _try_hook_to_player():
 		elif player_ref.has_method("on_fish_spawned"):
 			player_ref.call("on_fish_spawned", self)
 		is_hooked_to_player = true
-		print("🎣 Pesce agganciato!")
 
 # ===========================================
 # COLLISION
@@ -549,6 +635,9 @@ func _on_area_exited(area: Area2D):
 	var an = area.name.to_lower()
 	var pn = area.get_parent().name.to_lower() if area.get_parent() else ""
 	if "water" in an or "water" in pn or area.is_in_group("water"):
+		# Se sei ancora sotto superficie nel bacino, resti in acqua.
+		if _try_reenter_water():
+			return
 		in_water = false
 
 func _on_hook_detected(hook: Node):
@@ -573,6 +662,8 @@ func release_from_hook():
 	
 	# SEMPRE: pesce in acqua, mai cadere o fluttuare nel vuoto
 	gravity_scale = 0.0
+	freeze = false
+	collision_mask = 0
 	in_water = true
 	
 	# Azzera stato aggancio
@@ -582,6 +673,9 @@ func release_from_hook():
 	struggle_timer = 0.0
 	reel_force = Vector2.ZERO
 	_wrong_reel = false
+	_allow_surface_exit = false
+	_catch_jump_active = false
+	_reel_force_smoothed = Vector2.ZERO
 	player_ref = null
 	target_hook = null
 	
@@ -593,6 +687,7 @@ func release_from_hook():
 			p.x = clampf(p.x, r.position.x + WATER_BOUNDS_MARGIN, r.position.x + r.size.x - WATER_BOUNDS_MARGIN)
 			p.y = clampf(p.y, r.position.y + WATER_BOUNDS_MARGIN, r.position.y + r.size.y - WATER_BOUNDS_MARGIN)
 			global_position = p
+	_try_reenter_water()
 	
 	# Resta dove si è liberato: home = posizione attuale, torna subito a nuotare normale
 	home_position = global_position + home_offset
@@ -610,8 +705,11 @@ func set_player_reference(player: Node):
 	is_hooked_to_player = true
 	is_attracted = false
 	is_escaping = false
+	_allow_surface_exit = false
+	_catch_jump_active = false
+	freeze = false
 	_reel_force_smoothed = Vector2.ZERO  # reset smooth quando si aggancia
-
+	_try_reenter_water()
 func attract_to(target_pos: Vector2):
 	if hook_cooldown > 0 or is_escaping:
 		return
@@ -621,6 +719,29 @@ func attract_to(target_pos: Vector2):
 func apply_reel_force(force: Vector2):
 	# Non sovrascrivere bruscamente: il smoothing è in _process_swimming
 	reel_force = force
+
+
+## Tiro a lenza tesa: sposta il pesce verso la canna.
+func pull_along_line(rod_pos: Vector2, amount: float, allow_exit: bool = false) -> void:
+	if amount <= 0.0 or not is_hooked_to_player:
+		return
+	var to_rod := rod_pos - global_position
+	if to_rod.length_squared() < 0.0001:
+		return
+	var dir := to_rod.normalized()
+	var exiting := allow_exit or _allow_surface_exit
+	if not exiting:
+		dir = Vector2(dir.x, clampf(dir.y, -0.4, 0.9)).normalized()
+	global_position += dir * amount
+	velocity = velocity.lerp(dir * minf(hooked_max_speed * 1.25, amount * 80.0), 0.65)
+	if exiting and _is_above_water_surface():
+		in_water = false
+	elif not exiting:
+		_clamp_below_surface(6.0)
+		_clamp_to_water_bounds()
+	# Se dopo il tiro sei di nuovo sotto, rientri.
+	_try_reenter_water()
+
 
 func apply_struggle_force(force: Vector2):
 	# Forza applicata dal player durante lo struggle (cap per evitare spike)
@@ -643,19 +764,30 @@ func stop_struggle():
 	is_struggling = false
 	struggle_timer = 0.0
 
-## Scatto verso l'alto e verso il player fuori dall'acqua (~50 px), così puoi reelarlo (mai verso il basso)
+## Scatto verso la riva / canna: esce dall'acqua.
 func do_catch_jump():
-	var up_strength: float = 320.0
-	var toward_strength: float = 220.0
+	_allow_surface_exit = true
+	_catch_jump_active = true
 	in_water = false
+	freeze = false
+	gravity_scale = 0.0
+	var up_strength: float = 200.0
+	var toward_strength: float = 320.0
 	if player_ref != null and is_instance_valid(player_ref):
-		var to_player: Vector2 = (player_ref.global_position - global_position).normalized()
-		# Sempre verso l'alto + verso il player
+		var to_player: Vector2 = ((player_ref as Node2D).global_position - global_position).normalized()
 		velocity.x = to_player.x * toward_strength
 		velocity.y = -up_strength
+		global_position += Vector2(to_player.x * 22.0, -14.0)
 	else:
 		velocity.y = -up_strength
 		velocity.x *= 0.25
+		global_position.y -= 14.0
+
+func set_allow_surface_exit(allowed: bool) -> void:
+	_allow_surface_exit = allowed
+	# Se spegni lo sbarco e sei sotto, torna subito in acqua.
+	if not allowed:
+		_try_reenter_water()
 
 func set_wrong_reel(active: bool):
 	_wrong_reel = active
@@ -719,12 +851,10 @@ func _keep_near_top():
 	var water_surface_y = water_area.global_position.y + water_area.target_height
 	var current_depth_from_surface: float = global_position.y - water_surface_y
 	
-	# In reel zone agganciato: non spingere giù, così il pesce può salire verso la superficie e uscire
-	if is_hooked_to_player and _in_reel_zone():
-		if current_depth_from_surface > max_depth_from_top:
-			var push_up: float = (current_depth_from_surface - max_depth_from_top) * 2.0
-			velocity.y -= push_up
-		# Non applicare push_down: può andare verso la superficie e saltare
+	# Fase sbarco attiva (dopo salto / vicino al player): spingi verso la superficie.
+	if is_hooked_to_player and _allow_surface_exit and (_catch_jump_active or _in_reel_zone()):
+		if current_depth_from_surface > 4.0:
+			velocity.y -= current_depth_from_surface * 3.5
 		return
 	
 	# Troppo in basso: spingi verso l'alto (resta entro la fascia)

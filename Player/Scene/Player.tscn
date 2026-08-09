@@ -160,7 +160,7 @@ _data = {
 }
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_p0c61"]
-size = Vector2(151, 136.375)
+size = Vector2(90, 70)
 
 [node name="CharacterBody2D" type="CharacterBody2D"]
 z_index = 8
