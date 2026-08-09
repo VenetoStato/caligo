@@ -253,7 +253,8 @@ func _physics_process(delta: float):
 	# During a scene swap the old physics frame can still finish after current_scene
 	# has changed. Do not touch transforms or rendering resources while our scene exits.
 	var active_scene := get_tree().current_scene
-	if active_scene == null or not active_scene.is_ancestor_of(self):
+	var under_active := active_scene != null and active_scene.is_ancestor_of(self)
+	if not under_active and not _is_under_test_root():
 		return
 	_swim_animation_time += delta * _individual_speed_scale
 	if hook_cooldown > 0:
@@ -267,21 +268,35 @@ func _physics_process(delta: float):
 	collision_mask = 0
 	gravity_scale = 0.0
 
-	# Rientro acqua: non se stai penzolando dalla lenza.
-	if not _hanging:
+	# Rientro acqua: anche da hang (puo' ricadere e tornare attivo).
+	if _hanging:
+		if _try_reenter_from_hang():
+			pass
+	elif not _catch_jump_active:
 		_try_reenter_water()
 
 	var above_surface: bool = _is_above_water_surface()
-	var out_of_water: bool = is_hooked_to_player and (above_surface or not in_water or _hanging)
-	var effectively_in_water: bool = in_water and not out_of_water and not _hanging
+	# Sopra superficie in fase sbarco → hang (dopo il saltino).
+	if (
+		is_hooked_to_player
+		and not _hanging
+		and above_surface
+		and (_catch_jump_active or _allow_surface_exit)
+		and in_water
+	):
+		_start_hanging_out_of_water()
 
-	if effectively_in_water:
-		_set_hanging(false)
-		if is_escaping:
+	if _hanging:
+		_process_hooked_out_of_water(delta)
+	elif in_water:
+		if is_escaping and not _catch_jump_active:
 			_process_escaping(delta)
 		else:
 			_process_swimming(delta)
+			if _catch_jump_active:
+				_process_surface_breach(delta)
 	elif is_hooked_to_player:
+		_start_hanging_out_of_water()
 		_process_hooked_out_of_water(delta)
 	else:
 		_set_hanging(false)
@@ -296,11 +311,20 @@ func _physics_process(delta: float):
 	_update_breathing(delta)
 	_keep_near_top()
 
-	if effectively_in_water and is_hooked_to_player and not _allow_surface_exit:
+	if in_water and not _hanging and is_hooked_to_player and not _allow_surface_exit and not _catch_jump_active:
 		_clamp_to_water_bounds()
 		_clamp_below_surface(8.0)
-	elif effectively_in_water and not is_hooked_to_player:
+	elif in_water and not _hanging and not is_hooked_to_player:
 		_clamp_to_water_bounds()
+
+
+func _is_under_test_root() -> bool:
+	var n: Node = self
+	while n != null:
+		if n.has_meta("is_test_root"):
+			return true
+		n = n.get_parent()
+	return false
 
 
 ## Rientro acqua: sotto superficie + dentro bacino → nuoto normale.
@@ -319,6 +343,29 @@ func _try_reenter_water() -> bool:
 	freeze = false
 	return true
 
+
+## Da hang: se ricade sotto la superficie torna attivo in acqua (ancora agganciato).
+func _try_reenter_from_hang() -> bool:
+	if not _hanging:
+		return false
+	var surface_y := _get_water_surface_y()
+	if surface_y >= INF:
+		return false
+	if not _is_inside_water_bounds():
+		return false
+	# Abbastanza sotto: rientra e nuota di nuovo.
+	if global_position.y < surface_y + 16.0:
+		return false
+	in_water = true
+	_catch_jump_active = false
+	_allow_surface_exit = true
+	_set_hanging(false)
+	velocity.y = minf(velocity.y, 60.0)
+	velocity.x *= 0.7
+	gravity_scale = 0.0
+	freeze = false
+	return true
+
 func _process_swimming(delta: float):
 	var desired = Vector2.ZERO
 
@@ -328,10 +375,15 @@ func _process_swimming(delta: float):
 		if reeling_now:
 			_reel_force_smoothed = _reel_force_smoothed.lerp(reel_force, delta * REEL_FORCE_SMOOTH)
 			var reel_dir := _reel_force_smoothed.normalized()
-			if not _allow_surface_exit:
+			if _catch_jump_active or _allow_surface_exit:
+				# Solo in uscita: piu' forza verso l'alto.
+				reel_dir = Vector2(reel_dir.x * 0.55, minf(reel_dir.y, -0.7)).normalized()
+				var exit_speed := clampf(_reel_force_smoothed.length() * 0.22, 90.0, 200.0)
+				desired += reel_dir * exit_speed * reel_resistance
+			else:
 				reel_dir = Vector2(reel_dir.x, clampf(reel_dir.y, -0.4, 0.7)).normalized()
-			var reel_speed := clampf(_reel_force_smoothed.length() * 0.12, 28.0, 85.0)
-			desired += reel_dir * reel_speed * reel_resistance
+				var reel_speed := clampf(_reel_force_smoothed.length() * 0.12, 28.0, 85.0)
+				desired += reel_dir * reel_speed * reel_resistance
 		else:
 			_reel_force_smoothed = _reel_force_smoothed.lerp(Vector2.ZERO, delta * 3.0)
 		reel_force = reel_force.lerp(Vector2.ZERO, delta * 2.0)
@@ -409,12 +461,13 @@ func _process_swimming(delta: float):
 		elif offset.y < -swim_bounds_y:
 			desired.y += boundary_push
 
-	# Reel: risposta lenta = movimento calmo.
-	var response := swim_response * (0.9 if is_hooked_to_player and reel_force.length_squared() > 0.01 else 1.0)
+	# Reel: risposta calma (niente strattone eccessivo).
+	var reeling_hooked := is_hooked_to_player and reel_force.length_squared() > 0.01
+	var response := swim_response * (0.9 if reeling_hooked else 1.0)
 	velocity = velocity.lerp(desired, delta * response)
 	if is_hooked_to_player:
 		velocity *= 0.96
-		var speed_cap := hooked_max_speed * (1.05 if reel_force.length_squared() > 0.01 else 0.9)
+		var speed_cap := hooked_max_speed * (1.05 if reeling_hooked else 0.9)
 		if velocity.length() > speed_cap:
 			velocity = velocity.normalized() * speed_cap
 	else:
@@ -485,31 +538,32 @@ func _process_escaping(delta: float):
 		home_position = global_position
 		_pick_new_swim_direction()
 
-## Fuori acqua: SOLO gravita' + penzoloni dalla lenza (bocca sull'amo).
+## Fuori acqua: gravita' + lenza a raggio MAX (niente allungo / snap lungo).
 func _process_hooked_out_of_water(delta: float):
 	_set_hanging(true)
 	in_water = false
 
-	# Gravita' verso il basso.
-	velocity.y += 820.0 * delta
-	velocity.y = minf(velocity.y, 420.0)
-	velocity.x *= 0.985
+	var reeling_hang := reel_force.length_squared() > 0.01 and _has_tether
 
-	# Issaggio calmo verso la canna (smooth).
-	if reel_force.length_squared() > 0.01 and _has_tether:
-		_reel_force_smoothed = _reel_force_smoothed.lerp(reel_force, delta * 1.6)
+	velocity.y += (820.0 if reeling_hang else 980.0) * delta
+	velocity.y = minf(velocity.y, 480.0)
+	velocity.x *= 0.995
+
+	if reeling_hang:
+		_reel_force_smoothed = _reel_force_smoothed.lerp(reel_force, delta * 2.2)
 		var to_rod := _tether_anchor - global_position
-		if to_rod.length_squared() > 0.01:
-			velocity = velocity.lerp(to_rod.normalized() * 55.0, delta * 1.8)
+		var dist := to_rod.length()
+		if dist > 0.01:
+			var radial := to_rod / dist
+			var hang_speed := clampf(_reel_force_smoothed.length() * 0.1, 60.0, 140.0)
+			var radial_v := velocity.dot(radial)
+			velocity += radial * maxf(0.0, hang_speed - radial_v) * delta * 4.0
 	else:
-		_reel_force_smoothed = _reel_force_smoothed.lerp(Vector2.ZERO, delta * 2.2)
-		# Tende a penzolare sotto la canna.
-		if _has_tether:
-			var hang_rest := Vector2(_tether_anchor.x, _tether_anchor.y + _tether_length)
-			velocity = velocity.lerp((hang_rest - global_position) * 1.6, delta * 1.4)
-	reel_force = reel_force.lerp(Vector2.ZERO, delta * 1.8)
+		_reel_force_smoothed = _reel_force_smoothed.lerp(Vector2.ZERO, delta * 2.0)
 
-	_constrain_hanging_to_line()
+	reel_force = reel_force.lerp(Vector2.ZERO, delta * 1.8)
+	# Solo limite massimo: se la lenza e' piu' lunga non "stirarla" fino al raggio.
+	_constrain_hanging_to_line(false)
 
 
 ## Punto di attacco lenza = bocca (Marker2D "Mouth" se presente).
@@ -520,6 +574,14 @@ func get_line_attach_point() -> Vector2:
 	if _hanging:
 		return global_position
 	return global_position + _mouth_offset_swim()
+
+
+func get_hang_tether_length() -> float:
+	return _tether_length if _has_tether else 0.0
+
+
+func is_catch_jump_active() -> bool:
+	return _catch_jump_active
 
 
 func is_hanging() -> bool:
@@ -551,21 +613,32 @@ func _mouth_offset_swim() -> Vector2:
 	return Vector2(_head_facing_x() * _computed_mouth_offset(), -2.0)
 
 
+func _mouth_local_from_center() -> Vector2:
+	# Offset bocca dal centro texture (spazio locale, senza flip).
+	var ox := _computed_mouth_offset()
+	if _variant_sprite:
+		# sarago/boops: bocca a destra nella texture.
+		return Vector2(ox, -1.0)
+	# fishes.png: bocca a sinistra.
+	return Vector2(-ox, -1.0)
+
+
+func _mouth_to_tail_local() -> Vector2:
+	# Direzione testa→coda nella texture (lato lungo del pesce).
+	return Vector2.LEFT if _variant_sprite else Vector2.RIGHT
+
+
 func _set_hanging(enabled: bool) -> void:
 	if _hanging == enabled:
 		return
 	if enabled:
-		# Origine = bocca.
 		var mouth_mark := get_node_or_null("Mouth") as Node2D
 		if mouth_mark != null:
 			global_position = mouth_mark.global_position
 		else:
 			global_position += _mouth_offset_swim()
 		_hanging = true
-		if sprite != null:
-			sprite.position = Vector2(0.0, hang_body_drop)
-			# Testa in alto (bocca sull'amo), corpo sotto.
-			sprite.rotation = PI * 0.5 if _head_facing_x() < 0.0 else -PI * 0.5
+		_apply_hanging_pose(Vector2.DOWN)
 	else:
 		if sprite != null:
 			global_position += sprite.position
@@ -574,11 +647,27 @@ func _set_hanging(enabled: bool) -> void:
 		_hanging = false
 
 
+func _apply_hanging_pose(body_dir: Vector2) -> void:
+	if sprite == null:
+		return
+	var base := absf(_fish_base_scale)
+	sprite.scale = Vector2(base, base)
+	var dir := body_dir.normalized() if body_dir.length_squared() > 0.0001 else Vector2.DOWN
+	var axis := _mouth_to_tail_local()
+	sprite.rotation = dir.angle() - axis.angle()
+	# Origine nodo = bocca: sposta lo sprite cosi' la bocca resta sull'amo.
+	sprite.position = -_mouth_local_from_center().rotated(sprite.rotation)
+
+
 func _update_hanging_visual(_delta: float) -> void:
 	if sprite == null or not _hanging:
 		return
-	sprite.position = Vector2(0.0, hang_body_drop)
-	sprite.rotation = PI * 0.5 if _head_facing_x() < 0.0 else -PI * 0.5
+	var body_dir := Vector2.DOWN
+	if _has_tether:
+		var along := global_position - _tether_anchor
+		if along.length_squared() > 4.0:
+			body_dir = along.normalized()
+	_apply_hanging_pose(body_dir)
 
 
 func set_line_tether(anchor: Vector2, length: float) -> void:
@@ -591,29 +680,32 @@ func clear_line_tether() -> void:
 	_has_tether = false
 
 
-## Bocca agganciata: pende sotto la canna entro lunghezza lenza.
-func _constrain_hanging_to_line() -> void:
+## Bocca agganciata: lenza TESA (raggio fisso) → dondola come pendolo.
+func _constrain_hanging_to_line(taut: bool = false) -> void:
 	if not _has_tether:
 		return
 	var offset := global_position - _tether_anchor
 	var dist := offset.length()
+	var len := _tether_length
 	if dist < 0.001:
-		global_position = _tether_anchor + Vector2(0.0, _tether_length)
+		global_position = _tether_anchor + Vector2(0.0, len)
+		velocity.x *= 0.98
 		return
-	if dist > _tether_length:
-		var n := offset / dist
-		global_position = _tether_anchor + n * _tether_length
-		var outward := velocity.dot(n)
-		if outward > 0.0:
-			velocity -= n * outward
+	var n := offset / dist
+	# Appeso: sempre tesa. Altrimenti solo limite massimo.
+	if taut or dist > len:
+		global_position = _tether_anchor + n * len
+		# Togli solo la velocita' radiale: resta lo swing tangenziale.
+		var radial_v := velocity.dot(n)
+		velocity -= n * radial_v
 
 
 func _apply_line_tether_constraint() -> void:
-	_constrain_hanging_to_line()
+	_constrain_hanging_to_line(true)
 
 
 func _apply_soft_line_tether(_delta: float) -> void:
-	_constrain_hanging_to_line()
+	_constrain_hanging_to_line(true)
 
 
 ## Fuori acqua (non agganciato): ricade / rientra nel bacino.
@@ -683,7 +775,7 @@ func _update_sprite_direction():
 		_flip_cooldown = FLIP_COOLDOWN_TIME
 
 func _update_breathing(delta: float):
-	if sprite == null:
+	if sprite == null or _hanging:
 		return
 	_breath_timer += delta
 	var t = sin(_breath_timer * 2.6)
@@ -849,7 +941,7 @@ func apply_reel_force(force: Vector2):
 	reel_force = force
 
 
-## Tiro a lenza: solo velocita' smooth (niente teleport = niente scatti).
+## Tiro a lenza: velocita' smooth + piccolo passo verso la canna.
 func pull_along_line(rod_pos: Vector2, amount: float, allow_exit: bool = false) -> void:
 	if amount <= 0.0 or not is_hooked_to_player:
 		return
@@ -860,8 +952,28 @@ func pull_along_line(rod_pos: Vector2, amount: float, allow_exit: bool = false) 
 	var exiting := allow_exit or _allow_surface_exit or _hanging
 	if not exiting:
 		dir = Vector2(dir.x, clampf(dir.y, -0.35, 0.75)).normalized()
+	elif not _hanging:
+		dir = Vector2(dir.x * 0.55, minf(dir.y, -0.7)).normalized()
 	var target_speed := clampf(amount * 18.0, 22.0, 70.0)
-	velocity = velocity.lerp(dir * target_speed, 0.12)
+	var step := clampf(amount * 0.7, 1.5, 10.0)
+	if exiting and not _hanging:
+		target_speed = clampf(amount * 34.0, 70.0, 190.0)
+		step = clampf(amount * 1.2, 4.0, 18.0)
+	velocity = velocity.lerp(dir * target_speed, 0.12 if not exiting else 0.32)
+	if _hanging and _has_tether:
+		var to_anchor := global_position - _tether_anchor
+		var d := to_anchor.length()
+		if d > 0.01:
+			var radial_in := -to_anchor / d
+			global_position += radial_in * minf(step, maxf(0.0, d - 18.0))
+			_tether_length = maxf(18.0, d - step)
+			var rv := velocity.dot(radial_in)
+			if rv < 0.0:
+				velocity -= radial_in * rv
+			_constrain_hanging_to_line(true)
+	else:
+		global_position += dir * minf(step, to_rod.length())
+	linear_velocity = velocity
 	if exiting and (_is_above_water_surface() or _hanging):
 		in_water = false
 	elif not exiting:
@@ -891,20 +1003,110 @@ func stop_struggle():
 	struggle_timer = 0.0
 
 
-## Scatto soft fuori acqua → subito penzoloni.
+## Saltino leggero fuori acqua → poi hang / possibile rientro.
 func do_catch_jump():
 	_allow_surface_exit = true
 	_catch_jump_active = true
-	in_water = false
 	freeze = false
 	gravity_scale = 0.0
+	in_water = true
+	if _hanging:
+		_set_hanging(false)
+	# Hop morbido verso l'alto (non uno strappo lungo la lenza).
+	var hop := Vector2(clampf(velocity.x * 0.4, -50.0, 50.0), -150.0)
+	if _has_tether:
+		var to_rod := _tether_anchor - global_position
+		if to_rod.length_squared() > 0.01:
+			var n := to_rod.normalized()
+			hop = Vector2(n.x * 40.0, minf(n.y * 120.0, -130.0))
+	velocity = hop
+	var surf := _get_water_surface_y()
+	if surf < INF:
+		var depth := global_position.y - surf
+		if depth > 0.0:
+			global_position.y -= minf(depth * 0.35, 22.0)
+	if _is_above_water_surface():
+		_start_hanging_out_of_water()
+
+
+## Passaggio acqua → hang (lenza = distanza attuale, niente allungo).
+func _start_hanging_out_of_water() -> void:
+	if _hanging:
+		return
+	_allow_surface_exit = true
+	_catch_jump_active = true
+	in_water = false
+	var surf := _get_water_surface_y()
+	_spawn_water_exit_effect(surf)
+	if surf < INF and global_position.y > surf - 6.0:
+		global_position.y = surf - 10.0
+	# Velocita' da saltino, non da catapulta.
+	velocity.x = clampf(velocity.x, -120.0, 120.0)
+	velocity.y = clampf(velocity.y, -160.0, 40.0)
 	_set_hanging(true)
-	# Stacco dolcissimo; poi gravita' + lenza.
-	velocity = Vector2(velocity.x * 0.25, -28.0)
+	if _has_tether:
+		# Lenza al massimo = distanza corrente (non stirare oltre).
+		_tether_length = maxf(28.0, global_position.distance_to(_tether_anchor))
+		_constrain_hanging_to_line(false)
+
+
+## Splash + gocce quando il pesce esce dall'acqua.
+func _spawn_water_exit_effect(surf_y: float) -> void:
+	var splash_y := surf_y if surf_y < INF else global_position.y
+	var splash_pos := Vector2(global_position.x, splash_y)
+	var water: Node = _find_water_area()
+	if water != null and water.has_method("splash_at"):
+		water.call("splash_at", splash_pos.x, 320.0, 96.0)
+	var parent_n := get_parent()
+	if parent_n == null:
+		return
+	var burst := CPUParticles2D.new()
+	burst.name = "FishExitSplash"
+	burst.z_index = 18
+	burst.emitting = false
+	burst.one_shot = true
+	burst.explosiveness = 0.92
+	burst.amount = 22
+	burst.lifetime = 0.45
+	burst.preprocess = 0.0
+	burst.direction = Vector2(0, -1)
+	burst.spread = 55.0
+	burst.initial_velocity_min = 70.0
+	burst.initial_velocity_max = 180.0
+	burst.gravity = Vector2(0, 520)
+	burst.scale_amount_min = 1.2
+	burst.scale_amount_max = 2.6
+	burst.color = Color(0.72, 0.88, 0.95, 0.85)
+	parent_n.add_child(burst)
+	burst.global_position = splash_pos
+	burst.emitting = true
+	# Cleanup sicuro (signal finished non sempre affidabile su CPUParticles).
+	burst.get_tree().create_timer(0.7).timeout.connect(func():
+		if is_instance_valid(burst):
+			burst.queue_free()
+	)
+
+
+## Durante l'uscita: saltino verso la superficie (non uno strappo).
+func _process_surface_breach(delta: float) -> void:
+	var surf := _get_water_surface_y()
+	if surf < INF:
+		var depth := global_position.y - surf
+		if depth > 0.0:
+			velocity.y -= (200.0 + depth * 4.0) * delta
+			velocity.y = maxf(velocity.y, -220.0)
+	if _has_tether:
+		var to_rod := _tether_anchor - global_position
+		if to_rod.length_squared() > 0.01:
+			velocity = velocity.lerp(to_rod.normalized() * 120.0, delta * 2.2)
+
 
 func set_allow_surface_exit(allowed: bool) -> void:
+	# Mai interrompere un'uscita / hang gia' avviati.
+	if _hanging or _catch_jump_active:
+		_allow_surface_exit = true
+		return
 	_allow_surface_exit = allowed
-	# Se spegni lo sbarco e sei sotto, torna subito in acqua.
 	if not allowed:
 		_try_reenter_water()
 
@@ -970,10 +1172,10 @@ func _keep_near_top():
 	var water_surface_y = water_area.global_position.y + water_area.target_height
 	var current_depth_from_surface: float = global_position.y - water_surface_y
 	
-	# Fase sbarco attiva (dopo salto / vicino al player): spingi verso la superficie.
-	if is_hooked_to_player and _allow_surface_exit and (_catch_jump_active or _in_reel_zone()):
-		if current_depth_from_surface > 4.0:
-			velocity.y -= current_depth_from_surface * 3.5
+	# Fase sbarco attiva: spingi verso la superficie.
+	if is_hooked_to_player and (_allow_surface_exit or _catch_jump_active):
+		if current_depth_from_surface > 2.0:
+			velocity.y -= current_depth_from_surface * 5.5
 		return
 	
 	# Troppo in basso: spingi verso l'alto (resta entro la fascia)

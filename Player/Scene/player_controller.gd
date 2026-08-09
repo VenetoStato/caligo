@@ -118,14 +118,14 @@ signal locked_skill_requested
 ## Impulso extra al tap di R (oltre al hold)
 @export var reel_pulse_duration: float = 0.18
 @export var fish_reel_distance: float = 42.0
-@export var fish_catch_jump_distance: float = 85.0
+@export var fish_catch_jump_distance: float = 72.0
 @export var fish_pull_strength: float = 220.0
 ## Progresso reel richiesto prima della cattura (0–1). Il morso da solo NON basta.
 @export var min_reel_progress_to_catch: float = 0.7
-@export var reel_progress_per_second: float = 0.65
-@export var min_hooked_time_before_catch: float = 1.0
-## Sbarco: solo quando hai reelato abbastanza (mid-fight resta in acqua).
-@export var catch_jump_reel_threshold: float = 0.55
+@export var reel_progress_per_second: float = 0.75
+@export var min_hooked_time_before_catch: float = 0.85
+## Sbarco: solo quando hai reelato abbastanza (niente uscita precoce).
+@export var catch_jump_reel_threshold: float = 0.5
 @export_range(1, 3, 1) var fish_health_reward: int = 1
 
 @export_category("Health")
@@ -363,6 +363,7 @@ func _on_fish_area_body_entered(body: Node2D):
 	if body.has_method("do_catch_jump"):
 		body.call("do_catch_jump")
 		_fish_catch_jump_done = true
+		_sync_line_length_for_hang()
 
 func _update_attack_hitbox_position():
 	if _attack_hitbox == null:
@@ -1577,8 +1578,14 @@ func _update_line_color(delta: float):
 	_current_line_stress = lerp(_current_line_stress, stress, delta * _line_color_lerp_speed)
 	fishing_line.default_color = fishing_line.default_color.lerp(col, delta * _line_color_lerp_speed)
 	fishing_line.width = lerp(2.8, 4.6, _current_line_stress)
-	# Se la lenza diventa troppo rossa durante la lotta, il pesce si libera
-	if fish_hooked and fish_struggle_active and _current_line_stress >= stress_escape_threshold:
+	# Se la lenza diventa troppo rossa durante la lotta IN ACQUA, il pesce si libera.
+	if (
+		fish_hooked
+		and fish_struggle_active
+		and not _fish_catch_jump_done
+		and not _is_current_fish_out_of_water()
+		and _current_line_stress >= stress_escape_threshold
+	):
 		_on_fish_escaped()
 
 func _get_stress_color(stress: float) -> Color:
@@ -1596,19 +1603,37 @@ func _simulate_rope(delta: float):
 	points[points.size() - 1] = end
 	old_points[old_points.size() - 1] = end
 	var dist = rod.distance_to(end)
+	var fish_hanging := (
+		fish_hooked
+		and is_instance_valid(current_fish)
+		and current_fish.has_method("is_hanging")
+		and bool(current_fish.call("is_hanging"))
+	)
+	# Pesce appeso: lenza sulla distanza reale (niente stiramento visuale).
+	if fish_hanging:
+		current_line_length = minf(current_line_length, maxf(28.0, dist))
+		segment_length = max(1.0, dist / float(points.size() - 1))
+		var iters_hang := rope_stiffness + 6
+		var grav_hang := rope_gravity * 0.35
+		for i in range(1, points.size() - 1):
+			var cur = points[i]
+			var old = old_points[i]
+			var vel = (cur - old) * 0.9
+			old_points[i] = cur
+			points[i] = cur + vel + Vector2(0, grav_hang * delta * delta)
+		for _it in range(iters_hang):
+			_apply_rope_constraints(rod, end)
+		points[points.size() - 1] = end
+		old_points[old_points.size() - 1] = end
+		return
 	# Lasca se piu' corta della lenza; tesa se allungata.
 	var slack := 1.0
 	if dist < current_line_length:
 		slack = clampf(dist / maxf(current_line_length, 1.0), 0.6, 1.0)
 	segment_length = max(1.0, (current_line_length / (points.size() - 1)) * slack)
 	var weight := (fish_line_weight if fish_hooked else 1.0)
-	if fish_hooked and is_instance_valid(current_fish) and current_fish.has_method("is_hanging") and bool(current_fish.call("is_hanging")):
-		weight *= 1.35
 	var taut: bool = dist >= current_line_length * 0.92
 	var tension_factor := clampf(_effective_tension + (0.2 if is_reeling else 0.0) + (0.3 if taut else 0.0), 0.0, 1.0)
-	# Pesce appeso: lenza piu' curva (meno tensione apparente).
-	if fish_hooked and is_instance_valid(current_fish) and current_fish.has_method("is_hanging") and bool(current_fish.call("is_hanging")) and not is_reeling:
-		tension_factor *= 0.55
 	var grav = rope_gravity * weight * (1.0 - tension_factor * 0.7)
 	for i in range(1, points.size() - 1):
 		var cur = points[i]
@@ -1735,6 +1760,18 @@ func _update_fish_struggle(delta: float):
 		_on_fish_lost(false)
 		return
 	_fish_hooked_time += delta
+
+	var fish_out := _is_current_fish_out_of_water()
+	# Fuori acqua / in uscita: niente lotta ne' fuga — solo issaggio.
+	if fish_out or _fish_catch_jump_done:
+		if fish_struggle_active:
+			_stop_fish_struggle()
+		if current_fish.has_method("set_wrong_reel"):
+			current_fish.call("set_wrong_reel", false)
+		if is_reeling:
+			_fish_reel_progress = minf(1.25, _fish_reel_progress + reel_progress_per_second * 1.2 * delta)
+		return
+
 	# Progresso reel solo fuori lotta: serve a "guadagnare" la cattura.
 	if is_reeling and not fish_struggle_active:
 		var dist_now := global_position.distance_to(current_fish.global_position)
@@ -1769,6 +1806,16 @@ func _update_fish_struggle(delta: float):
 				current_fish.call("apply_struggle_force", (fp - rod).normalized() * fish_pull_strength * delta)
 			if fish_struggle_phase_timer >= fish_struggle_phase_duration:
 				_stop_fish_struggle()
+
+
+func _is_current_fish_out_of_water() -> bool:
+	if not is_instance_valid(current_fish):
+		return false
+	if current_fish.has_method("is_hanging") and bool(current_fish.call("is_hanging")):
+		return true
+	if current_fish.has_method("is_in_water") and not bool(current_fish.call("is_in_water")):
+		return true
+	return false
 
 func _stop_fish_struggle():
 	fish_struggle_active = false
@@ -1853,29 +1900,62 @@ func _reel_fish_to_player(delta: float = 0.016) -> void:
 	var fish_area: Area2D = get_node_or_null("FishArea") as Area2D
 	var in_area: bool = fish_area != null and current_fish in fish_area.get_overlapping_bodies()
 	var near_surface: bool = current_fish.has_method("is_near_surface") and current_fish.call("is_near_surface")
-	# Fase sbarco: progresso reel alto + non in lotta.
-	var can_land := (
+	var fish_out := _is_current_fish_out_of_water()
+	# Se rientra in acqua dopo lo sbarco, torna la fase in-acqua.
+	if (
+		_fish_catch_jump_done
+		and not fish_out
+		and current_fish.has_method("is_in_water")
+		and bool(current_fish.call("is_in_water"))
+	):
+		_fish_catch_jump_done = false
+
+	# --- Due dinamiche distinte ---
+	# IN ACQUA: lotta + progresso + tiro orizzontale (resta sotto).
+	# USCITA / FUORI: niente lotta, tiro verso canna, pendolo.
+	var can_start_exit := (
 		not fish_struggle_active
+		and not fish_out
+		and not _fish_catch_jump_done
 		and _fish_reel_progress >= catch_jump_reel_threshold
 	)
+
+	# Non spegnere mai l'uscita una volta iniziata.
 	if current_fish.has_method("set_allow_surface_exit"):
-		current_fish.call("set_allow_surface_exit", can_land)
-	# Tira fuori dall'acqua solo vicino / pronto allo sbarco.
+		if fish_out or _fish_catch_jump_done or can_start_exit:
+			current_fish.call("set_allow_surface_exit", true)
+		else:
+			current_fish.call("set_allow_surface_exit", false)
+
 	if (
-		not _fish_catch_jump_done
-		and can_land
+		can_start_exit
+		and is_reeling
 		and current_fish.has_method("do_catch_jump")
 	):
+		# Uscita solo vicino al player / FishArea (niente trigger solo per near_surface).
 		if (
 			in_area
 			or dist < fish_catch_jump_distance
-			or (near_surface and horizontal_dist < 110.0 and dist < 160.0)
+			or (
+				near_surface
+				and horizontal_dist < 70.0
+				and dist < 100.0
+				and _fish_reel_progress >= catch_jump_reel_threshold + 0.12
+			)
 		):
 			current_fish.call("do_catch_jump")
 			_fish_catch_jump_done = true
+			_stop_fish_struggle()
+			_sync_line_length_for_hang()
 
 	if current_fish.has_method("set_line_tether"):
 		current_fish.call("set_line_tether", rod, current_line_length)
+	if fish_out and current_fish.has_method("get_hang_tether_length"):
+		var fish_len := float(current_fish.call("get_hang_tether_length"))
+		if fish_len > 1.0 and fish_len < current_line_length:
+			current_line_length = maxf(28.0, fish_len)
+			current_fish.call("set_line_tether", rod, current_line_length)
+
 	fish_pos = get_fish_center_position(current_fish)
 	to_rod = Vector2(rod.x - fish_pos.x, rod.y - fish_pos.y)
 	dist = to_rod.length()
@@ -1883,29 +1963,55 @@ func _reel_fish_to_player(delta: float = 0.016) -> void:
 	if _can_finish_fish_catch(dist):
 		_complete_fish_catch(current_fish)
 		return
-	# Durante la lotta non trascinare.
-	if fish_struggle_active:
+
+	# Lotta in acqua: non trascinare (ma non annullare un'uscita gia' partita).
+	if fish_struggle_active and not fish_out and not _fish_catch_jump_done:
 		return
 
-	var fish_out := (
-		current_fish.has_method("is_in_water")
-		and not bool(current_fish.call("is_in_water"))
-	)
 	var dir: Vector2 = to_rod.normalized() if to_rod.length_squared() > 0.0001 else Vector2.UP
-	if not can_land and not fish_out:
-		dir = Vector2(to_rod.x, to_rod.y * 0.4)
+	var pull: float
+	var haul_mul: float
+	var allow_exit_pull := fish_out or _fish_catch_jump_done or can_start_exit
+
+	if fish_out or _fish_catch_jump_done:
+		# MODO FUORI / USCITA: verso la canna, forza piena.
+		dir = Vector2(dir.x * 0.5, minf(dir.y, -0.75)).normalized()
+		pull = reel_pull_force * (1.0 + _fish_reel_progress * 0.2)
+		haul_mul = 1.2
+	else:
+		# MODO IN ACQUA: avvicina al player, resta sott'acqua.
+		dir = Vector2(to_rod.x, to_rod.y * 0.35)
 		if dir.length_squared() > 0.0001:
 			dir = dir.normalized()
+		pull = reel_pull_force * (0.55 + _fish_reel_progress * 0.2)
+		haul_mul = 0.55
+		# Se sbarco sbloccato e stai reelando: inizia a salire.
+		if can_start_exit and is_reeling:
+			dir = Vector2(dir.x * 0.6, minf(dir.y, -0.65)).normalized()
+			pull = reel_pull_force * 0.95
+			haul_mul = 1.05
 
-	var pull: float = reel_pull_force * (0.55 + _fish_reel_progress * 0.2)
 	if current_fish.has_method("apply_reel_force"):
 		current_fish.call("apply_reel_force", dir * pull)
-
-	# Fuori acqua: issaggio ancora piu' calmo (solo accorcia lenza + soft force).
-	var haul_mul := 0.35 if fish_out else 0.55
 	var haul := reel_in_speed * delta * haul_mul
 	if current_fish.has_method("pull_along_line"):
-		current_fish.call("pull_along_line", rod, haul, can_land or fish_out)
+		current_fish.call("pull_along_line", rod, haul, allow_exit_pull)
+
+
+func _sync_line_length_for_hang() -> void:
+	if not is_instance_valid(current_fish):
+		return
+	var rod: Vector2 = get_rod_tip_position()
+	var d := rod.distance_to(get_fish_center_position(current_fish))
+	# Mai allungare: all'uscita la lenza si accorcia alla distanza reale.
+	current_line_length = clampf(minf(current_line_length, d), 28.0, max_line_length)
+	if current_fish.has_method("set_line_tether"):
+		current_fish.call("set_line_tether", rod, current_line_length)
+	if current_fish.has_method("get_hang_tether_length"):
+		var fish_len := float(current_fish.call("get_hang_tether_length"))
+		if fish_len > 1.0:
+			current_line_length = minf(current_line_length, maxf(28.0, fish_len))
+			current_fish.call("set_line_tether", rod, current_line_length)
 
 
 func _tether_fish_to_line(rod: Vector2, max_len: float) -> void:
