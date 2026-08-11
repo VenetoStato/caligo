@@ -20,7 +20,12 @@ func _process(_delta: float) -> void:
 	if not is_instance_valid(_player):
 		_find_player()
 	var caught := int(AchievementManager.get("fish_caught_count")) if AchievementManager else 0
-	_fish_label.text = "PESCA  %d   •   OGNI CATTURA +1 VITA" % caught
+	if caught <= 0:
+		_fish_label.text = "PESCA  —"
+	elif caught == 1:
+		_fish_label.text = "PESCA  1   ·   +1 VITA"
+	else:
+		_fish_label.text = "PESCA  %d" % caught
 	var level := get_tree().current_scene
 	if level and level.has_method("get_current_grace_name"):
 		_grace_label.text = str(level.call("get_current_grace_name")).to_upper()

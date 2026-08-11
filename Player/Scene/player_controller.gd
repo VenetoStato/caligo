@@ -1033,7 +1033,6 @@ func take_damage(
 	blink_timer = 0.0
 	
 	_request_shake(0.42)
-	print("💔 Danno! Vita: ", current_health)
 	
 	if current_health <= 0:
 		_on_death()
@@ -1051,7 +1050,6 @@ func heal(amount: int = 1):
 	
 	if current_health > old:
 		_show_health_ui()
-		print("💚 Curato! Vita: ", current_health)
 
 func _on_death():
 	if is_dead:
@@ -1066,8 +1064,6 @@ func _on_death():
 	is_charging = false
 	if line_extended or hook_instance != null:
 		_destroy_hook()
-	
-	print("☠️ MORTE!")
 	
 	# La morte usa la caduta in loop lento: evita il frame statico incoerente.
 	if anim and anim.has_animation("Falling"):
@@ -1231,8 +1227,6 @@ func _on_respawn():
 		call_deferred("play_altar_wake_animation")
 	else:
 		set_meta("skip_wake_animation", false)
-	
-	print("🔄 Respawn!")
 
 
 func play_altar_wake_animation() -> void:
@@ -1750,7 +1744,7 @@ func on_fish_hooked(fish: Node2D):
 			hide = using_fishing_hook and line_mode == LineMode.FISHING
 		if hide and hook_instance.has_method("hide_for_fish"):
 			hook_instance.call("hide_for_fish")
-	print("🎣 Pesce agganciato! Tieni R per tirare — rilascia quando la lenza diventa rossa.")
+	_notify_gameplay("PESCE AGGANCIATO  •  TIENI R — RILASCIA SE LA LENZA È ROSSA")
 
 func on_fish_spawned(fish: Node2D):
 	on_fish_hooked(fish)
@@ -1790,6 +1784,8 @@ func _update_fish_struggle(delta: float):
 		fish_struggle_phase_timer = 0.0
 		if current_fish.has_method("start_struggle"):
 			current_fish.call("start_struggle")
+		if _fish_hooked_time < 8.0:
+			_notify_gameplay("ASPETTA  •  LA LENZA È IN TENSIONE")
 	if fish_struggle_active:
 		if is_reeling:
 			# Tirare durante la lotta = sbagliato: stress e rischio fuga.
@@ -1826,7 +1822,7 @@ func _stop_fish_struggle():
 		current_fish.call("stop_struggle")
 
 func _on_fish_escaped():
-	print("💨 Pesce scappato!")
+	_notify_gameplay("IL PESCE È SCAPPATO")
 	# L'amo resta dove il pesce si è staccato (non torna al punto del morso)
 	if current_fish and is_instance_valid(current_fish) and hook_instance and is_instance_valid(hook_instance):
 		var fish_pos: Vector2 = get_fish_center_position(current_fish)
@@ -2035,7 +2031,7 @@ func _tether_fish_to_line(rod: Vector2, max_len: float) -> void:
 func _complete_fish_catch(fish: Node2D) -> void:
 	if fish == null or not is_instance_valid(fish):
 		return
-	print("🏆 Pesce catturato: nutrimento recuperato!")
+	_notify_gameplay("CATTURA  •  NUTRIMENTO RECUPERATO")
 	var health_before := current_health
 	heal(fish_health_reward)
 	var health_restored := current_health - health_before
@@ -2051,6 +2047,14 @@ func _complete_fish_catch(fish: Node2D) -> void:
 	_fish_hooked_time = 0.0
 	_fish_catch_jump_done = false
 	_destroy_hook()
+
+
+func _notify_gameplay(text: String) -> void:
+	var level := get_tree().current_scene
+	if level and level.has_method("_show_message"):
+		level.call("_show_message", text)
+	elif OS.is_debug_build():
+		print(text)
 
 
 func _spawn_fish_catch_effect(world_position: Vector2, health_restored: int) -> void:

@@ -11,7 +11,8 @@ func _ready() -> void:
 	_add_ledge(Rect2(-435, 460, 700, 96), 0.78)  # -435 → 265
 	_add_ledge(Rect2(395, 460, 630, 96), 0.78)   # 395 → 1025 (gap 265–395)
 
-	_add_ledge(Rect2(1190, 485, 790, 110), 0.82)
+	# Quay fino a destra della grazia Dogana; dopo c'è il varco di discesa.
+	_add_ledge(Rect2(1190, 485, 745, 110), 0.82)
 	_add_central_wedge()
 	for rect in [
 		Rect2(2165, 396, 190, 28),
@@ -36,14 +37,18 @@ func _ready() -> void:
 		_add_ledge(rect, 0.95)
 	_add_ledge(Rect2(4620, 485, 1120, 110), 0.8)
 
-	# Le stanze segrete condividono lo stesso linguaggio visivo.
-	_add_ledge(Rect2(1200, 632, 760, 36), 0.5)
-	_add_ledge(Rect2(1200, 832, 760, 36), 0.5)
-	# Discesa visibile sul lato destro del muro segreto: il giocatore può
-	# scendere dal cuneo, atterrare e colpire la parete dall'esterno.
-	_add_ledge(Rect2(1975, 686, 190, 28), 0.72)
-	_add_ledge(Rect2(1990, 746, 190, 28), 0.72)
-	_add_ledge(Rect2(2000, 806, 190, 28), 0.72)
+	# Archivio sotto la grazia: soffitto corto a ovest (non chiude le scale).
+	_add_ledge(Rect2(1120, 580, 560, 28), 0.5)
+	_add_ledge(Rect2(1120, 842, 760, 36), 0.5)
+	# Scale allineate alla collision di HiddenArchiveRoute.
+	for rect in [
+		Rect2(1885, 546, 190, 28),
+		Rect2(1910, 616, 190, 28),
+		Rect2(1840, 686, 190, 28),
+		Rect2(1720, 756, 190, 28),
+		Rect2(1600, 816, 190, 28),
+	]:
+		_add_ledge(rect, 0.72)
 	_add_ledge(Rect2(3615, 20, 430, 30), 0.48)
 	_add_ledge(Rect2(3615, 235, 430, 30), 0.48)
 
@@ -65,6 +70,7 @@ func _add_central_wedge() -> void:
 	sprite.name = "CentralDoganaWedgeArt"
 	sprite.texture = art_profile.central_wedge
 	sprite.centered = false
-	sprite.position = Vector2(1980, 148)
+	# Allineato al cuneo collision (inizia a x=2060): non coprire il varco scale.
+	sprite.position = Vector2(2060, 148)
 	sprite.modulate = Color(0.72, 0.78, 0.76, 1.0)
 	add_child(sprite)

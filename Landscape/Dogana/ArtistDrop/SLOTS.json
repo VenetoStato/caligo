@@ -1,0 +1,125 @@
+{
+  "_readme": "Drop PNG files with these exact names into ArtistDrop/, then run: python tools/sync_artist_drop.py",
+  "slots": [
+    {
+      "file": "01_arrival.png",
+      "dest": "Landscape/Dogana/Illustrated/arrival.png",
+      "profile": "arrival_background",
+      "size": [1536, 1024],
+      "kind": "background",
+      "notes": "Sezione arrivo / pontile. Mantieni la linea d'orizzonte."
+    },
+    {
+      "file": "02_customs.png",
+      "dest": "Landscape/Dogana/Illustrated/customs.png",
+      "profile": "customs_background",
+      "size": [1536, 1024],
+      "kind": "background",
+      "notes": "Dogana / dogana da mar."
+    },
+    {
+      "file": "03_canal.png",
+      "dest": "Landscape/Dogana/Illustrated/canal.png",
+      "profile": "canal_background",
+      "size": [1536, 1024],
+      "kind": "background",
+      "notes": "Grand Canal."
+    },
+    {
+      "file": "04_fortuna.png",
+      "dest": "Landscape/Dogana/Illustrated/fortuna.png",
+      "profile": "fortuna_background",
+      "size": [1536, 1024],
+      "kind": "background",
+      "notes": "Torre Atlante / Fortuna."
+    },
+    {
+      "file": "05_archive.png",
+      "dest": "Landscape/Dogana/Illustrated/archive.png",
+      "profile": "archive_background",
+      "size": [1536, 1024],
+      "kind": "background",
+      "notes": "Archivio segreto / ossario."
+    },
+    {
+      "file": "10_quay_platform.png",
+      "dest": "Landscape/Dogana/Generated/quay_platform.png",
+      "profile": "walkable_platform",
+      "size": [1024, 371],
+      "kind": "architecture",
+      "notes": "Bordo calpestabile in alto nell'immagine. Collisioni separate."
+    },
+    {
+      "file": "11_central_wedge.png",
+      "dest": "Landscape/Dogana/Generated/central_dogana_wedge.png",
+      "profile": "central_wedge",
+      "size": [1280, 502],
+      "kind": "architecture",
+      "notes": "Cuneo centrale Dogana."
+    },
+    {
+      "file": "12_tide_altar.png",
+      "dest": "Landscape/Dogana/Generated/tide_altar.png",
+      "profile": "tide_altar",
+      "size": [1024, 1024],
+      "kind": "prop",
+      "notes": "Altare delle maree. PNG con trasparenza, padding stretto."
+    },
+    {
+      "file": "20_fishing_cache.png",
+      "dest": "Landscape/Dogana/Generated/breakable_fishing_cache.png",
+      "profile": "fishing_cache",
+      "size": [384, 288],
+      "kind": "prop",
+      "notes": "Cassa tutorial rompibile."
+    },
+    {
+      "file": "21_urn.png",
+      "dest": "Landscape/Dogana/Generated/breakable_urn.png",
+      "profile": "cracked_urn",
+      "size": [1024, 1024],
+      "kind": "prop",
+      "notes": "Anfora incrinata."
+    },
+    {
+      "file": "22_net_bundle.png",
+      "dest": "Landscape/Dogana/Generated/breakable_net_bundle.png",
+      "profile": "net_bundle",
+      "size": [1024, 1024],
+      "kind": "prop",
+      "notes": "Fascio di reti."
+    },
+    {
+      "file": "23_fishbone_wall.png",
+      "dest": "Landscape/Dogana/Generated/breakable_fishbone_wall.png",
+      "profile": "fishbone_wall",
+      "size": [320, 427],
+      "kind": "prop",
+      "notes": "Muro osseo rompibile."
+    },
+    {
+      "file": "30_tide_bloater.png",
+      "dest": "Landscape/Dogana/Generated/tide_bloater.png",
+      "profile": "tide_bloater",
+      "size": [512, 436],
+      "kind": "character",
+      "notes": "Nemico base. Piedi in basso, trasparenza."
+    },
+    {
+      "file": "31_lagoon_oracle.png",
+      "dest": "Landscape/Dogana/Generated/lagoon_oracle.png",
+      "profile": "lagoon_oracle",
+      "size": [431, 512],
+      "kind": "character",
+      "notes": "Nemico speciale / oracolo."
+    },
+    {
+      "file": "32_drowned_warden.png",
+      "dest": "Landscape/Dogana/Generated/drowned_customs_warden.png",
+      "profile": "drowned_warden",
+      "size": [512, 512],
+      "kind": "character",
+      "notes": "Boss custode sommerso."
+    }
+  ]
+}

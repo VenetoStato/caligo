@@ -176,14 +176,15 @@ func _ready():
 func _configure_tutorial_fish() -> void:
 	# Il branco didattico resta visibile sotto il pontile e raggiunge rapidamente
 	# l'amo: il tutorial deve insegnare la pesca, non cercare pesci fuori camera.
-	natural_swim_speed = 38.0
+	natural_swim_speed = 32.0
 	attraction_speed = 118.0
-	swim_bounds_x = 72.0
-	swim_bounds_y = 28.0
+	swim_bounds_x = 48.0
+	swim_bounds_y = 22.0
 	home_offset = Vector2.ZERO
 	min_depth_from_top = 36.0
-	max_depth_from_top = 96.0
-	turn_chance = 0.16
+	max_depth_from_top = 88.0
+	turn_chance = 0.12
+	vertical_wander = 0.12
 
 func _setup_underwater_shader():
 	# Applica distorsione leggera ai pesci quando sono in acqua
@@ -1003,7 +1004,7 @@ func stop_struggle():
 	struggle_timer = 0.0
 
 
-## Saltino leggero fuori acqua → poi hang / possibile rientro.
+## Saltino fuori acqua → poi hang / possibile rientro.
 func do_catch_jump():
 	_allow_surface_exit = true
 	_catch_jump_active = true
@@ -1012,19 +1013,23 @@ func do_catch_jump():
 	in_water = true
 	if _hanging:
 		_set_hanging(false)
-	# Hop morbido verso l'alto (non uno strappo lungo la lenza).
-	var hop := Vector2(clampf(velocity.x * 0.4, -50.0, 50.0), -150.0)
+	# Hop verso l'alto: deve uscire nettamente sopra la superficie.
+	var hop := Vector2(clampf(velocity.x * 0.4, -55.0, 55.0), -240.0)
 	if _has_tether:
 		var to_rod := _tether_anchor - global_position
 		if to_rod.length_squared() > 0.01:
 			var n := to_rod.normalized()
-			hop = Vector2(n.x * 40.0, minf(n.y * 120.0, -130.0))
+			hop = Vector2(n.x * 48.0, minf(n.y * 160.0, -210.0))
 	velocity = hop
 	var surf := _get_water_surface_y()
 	if surf < INF:
 		var depth := global_position.y - surf
 		if depth > 0.0:
-			global_position.y -= minf(depth * 0.35, 22.0)
+			# Avvicina alla superficie senza uscire ancora (l'hang parte dopo il breach).
+			global_position.y -= minf(depth * 0.45, 36.0)
+		elif global_position.y > surf - 28.0:
+			# Gia' a pelo d'acqua / sopra: porta la bocca piu' in alto.
+			global_position.y = surf - 28.0
 	if _is_above_water_surface():
 		_start_hanging_out_of_water()
 
@@ -1038,11 +1043,13 @@ func _start_hanging_out_of_water() -> void:
 	in_water = false
 	var surf := _get_water_surface_y()
 	_spawn_water_exit_effect(surf)
-	if surf < INF and global_position.y > surf - 6.0:
-		global_position.y = surf - 10.0
+	# Bocca ben sopra la superficie cosi' il corpo appeso non resta mezzo in acqua.
+	const EXIT_CLEARANCE := 48.0
+	if surf < INF and global_position.y > surf - EXIT_CLEARANCE:
+		global_position.y = surf - EXIT_CLEARANCE
 	# Velocita' da saltino, non da catapulta.
 	velocity.x = clampf(velocity.x, -120.0, 120.0)
-	velocity.y = clampf(velocity.y, -160.0, 40.0)
+	velocity.y = clampf(velocity.y, -200.0, 20.0)
 	_set_hanging(true)
 	if _has_tether:
 		# Lenza al massimo = distanza corrente (non stirare oltre).
@@ -1087,18 +1094,19 @@ func _spawn_water_exit_effect(surf_y: float) -> void:
 	)
 
 
-## Durante l'uscita: saltino verso la superficie (non uno strappo).
+## Durante l'uscita: spinta verso (e oltre) la superficie.
 func _process_surface_breach(delta: float) -> void:
 	var surf := _get_water_surface_y()
 	if surf < INF:
 		var depth := global_position.y - surf
-		if depth > 0.0:
-			velocity.y -= (200.0 + depth * 4.0) * delta
-			velocity.y = maxf(velocity.y, -220.0)
+		if depth > -36.0:
+			# Continua a salire finche' non e' abbastanza sopra acqua.
+			velocity.y -= (280.0 + maxf(depth, 0.0) * 5.0) * delta
+			velocity.y = maxf(velocity.y, -280.0)
 	if _has_tether:
 		var to_rod := _tether_anchor - global_position
 		if to_rod.length_squared() > 0.01:
-			velocity = velocity.lerp(to_rod.normalized() * 120.0, delta * 2.2)
+			velocity = velocity.lerp(to_rod.normalized() * 140.0, delta * 2.4)
 
 
 func set_allow_surface_exit(allowed: bool) -> void:

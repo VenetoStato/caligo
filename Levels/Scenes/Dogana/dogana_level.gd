@@ -659,8 +659,9 @@ func _get_player_region(world_position: Vector2) -> String:
 		return "customs"
 	if world_position.x < 3800.0:
 		return "canal"
-	# Torre Fortuna + nartece: x 3800–4550. Nave della Salute (boss): oltre.
-	if world_position.x < 4550.0:
+	# Torre Fortuna + nartece fino al sigillo d'ingresso arena (~4580).
+	# Nave della Salute (boss): oltre l'EntranceSeal.
+	if world_position.x < 4580.0:
 		return "fortuna"
 	return "salute"
 

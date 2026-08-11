@@ -70,6 +70,8 @@ func _ready() -> void:
 	var training_cache := level.get_node_or_null("Gameplay/Breakables/ArrivalCache") if level else null
 	if training_cache and training_cache.has_signal("prop_broken"):
 		training_cache.connect("prop_broken", _on_training_cache_broken)
+	# Hook subito: le azioni fatte prima dell'arm possono valere come step.
+	call_deferred("_ensure_player_hooks")
 	# Dopo tutti i _ready: se non c'è cutscene di arrivo, arma subito.
 	call_deferred("_maybe_auto_arm")
 
@@ -92,19 +94,21 @@ func arm_tutorial() -> void:
 	if _armed:
 		return
 	_armed = true
-	_player = get_tree().get_first_node_in_group("player") as CharacterBody2D
+	_ensure_player_hooks()
+	# Dopo la cutscene riparti da QUI: lo spostamento in barca non deve chiudere MOVE.
 	if _player:
 		_start_position = _player.global_position
+		_observed[Step.MOVE] = false
+		_completed[Step.MOVE] = false
 	_refresh_step()
 
 
-func _process(_delta: float) -> void:
-	if not _armed:
-		return
+func _ensure_player_hooks() -> void:
 	if _player == null:
 		_player = get_tree().get_first_node_in_group("player") as CharacterBody2D
-		if _player == null:
-			return
+	if _player == null:
+		return
+	if _start_position == Vector2.INF:
 		_start_position = _player.global_position
 	if not _player_signal_connected and _player.has_signal("tutorial_action_performed"):
 		_player.connect("tutorial_action_performed", _on_player_tutorial_action)
@@ -112,14 +116,22 @@ func _process(_delta: float) -> void:
 	if not _fish_signal_connected and _player.has_signal("fish_caught"):
 		_player.connect("fish_caught", _on_fish_caught)
 		_fish_signal_connected = true
-	if _current_step == Step.MOVE:
+
+
+func _process(_delta: float) -> void:
+	# Sempre: cattura azioni anticipate anche con tutorial non ancora armato.
+	_ensure_player_hooks()
+	if _player == null:
+		return
+	if _start_position != Vector2.INF:
 		var moved := absf(_player.global_position.x - _start_position.x) >= 72.0
 		if moved:
-			_mark_completed(Step.MOVE)
-	if _current_step == Step.MAP:
-		var map_overlay := get_tree().current_scene.get_node_or_null("DoganaMap/Overlay") as Control
-		if map_overlay and map_overlay.visible:
-			_observe_step(Step.MAP)
+			_observe_step(Step.MOVE)
+	var map_overlay := get_tree().current_scene.get_node_or_null("DoganaMap/Overlay") as Control if get_tree().current_scene else null
+	if map_overlay and map_overlay.visible:
+		_observe_step(Step.MAP)
+	if not _armed:
+		return
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -139,8 +151,11 @@ func _on_player_tutorial_action(action: StringName) -> void:
 			_observe_step(Step.DOUBLE_JUMP)
 		&"dash":
 			_observe_step(Step.DASH)
+		&"attack":
+			_observe_step(Step.ATTACK)
 		&"cast":
 			_observe_step(Step.CAST)
+		# REEL si completa solo con una cattura reale (vedi _on_fish_caught).
 
 
 func _on_fish_caught(_health_restored: int) -> void:
@@ -166,6 +181,7 @@ func _observe_step(step: Step) -> void:
 	_observed[step] = true
 	if not _armed:
 		return
+	# Solo lo step corrente si completa subito; i futuri verranno skippati in advance.
 	if step != _current_step:
 		return
 	_mark_completed(step)
@@ -186,11 +202,15 @@ func _advance_to_next_step() -> void:
 	for step in STEP_ORDER:
 		if not bool(_completed.get(step, false)):
 			_current_step = step
-			# Se lo step era già stato fatto in anticipo (es. cassa rotta prima), completa subito.
+			# Se lo step era già stato fatto in anticipo, completa subito senza mostrarlo.
 			if bool(_observed.get(step, false)):
 				_completed[step] = true
 				continue
 			if step == Step.ATTACK and _is_training_cache_already_broken():
+				_observed[step] = true
+				_completed[step] = true
+				continue
+			if step == Step.INTERACT and _is_altar_already_used():
 				_observed[step] = true
 				_completed[step] = true
 				continue
@@ -199,6 +219,12 @@ func _advance_to_next_step() -> void:
 	_current_step = Step.COMPLETE
 	_unlock_tutorial_gate()
 	_show_completion()
+
+
+func _is_altar_already_used() -> bool:
+	# Solo se il player ha davvero usato un altare (notify / grace_activated).
+	# L'attivazione silenziosa del pontile all'avvio NON conta.
+	return bool(_observed.get(Step.INTERACT, false))
 
 
 func _is_training_cache_already_broken() -> bool:
@@ -232,7 +258,7 @@ func _apply_step_copy(step: Step) -> void:
 
 func _set_step_copy(step: Step, copy: Dictionary) -> void:
 	_last_section = _get_section_label(step)
-	_eyebrow.text = "%02d / %02d" % [_completed_count() + 1, STEP_ORDER.size()]
+	_eyebrow.text = "%s   ·   %02d / %02d" % [_last_section, _completed_count() + 1, STEP_ORDER.size()]
 	_title.text = str(copy.title)
 	_instruction.text = str(copy.instruction)
 	_key_label.text = str(copy.key)
@@ -263,8 +289,8 @@ func _get_step_copy(step: Step, touch: bool) -> Dictionary:
 		Step.INTERACT:
 			return {
 				"title": "Altare",
-				"instruction": "Interagisci per riposare e salvare il respawn.",
-				"key": "✦" if touch else "E",
+				"instruction": "Tieni premuto sull'altare per riposare e fissare il respawn.",
+				"key": "TIENI ✦" if touch else "TIENI E",
 			}
 		Step.JUMP:
 			return {
@@ -293,14 +319,14 @@ func _get_step_copy(step: Step, touch: bool) -> Dictionary:
 		Step.CAST:
 			return {
 				"title": "Pesca",
-				"instruction": "Lancia la lenza nel varco d'acqua.",
+				"instruction": "Con F lanci la lenza (e un po' di pastura). Mira al varco d'acqua.",
 				"key": "LENZA" if touch else "F",
 			}
 		Step.REEL:
 			return {
 				"title": "Tira",
-				"instruction": "Recupera il pesce quando abborda.",
-				"key": "TIRA" if touch else "R",
+				"instruction": "Quando abborda: tieni R per recuperare, rilascia se la lenza diventa rossa. Serve una cattura.",
+				"key": "R" if touch else "R (tieni / rilascia)",
 			}
 		Step.MAP:
 			return {

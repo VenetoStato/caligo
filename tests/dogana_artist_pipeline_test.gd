@@ -54,10 +54,10 @@ func _ready() -> void:
 	for fish in tutorial_fishes:
 		if (
 			not is_instance_valid(fish)
-			or fish.global_position.x < 360.0
-			or fish.global_position.x > 710.0
-			or fish.global_position.y < 590.0
-			or fish.global_position.y > 700.0
+			or fish.global_position.x < 180.0
+			or fish.global_position.x > 430.0
+			or fish.global_position.y < 580.0
+			or fish.global_position.y > 720.0
 			or fish.get("_water_body") == null
 		):
 			_fail("Tutorial fish drifted away or spawned before receiving its water body.")
@@ -116,7 +116,9 @@ func _ready() -> void:
 	level.set("_boss_is_defeated", true)
 	level.call("_restore_boss_progress")
 	await get_tree().process_frame
-	if boss == null or int(boss.get("state")) != 5 or boss.is_physics_processing():
+	# DEAD enum value on drowned_customs_warden (last state).
+	var dead_state := 12
+	if boss == null or int(boss.get("state")) != dead_state or boss.is_physics_processing():
 		_fail("A defeated boss was restored as an active encounter.")
 		return
 

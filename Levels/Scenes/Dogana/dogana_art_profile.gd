@@ -4,6 +4,9 @@ extends Resource
 ## Single hand-off resource for illustrators. Replacing a texture here updates every
 ## Dogana scene that consumes the corresponding visual slot; gameplay collision,
 ## scripts and coordinates remain untouched.
+##
+## Flusso comodo: drop PNG in `Landscape/Dogana/ArtistDrop/` e
+## `python tools/sync_artist_drop.py` (vedi LEGGIMI.md).
 
 @export_category("Environment sections")
 @export var arrival_background: Texture2D

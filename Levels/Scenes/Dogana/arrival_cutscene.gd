@@ -472,6 +472,9 @@ func _build_skip_hint() -> void:
 	_skip_label.offset_top = -48.0
 	_skip_label.offset_bottom = -18.0
 	_skip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var body_font := load("res://UI/Fonts/SourceSans3.ttf") as Font
+	if body_font:
+		_skip_label.add_theme_font_override("font", body_font)
 	_skip_label.add_theme_font_size_override("font_size", 13)
 	_skip_label.add_theme_color_override("font_color", Color(0.78, 0.82, 0.74, 0.72))
 	_skip_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))

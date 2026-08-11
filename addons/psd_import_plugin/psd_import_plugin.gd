@@ -20,6 +20,8 @@ func _enter_tree():
 	# Se fallisce con solo questo, il problema è fuori dallo script (cfg o Godot)
 	add_tool_menu_item("Importa PSD/PSB da file...", Callable(self, "_on_menu_import_from_external"))
 	add_tool_menu_item("Import PSD layers...", Callable(self, "_on_menu_import_psd"))
+	add_tool_menu_item("ArtistDrop: sincronizza disegni...", Callable(self, "_on_menu_sync_artist_drop"))
+	add_tool_menu_item("ArtistDrop: apri cartella...", Callable(self, "_on_menu_open_artist_drop"))
 	call_deferred("_add_toolbar_buttons")
 	call_deferred("_deferred_init")
 
@@ -34,6 +36,8 @@ func _exit_tree():
 	_remove_context_menu()
 	remove_tool_menu_item("Importa PSD/PSB da file...")
 	remove_tool_menu_item("Import PSD layers...")
+	remove_tool_menu_item("ArtistDrop: sincronizza disegni...")
+	remove_tool_menu_item("ArtistDrop: apri cartella...")
 	if _psd_dialog and is_instance_valid(_psd_dialog):
 		_psd_dialog.queue_free()
 	if _external_dialog and is_instance_valid(_external_dialog):
@@ -60,6 +64,11 @@ func _add_toolbar_buttons():
 	btn_layers.tooltip_text = "Esporta i layer del PSD come PNG"
 	btn_layers.pressed.connect(_on_menu_import_psd)
 	_toolbar.add_child(btn_layers)
+	var btn_art := Button.new()
+	btn_art.text = "ArtistDrop sync"
+	btn_art.tooltip_text = "Copia i PNG da Landscape/Dogana/ArtistDrop nello slot live"
+	btn_art.pressed.connect(_on_menu_sync_artist_drop)
+	_toolbar.add_child(btn_art)
 	add_control_to_container(0, _toolbar)  # CONTAINER_TOOLBAR
 
 func _add_format_support_query():
@@ -133,3 +142,32 @@ func _on_menu_import_psd():
 	get_editor_interface().get_base_control().add_child(_psd_dialog)
 	_psd_dialog.show()
 	_psd_dialog.popup_centered()
+
+
+func _on_menu_open_artist_drop() -> void:
+	var drop := ProjectSettings.globalize_path("res://Landscape/Dogana/ArtistDrop")
+	OS.shell_open(drop)
+
+
+func _on_menu_sync_artist_drop() -> void:
+	var root := ProjectSettings.globalize_path("res://")
+	var script := root.path_join("tools/sync_artist_drop.py")
+	if not FileAccess.file_exists("res://tools/sync_artist_drop.py"):
+		push_error("ArtistDrop: manca tools/sync_artist_drop.py")
+		return
+	var output: Array = []
+	var code := OS.execute("python", PackedStringArray([script]), output, true)
+	var lines := PackedStringArray()
+	for item in output:
+		lines.append(str(item))
+	print("\n".join(lines))
+	if code != 0 and code != 2:
+		push_error("ArtistDrop sync fallito (code %s). Vedi Output." % str(code))
+		return
+	var board := root.path_join("tools/make_artist_board.py")
+	if FileAccess.file_exists("res://tools/make_artist_board.py"):
+		OS.execute("python", PackedStringArray([board]), [], true)
+	var fs := get_editor_interface().get_resource_filesystem()
+	if fs:
+		fs.scan()
+	print("ArtistDrop: sync completato. Ricarica la scena Dogana per vedere i disegni.")

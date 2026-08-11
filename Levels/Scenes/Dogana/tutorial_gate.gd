@@ -49,11 +49,20 @@ func _draw() -> void:
 		draw_line(Vector2(-14, y), Vector2(14, y + 18), Color(0.3, 0.82, 0.7, 0.3 + pulse * 0.25), 1.5, true)
 	draw_arc(Vector2.ZERO, 27.0 + pulse * 5.0, 0.0, TAU, 32, Color(0.34, 0.94, 0.78, pulse), 3.0, true)
 	draw_circle(Vector2.ZERO, 7.0, Color(0.72, 0.86, 0.55, pulse))
-	var font := ThemeDB.fallback_font
+	var font := _ui_font()
 	var title_color := Color(0.72, 0.98, 0.88, 0.55 + pulse * 0.4)
 	var hint_color := Color(0.92, 0.86, 0.58, 0.75 + pulse * 0.2)
 	draw_string(font, Vector2(-78, -248), "VARCO SIGILLATO", HORIZONTAL_ALIGNMENT_LEFT, 156, 15, title_color)
 	draw_string(font, Vector2(-102, -228), "completa l'addestramento", HORIZONTAL_ALIGNMENT_LEFT, 204, 12, hint_color)
+
+
+func _ui_font() -> Font:
+	var themed := ThemeDB.get_project_theme()
+	if themed:
+		var f := themed.get_default_font()
+		if f:
+			return f
+	return ThemeDB.fallback_font
 
 
 func _spawn_unlock_particles() -> void:

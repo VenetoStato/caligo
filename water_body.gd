@@ -528,10 +528,13 @@ func spawn_fish_in_water() -> void:
 
 		var spawn_position: Vector2
 		if i < tutorial_fish_count:
-			var cluster_offset := (float(i) - float(tutorial_fish_count - 1) * 0.5) * 58.0
+			var cluster_offset := (float(i) - float(tutorial_fish_count - 1) * 0.5) * 48.0
+			# Ancora il branco al varco di pesca (centro del gap pontile), non al centro del bacino.
+			var well := get_tree().get_first_node_in_group("dogana_fishing_well") as Node2D
+			var center_x := well.global_position.x if well else lerpf(bounds.position.x, bounds.end.x, tutorial_fish_center_ratio)
 			spawn_position = Vector2(
-				lerpf(bounds.position.x, bounds.end.x, tutorial_fish_center_ratio) + cluster_offset,
-				bounds.position.y + 48.0 + float(i % 2) * 24.0
+				center_x + cluster_offset,
+				bounds.position.y + 48.0 + float(i % 2) * 22.0
 			)
 			fish.set_meta("tutorial_fish", true)
 		else:

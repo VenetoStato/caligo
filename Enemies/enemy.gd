@@ -722,6 +722,15 @@ func _draw() -> void:
 	var radius := lerpf(18.0, 34.0, progress)
 	if attack_pattern == AttackPattern.TIDE_AREA:
 		radius = lerpf(area_attack_radius * 0.35, area_attack_radius, progress)
+	# Disco a terra più leggibile nell'ultimo quarto del windup.
+	if progress > 0.75 and attack_pattern in [
+		AttackPattern.TIDE_AREA,
+		AttackPattern.SALT_POOL,
+		AttackPattern.MARKED_STRIKE,
+	]:
+		var danger_center := to_local(_mark_position) if attack_pattern != AttackPattern.TIDE_AREA else Vector2.ZERO
+		var danger_r := radius if attack_pattern == AttackPattern.TIDE_AREA else lerpf(18.0, area_attack_radius * 0.85, progress)
+		draw_circle(danger_center, danger_r, Color(color.r, color.g, color.b, 0.10 + (progress - 0.75) * 0.55))
 	draw_arc(Vector2.ZERO, radius, -PI * 0.5, -PI * 0.5 + TAU * progress, 30, color, 2.0 + progress * 2.0, true)
 	for ray in 6:
 		var direction := Vector2.from_angle(float(ray) / 6.0 * TAU)
@@ -849,20 +858,27 @@ func _alert_nearby_enemies() -> void:
 
 
 func _draw_hurtbox_silhouette() -> void:
-	# Contorno stabile della hitbox: rende leggibile dove puoi colpire / essere colpito.
+	# Solo in combattimento / colpo: niente overlay debug in idle.
+	var combat_visible := (
+		state == State.AGGRO
+		or _hit_flash_timer > 0.0
+		or _melee_windup_remaining > 0.0
+		or _special_windup_remaining > 0.0
+		or (_attack_hitbox != null and _attack_hitbox.monitoring)
+	)
+	if not combat_visible:
+		return
 	var scale_safe := maxf(absf(scale.x), 0.001)
 	var half := Vector2(18.0, 22.0) / scale_safe
 	var center := Vector2(0.0, -10.0 / scale_safe)
-	var idle := state == State.IDLE
-	var fill := Color(0.95, 0.28, 0.22, 0.10 if idle else 0.16)
-	var edge := Color(1.0, 0.45, 0.32, 0.42 if idle else 0.72)
+	var fill := Color(0.95, 0.28, 0.22, 0.12)
+	var edge := Color(1.0, 0.45, 0.32, 0.55)
 	if _hit_flash_timer > 0.0:
 		fill = Color(1.0, 0.85, 0.35, 0.28)
 		edge = Color(1.0, 0.95, 0.55, 0.9)
 	draw_rect(Rect2(center - half, half * 2.0), fill, true)
 	draw_rect(Rect2(center - half, half * 2.0), edge, false, 1.6 / scale_safe)
-	# Punto centrale = "cuore" colpibile
-	draw_circle(center, 3.2 / scale_safe, Color(edge.r, edge.g, edge.b, edge.a * 0.85))
+	draw_circle(center, 2.6 / scale_safe, Color(edge.r, edge.g, edge.b, edge.a * 0.75))
 	if _attack_hitbox and _attack_hitbox.monitoring:
 		var atk_center := Vector2((28.0 if facing_right else -28.0) / scale_safe, -8.0 / scale_safe)
 		var atk_half := Vector2(16.0, 14.0) / scale_safe

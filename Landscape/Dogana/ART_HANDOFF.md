@@ -1,33 +1,43 @@
 # Punta della Dogana — art hand-off
 
-The gameplay geometry is deliberately independent from the artwork. An illustrator
-can replace section art, architecture, props and enemy images without editing
-collision polygons or GDScript.
+La geometria di gioco è indipendente dall’artwork. La disegnatrice può sostituire
+fondali, architettura, props e personaggi **senza** toccare collisioni o GDScript.
 
-## Main art switchboard
+## Flusso consigliato (più comodo)
 
-Open `res://Levels/Scenes/Dogana/dogana_art_profile.tres` in Godot and replace the
-texture assigned to a slot. The environment director and procedural scene builders
-consume this resource at runtime.
+1. Apri `Landscape/Dogana/ArtistDrop/LEGGIMI.md`
+2. Metti i PNG con i nomi degli slot in `ArtistDrop/`
+3. Esegui `python tools/sync_artist_drop.py` (o `.\tools\sync_artist_drop.ps1`)
+4. Gioca la scena: le texture finiscono in `Illustrated/` / `Generated/` e sono
+   già collegate da `dogana_art_profile.tres`
 
-- **Environment sections:** `arrival`, `customs`, `canal`, `fortuna`, `archive`
-- **Architecture kit:** walkable platform, central wedge, tide altar
+Comandi utili:
+
+```bat
+python tools/sync_artist_drop.py --status
+python tools/sync_artist_drop.py --seed
+python tools/sync_artist_drop.py 12_tide_altar.png
+```
+
+## Switchboard Godot
+
+In alternativa puoi aprire `res://Levels/Scenes/Dogana/dogana_art_profile.tres`
+e sostituire le texture slot per slot. Environment director e builder procedurali
+la leggono a runtime.
+
+- **Environment:** arrival, customs, canal, fortuna, archive
+- **Architecture:** walkable platform, central wedge, tide altar
 - **Breakables:** fishing cache, cracked urn, net bundle, fishbone wall
 - **Characters:** tide bloater, lagoon oracle, drowned warden
 
-Keep transparent padding tight around props. Section backgrounds should preserve
-the existing aspect ratio and horizon line. Platform art must keep its walkable
-top edge at the top of the source image; collision is defined separately.
+Props con trasparenza stretta. Fondali: tieni aspect ratio e orizzonte.
+Platform: bordo calpestabile in **alto** nell’immagine.
 
 ## Animation-safe replacement
 
-- Player frames: replace `res://Player/Sprites/player-Sheet.png` with the same grid
-  dimensions (`5 × 8`). Animation timing and frame tracks remain in `Player.tscn`.
-- Standard enemy frames: replace the texture configured on the enemy scene or art
-  profile without changing its collision children. Procedural breathing, recoil
-  and wind-up animation is applied to the sprite node.
-- Props animate through their parent script (hit recoil, break squash and debris),
-  so replacement images require no animation code.
+- Player: `res://Player/Sprites/player-Sheet.png` griglia `5 × 8`
+- Nemici: texture da art profile / scena; breath/recoil/wind-up restano procedurali
+- Props: hit/break restano nello script padre
 
 ## Layer contract
 
@@ -35,9 +45,8 @@ top edge at the top of the source image; collision is defined separately.
 - Secret-room art: z `-2`
 - Walkable platform body: z `-1`
 - Player: z `2`
-- Enemies and world props: z `0` or their scene-specific combat layer
-- Fishing line and hook: z `14–20`
+- Enemies / props: z `0` (o layer combat specifico)
+- Fishing line / hook: z `14–20`
 
-Do not add a procedural Line2D over the walkable edge. If an illustrator wants
-foreground foot occlusion, it must be painted into a dedicated transparent prop
-and reviewed per platform rather than stretched across the whole floor.
+Niente Line2D procedurale sul bordo calpestabile: se serve occlusione piedi,
+va dipinta in un prop trasparente dedicato.

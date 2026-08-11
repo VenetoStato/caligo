@@ -52,8 +52,9 @@ func _draw() -> void:
 		)
 	draw_arc(Vector2(0 if down else 9, 8 if down else 0), 14.0 + pulse * 2.0, 0.25, TAU - 0.25, 24, Color(marker_color.r, marker_color.g, marker_color.b, pulse * 0.62), 2.0, true)
 	if down:
+		var font := ThemeDB.get_project_theme().get_default_font() if ThemeDB.get_project_theme() else ThemeDB.fallback_font
 		draw_string(
-			ThemeDB.fallback_font,
+			font if font else ThemeDB.fallback_font,
 			Vector2(-34, 36),
 			"SOTTO",
 			HORIZONTAL_ALIGNMENT_LEFT,

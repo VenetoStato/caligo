@@ -6,6 +6,8 @@
 - Display and body fonts live in `UI/Fonts`.
 - Intro artwork is referenced by the relevant screen script; Dogana world artwork
   remains centralized in `dogana_art_profile.tres`.
+- Illustrators should prefer `Landscape/Dogana/ArtistDrop/` +
+  `python tools/sync_artist_drop.py` over editing scenes directly.
 
 ## Responsive layout
 

@@ -43,3 +43,17 @@ Thumbs.db
 android/build/
 build/
 *.apk
+
+# Artist drop working copies (seeded from live art; sync back with tools/sync_artist_drop.py)
+Landscape/Dogana/ArtistDrop/*.png
+Landscape/Dogana/ArtistDrop/*.jpg
+Landscape/Dogana/ArtistDrop/*.psd
+Landscape/Dogana/ArtistDrop/*.psb
+Landscape/Dogana/ArtistDrop/BOARD.html
+
+# Local test redirects
+_t_out.txt
+_t_err.txt
+_guided_out.txt
+_guided_err.txt
+tools/__pycache__/
