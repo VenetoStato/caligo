@@ -81,6 +81,8 @@ enum AttackPattern {
 
 @export_category("Visual")
 @export var sprite_node: Node2D = null
+## Kit art sostituibile: still e/o sheet a clip (idle/walk/wake/windup/attack/hurt/death/jump).
+@export var art_kit: EnemyArtKit
 ## Colore dello sprite quando viene colpito (flash molto visibile)
 @export var hit_flash_color: Color = Color(2.6, 0.55, 0.22, 1.0)
 @export var hit_flash_duration: float = 0.28
@@ -104,6 +106,10 @@ const FLIP_MIN_INTERVAL: float = 0.45  # cooldown tra un cambio direzione e l'al
 var _hurtbox: Area2D = null
 var _attack_hitbox: Area2D = null
 var _anim: AnimationPlayer = null
+var _animated: AnimatedSprite2D = null
+var _using_frames := false
+var _clip_lock := ""
+var _clip_lock_timer := 0.0
 var _original_sprite_scale: Vector2 = Vector2.ONE
 var _breath_timer: float = 0.0
 var _original_modulate: Color = Color(1.0, 1.0, 1.0, 1.0)
@@ -153,15 +159,12 @@ func _ready():
 	_normalize_collision_to_feet()
 	if sprite_node == null:
 		sprite_node = get_node_or_null("Sprite2D")
-	if variant_texture and sprite_node is Sprite2D:
-		var sprite := sprite_node as Sprite2D
-		sprite.texture = variant_texture
-		sprite.hframes = 1
-		sprite.vframes = 1
-		sprite.frame = 0
-		sprite.scale *= variant_scale_multiplier
-		if _anim:
-			_anim.active = false
+	if art_kit:
+		apply_art_kit(art_kit)
+	elif variant_texture and sprite_node is Sprite2D:
+		apply_variant_art(variant_texture)
+	if variant_texture and sprite_node and not _using_frames:
+		sprite_node.scale *= variant_scale_multiplier
 	if sprite_node:
 		_original_sprite_scale = sprite_node.scale
 		_original_modulate = sprite_node.modulate
@@ -195,21 +198,108 @@ func _ready():
 
 
 func apply_variant_art(texture: Texture2D) -> void:
-	# Entry point per l'art profile: una texture statica deve disattivare i frame
-	# della sprite sheet, altrimenti i frame inesistenti diventano glitch visivi.
-	if texture == null or sprite_node == null or not (sprite_node is Sprite2D):
+	# Still-only swap: collisioni e hitbox restano quelle del CharacterBody2D.
+	if texture == null:
 		return
-	variant_texture = texture
-	var sprite := sprite_node as Sprite2D
-	sprite.texture = texture
-	sprite.hframes = 1
-	sprite.vframes = 1
-	sprite.frame = 0
-	if _anim:
-		_anim.active = false
-	_original_sprite_scale = sprite.scale
-	_base_sprite_position = sprite.position
-	_apply_archetype_look()
+	if art_kit == null:
+		art_kit = EnemyArtKit.new()
+	art_kit.still = texture
+	apply_art_kit(art_kit)
+
+
+func apply_art_kit(kit: EnemyArtKit) -> void:
+	# Hollow Knight: il codice chiede un nome clip; l'artista cambia pixel/sheet.
+	if kit == null:
+		return
+	art_kit = kit
+	var still := kit.resolved_still()
+	if still:
+		variant_texture = still
+	var sprite_frames := kit.resolved_frames()
+	_using_frames = sprite_frames != null
+	if _using_frames:
+		_ensure_animated(sprite_frames)
+		if _anim:
+			_anim.active = false
+	elif still and sprite_node is Sprite2D:
+		var sprite := sprite_node as Sprite2D
+		sprite.visible = true
+		sprite.texture = still
+		sprite.hframes = 1
+		sprite.vframes = 1
+		sprite.frame = 0
+		if _animated:
+			_animated.visible = false
+		if _anim:
+			_anim.active = false
+	if sprite_node:
+		_original_sprite_scale = sprite_node.scale
+		_base_sprite_position = sprite_node.position
+		_apply_archetype_look()
+	_play_clip("idle")
+
+
+func _ensure_animated(sprite_frames: SpriteFrames) -> void:
+	if sprite_node == null:
+		sprite_node = get_node_or_null("Sprite2D")
+	_animated = get_node_or_null("AnimatedSprite2D") as AnimatedSprite2D
+	if _animated == null:
+		_animated = AnimatedSprite2D.new()
+		_animated.name = "AnimatedSprite2D"
+		add_child(_animated)
+	_animated.sprite_frames = sprite_frames
+	_animated.visible = true
+	_animated.centered = true
+	if sprite_node:
+		_animated.position = sprite_node.position
+		_animated.scale = sprite_node.scale
+		_animated.z_index = sprite_node.z_index
+		if sprite_node is CanvasItem:
+			sprite_node.visible = false
+	sprite_node = _animated
+
+
+func _play_clip(clip_name: String, force := false) -> void:
+	if _using_frames and _animated and _animated.sprite_frames and _animated.sprite_frames.has_animation(clip_name):
+		if not force and _clip_lock_timer > 0.0 and _clip_lock != "" and clip_name != _clip_lock:
+			if clip_name in ["idle", "walk"]:
+				return
+		if _animated.animation != clip_name or force:
+			_animated.play(clip_name)
+		var looping := _animated.sprite_frames.get_animation_loop(clip_name)
+		if looping:
+			_clip_lock = ""
+			_clip_lock_timer = 0.0
+		else:
+			var frames := maxi(_animated.sprite_frames.get_frame_count(clip_name), 1)
+			var fps := maxf(_animated.sprite_frames.get_animation_speed(clip_name), 1.0)
+			_clip_lock = clip_name
+			_clip_lock_timer = float(frames) / fps
+		return
+	if _anim == null or not _anim.active:
+		return
+	var aliases := {
+		"idle": "Idle",
+		"walk": "Walk",
+		"jump": "Jump",
+		"attack": "Attack",
+		"hurt": "Hit",
+		"wake": "Idle",
+		"windup": "Idle",
+		"death": "Hit",
+	}
+	var anim_name := String(aliases.get(clip_name, clip_name))
+	if _anim.has_animation(anim_name) and _anim.current_animation != anim_name:
+		_anim.play(anim_name)
+
+
+func _sync_locomotion_clip() -> void:
+	if _clip_lock_timer > 0.0:
+		return
+	if not hovering and absf(velocity.x) > 8.0:
+		_play_clip("walk")
+	else:
+		_play_clip("idle")
 
 
 func _normalize_collision_to_feet() -> void:
@@ -285,9 +375,12 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		queue_redraw()
 		return
-	# Le varianti illustrate usano animazione procedurale; i gamberetti
-	# conservano le animazioni a frame del loro AnimationPlayer.
-	if variant_texture:
+	if _clip_lock_timer > 0.0:
+		_clip_lock_timer = maxf(0.0, _clip_lock_timer - delta)
+		if _clip_lock_timer <= 0.0:
+			_clip_lock = ""
+	# Still-only: respiro procedurale. Con uno sheet si guidano le clip per nome.
+	if variant_texture and not _using_frames:
 		_update_variant_animation(delta)
 	elif sprite_node and state != State.DEAD:
 		_breath_timer += delta
@@ -314,6 +407,7 @@ func _physics_process(delta: float) -> void:
 				state = State.AGGRO
 				player = p
 				jump_timer = 0.0
+				_play_clip("wake", true)
 		_update_patrol(delta)
 		if hovering:
 			var hover_target := _home_position.y + sin(_breath_timer * 1.35) * 7.0
@@ -324,12 +418,8 @@ func _physics_process(delta: float) -> void:
 		if is_on_wall():
 			_turn_patrol()
 		_flip_patrol_facing()
-		if not hovering and _anim and _melee_windup_remaining <= 0.0:
-			if absf(velocity.x) > 8.0 and _anim.has_animation("Walk"):
-				if _anim.current_animation != "Walk":
-					_anim.play("Walk")
-			elif _anim.has_animation("Idle") and _anim.current_animation != "Idle":
-				_anim.play("Idle")
+		if not hovering and _melee_windup_remaining <= 0.0:
+			_sync_locomotion_clip()
 		queue_redraw()
 		return
 
@@ -472,8 +562,7 @@ func _physics_process(delta: float) -> void:
 				leap_boost = 1.15
 			velocity.y = -jump_speed * leap_boost
 			velocity.x += dir_x * move_speed * 0.35
-			if _anim and _anim.has_animation("Jump"):
-				_anim.play("Jump")
+			_play_clip("jump", true)
 
 	_update_special_attack(delta, to_player)
 	_update_leap_slam(delta)
@@ -487,10 +576,7 @@ func _physics_process(delta: float) -> void:
 		and _melee_windup_remaining <= 0.0
 		and (_anim == null or not _anim.is_playing() or _anim.current_animation == "Idle")
 	):
-		if absf(velocity.x) > 12.0 and _anim and _anim.has_animation("Walk"):
-			_anim.play("Walk")
-		elif _anim and _anim.has_animation("Idle"):
-			_anim.play("Idle")
+		_sync_locomotion_clip()
 	queue_redraw()
 
 
@@ -522,8 +608,7 @@ func _update_melee_attack(delta: float, dist: float) -> void:
 			82.0,
 			0.34
 		)
-		if _anim and _anim.has_animation("Attack"):
-			_anim.play("Attack")
+		_play_clip("attack", true)
 		return
 	if (
 		dist <= attack_range
@@ -538,6 +623,7 @@ func _update_melee_attack(delta: float, dist: float) -> void:
 		_pending_melee_damage = heavy_melee_damage if heavy else attack_damage
 		_melee_windup_remaining = melee_windup * (1.25 if heavy else 1.0)
 		_hit_flash_timer = 0.1 if heavy else 0.0
+		_play_clip("windup", true)
 		if sprite_node:
 			sprite_node.modulate = Color(1.4, 0.5, 0.38, 1.0) if heavy else Color(1.15, 0.85, 0.7, 1.0)
 		queue_redraw()
@@ -588,12 +674,14 @@ func _update_special_attack(delta: float, to_player: Vector2) -> void:
 			windup_scale = 0.7
 		_special_windup_remaining = special_windup * windup_scale
 		_special_timer = special_attack_cooldown
+		_play_clip("windup", true)
 		velocity.x *= 0.15
 		queue_redraw()
 
 
 func _fire_special_attack() -> void:
 	_attack_kick = 1.0
+	_play_clip("attack", true)
 	queue_redraw()
 	if attack_pattern == AttackPattern.TIDE_AREA:
 		# Windup già fatto sul nemico: l'area esplode subito (solo breve flash).
@@ -977,8 +1065,7 @@ func _update_variant_animation(delta: float) -> void:
 
 
 func play_idle() -> void:
-	if _anim and _anim.has_animation("Idle"):
-		_anim.play("Idle")
+	_play_clip("idle", true)
 
 func _on_hurtbox_area_entered(area: Area2D) -> void:
 	# Il danno lo applica solo il player nel suo _on_attack_hitbox_area_entered (1 o 2).
@@ -1012,14 +1099,11 @@ func take_damage(amount: int = 1, source_position: Vector2 = Vector2.ZERO) -> vo
 		velocity = dir * knockback_speed
 		_knockback_timer = knockback_duration
 
+	_play_clip("hurt", true)
 	if state == State.IDLE:
 		state = State.AGGRO
 		player = get_tree().get_first_node_in_group("player") as Node2D
 		jump_timer = 0.0
-		if _anim and _anim.has_animation("Hit"):
-			_anim.play("Hit")
-		elif _anim and _anim.has_animation("Walk"):
-			_anim.play("Walk")
 
 
 func can_be_combat_hooked() -> bool:
@@ -1098,8 +1182,7 @@ func stagger(duration: float) -> void:
 	velocity.x *= 0.2
 	if _attack_hitbox:
 		_attack_hitbox.set_deferred("monitoring", false)
-	if _anim and _anim.has_animation("Hit"):
-		_anim.play("Hit")
+	_play_clip("hurt", true)
 
 
 func is_staggered() -> bool:
@@ -1192,6 +1275,7 @@ func _die() -> void:
 	if state == State.DEAD:
 		return
 	state = State.DEAD
+	_play_clip("death", true)
 	_combat_hooked = false
 	_combat_hook_owner = null
 	if _hurtbox:
@@ -1285,7 +1369,7 @@ func reset_to_home() -> void:
 	if _attack_hitbox:
 		_attack_hitbox.set_deferred("monitoring", false)
 	if _anim:
-		_anim.active = variant_texture == null
+		_anim.active = not _using_frames and variant_texture == null
 		play_idle()
 	set_physics_process(not activation_managed)
 	PARTICLE_BURST.spawn(

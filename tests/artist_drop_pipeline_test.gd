@@ -34,10 +34,18 @@ func _run() -> void:
 	for slot in slots:
 		var dest: String = str(slot.get("dest", ""))
 		var profile_key: String = str(slot.get("profile", ""))
-		if dest.is_empty() or not ResourceLoader.exists("res://" + dest):
+		var optional := bool(slot.get("optional", false))
+		if dest.is_empty():
+			_fail("ArtistDrop slot is missing dest")
+			return
+		if not ResourceLoader.exists("res://" + dest):
+			if optional:
+				continue
 			_fail("Live art missing for slot dest: %s" % dest)
 			return
 		if profile_key.is_empty() or profile.get(profile_key) == null:
+			if optional:
+				continue
 			_fail("Art profile slot empty: %s" % profile_key)
 			return
 	print("CALIGO_ARTIST_DROP_OK: %d slots wired" % slots.size())

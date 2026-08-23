@@ -48,9 +48,27 @@ sostituito da solo; conserva il piede sul bordo inferiore del canvas.
 | `20_fishing_cache.png` | Cassa tutorial | 384×288 |
 | `21_urn.png` / `22_net_bundle.png` | Props rompibili | 1024×1024 |
 | `23_fishbone_wall.png` | Muro | 320×427 |
-| `30_tide_bloater.png` | Nemico | 512×436 |
-| `31_lagoon_oracle.png` | Nemico | 431×512 |
-| `32_drowned_warden.png` | Boss | 512×512 |
+| `30_tide_bloater.png` | Nemico (ritratto) | 512×436 |
+| `31_lagoon_oracle.png` | Nemico (ritratto) | 431×512 |
+| `32_drowned_warden.png` | Boss (ritratto) | 512×512 |
+| `30_tide_bloater_sheet.png` | Sheet 8 clip | 4096×436 |
+| `31_lagoon_oracle_sheet.png` | Sheet 8 clip | 3448×512 |
+| `32_drowned_warden_sheet.png` | Sheet 8 clip boss | 4096×512 |
+
+### Animazioni nemico (stile Hollow Knight)
+
+Il ritratto still è sufficiente. Per far muovere il personaggio a frame, lascia
+nella stessa cartella lo sheet `*_sheet.png` accanto al PNG still: il gioco lo
+carica da solo, senza toccare script o collisioni.
+
+Clip obbligatorie, da sinistra a destra sulla riga:
+
+`idle` `idle` `walk` `walk` `wake` `windup` `attack` `hurt/death`
+
+- Una cella può essere riusata in più clip (Team Cherry fa così).
+- Piedi sul bordo basso di **ogni** cella, stessa larghezza/altezza.
+- `wake` e `windup` devono avere una posa unica e leggibile: sono il telegraph.
+- Collisioni e hitbox restano in Godot. Non disegnarle nello sheet.
 
 ### Interno della Salute
 

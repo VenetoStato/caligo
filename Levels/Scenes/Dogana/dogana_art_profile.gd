@@ -44,3 +44,6 @@ extends Resource
 @export var tide_bloater: Texture2D
 @export var lagoon_oracle: Texture2D
 @export var drowned_warden: Texture2D
+@export var tide_bloater_kit: EnemyArtKit
+@export var lagoon_oracle_kit: EnemyArtKit
+@export var drowned_warden_kit: EnemyArtKit

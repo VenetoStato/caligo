@@ -168,6 +168,39 @@
       "size": [512, 512],
       "kind": "character",
       "notes": "Boss custode sommerso."
+    },
+    {
+      "file": "30_tide_bloater_sheet.png",
+      "dest": "Landscape/Dogana/Generated/tide_bloater_sheet.png",
+      "profile": "",
+      "size": [4096, 436],
+      "kind": "character_sheet",
+      "optional": true,
+      "columns": 8,
+      "rows": 1,
+      "notes": "8 celle in riga, stessa misura. Ordine: idle, idle, walk, walk, wake, windup, attack, hurt/death. Piedi sul bordo basso di ogni cella."
+    },
+    {
+      "file": "31_lagoon_oracle_sheet.png",
+      "dest": "Landscape/Dogana/Generated/lagoon_oracle_sheet.png",
+      "profile": "",
+      "size": [3448, 512],
+      "kind": "character_sheet",
+      "optional": true,
+      "columns": 8,
+      "rows": 1,
+      "notes": "Stesso contratto clip del bloater. Celle uguali, piedi in basso."
+    },
+    {
+      "file": "32_drowned_warden_sheet.png",
+      "dest": "Landscape/Dogana/Generated/drowned_customs_warden_sheet.png",
+      "profile": "",
+      "size": [4096, 512],
+      "kind": "character_sheet",
+      "optional": true,
+      "columns": 8,
+      "rows": 1,
+      "notes": "Sheet boss. Clip: idle, idle, walk, walk, wake, windup, attack, hurt/death."
     }
   ]
 }

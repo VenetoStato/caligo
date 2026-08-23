@@ -21,6 +21,8 @@ const MAX_BOSS_TRANSIENTS := 72
 @export var attack_damage := 1
 @export var heavy_attack_damage := 2
 @export var gravity := 620.0
+@export var variant_texture: Texture2D
+@export var art_kit: EnemyArtKit
 
 enum State { DORMANT, CHASE, WINDUP, LUNGE, SLAM, WAVE, SWEEP, SPIRAL, RING, STREAM, CROSS, RECOVER, DEAD, FAN, PILLARS, FLOOD }
 enum AttackKind { LUNGE, SLAM, WAVE, SWEEP, SPIRAL, RING, STREAM, CROSS, FAN, PILLARS, FLOOD }
@@ -73,6 +75,9 @@ var _anim_state := "dormant"
 var _anim_phase := 0.0
 var _step_phase := 0.0
 var _hurt_anim := 0.0
+var _art_kit: EnemyArtKit
+var _animated: AnimatedSprite2D
+var _using_frames := false
 
 
 func _ready() -> void:
@@ -89,6 +94,8 @@ func _ready() -> void:
 	_attack_hitbox.collision_mask = 2
 	_build_health_ui()
 	_build_telegraph()
+	if _art_kit:
+		apply_art_kit(_art_kit)
 
 
 func _physics_process(delta: float) -> void:
@@ -106,7 +113,10 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var to_player := player.global_position - global_position
-	_sprite.flip_h = to_player.x > 0.0
+	var face_right := to_player.x > 0.0
+	_sprite.flip_h = face_right
+	if _animated:
+		_animated.flip_h = face_right
 	_update_telegraph(to_player)
 
 	match state:
@@ -204,6 +214,66 @@ func _is_desperate() -> bool:
 	return current_health <= maxi(1, max_health / 3)
 
 
+func apply_art_kit(kit: EnemyArtKit) -> void:
+	if kit == null:
+		return
+	_art_kit = kit
+	if _sprite == null:
+		_sprite = get_node_or_null("Sprite2D") as Sprite2D
+	var still := kit.resolved_still()
+	if still:
+		variant_texture = still
+		if _sprite:
+			_sprite.texture = still
+	var sprite_frames := kit.resolved_frames()
+	_using_frames = sprite_frames != null
+	if not _using_frames:
+		return
+	_animated = get_node_or_null("AnimatedSprite2D") as AnimatedSprite2D
+	if _animated == null:
+		_animated = AnimatedSprite2D.new()
+		_animated.name = "AnimatedSprite2D"
+		add_child(_animated)
+	_animated.sprite_frames = sprite_frames
+	_animated.position = _sprite.position
+	_animated.scale = _sprite.scale
+	_animated.z_index = _sprite.z_index
+	_animated.visible = true
+	_sprite.visible = false
+
+
+func _play_kit_clip(anim_state: String) -> void:
+	if not _using_frames or _animated == null or _animated.sprite_frames == null:
+		return
+	var clip := "idle"
+	match anim_state:
+		"chase":
+			clip = "walk"
+		"windup":
+			clip = "windup"
+		"attack":
+			clip = "attack"
+		"hurt":
+			clip = "hurt"
+		"dead":
+			clip = "death"
+		"recover":
+			clip = "idle"
+		_:
+			clip = "idle"
+	if _animated.sprite_frames.has_animation(clip) and _animated.animation != clip:
+		_animated.play(clip)
+
+
+func apply_variant_art(texture: Texture2D) -> void:
+	if texture == null:
+		return
+	if _art_kit == null:
+		_art_kit = EnemyArtKit.new()
+	_art_kit.still = texture
+	apply_art_kit(_art_kit)
+
+
 func get_animation_state() -> String:
 	return _anim_state
 
@@ -217,7 +287,10 @@ func _animate(delta: float) -> void:
 	if next_state != _anim_state:
 		_anim_state = next_state
 		_anim_phase = 0.0
+		_play_kit_clip(_anim_state)
 	_anim_phase += delta
+	if _using_frames:
+		return
 
 	var facing := 1.0 if _sprite.flip_h else -1.0
 	var offset := Vector2.ZERO

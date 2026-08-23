@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EnemyArtKit" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Enemies/enemy_art_kit.gd" id="1_kit"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/lagoon_oracle.png" id="2_still"]
+
+[resource]
+script = ExtResource("1_kit")
+still = ExtResource("2_still")
+sheet_columns = 8
+sheet_rows = 1
+sheet_fps = 8.0

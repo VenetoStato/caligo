@@ -6,6 +6,13 @@ func _ready() -> void:
 	if profile == null:
 		_fail("Dogana art profile could not be loaded.")
 		return
+	if (
+		profile.tide_bloater_kit == null
+		or profile.lagoon_oracle_kit == null
+		or profile.drowned_warden_kit == null
+	):
+		_fail("Enemy art kits are missing from the Dogana profile.")
+		return
 	for texture in [profile.tide_altar, profile.cracked_urn, profile.net_bundle]:
 		if texture == null:
 			_fail("An illustrator-facing prop slot is empty.")

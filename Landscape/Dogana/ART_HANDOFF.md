@@ -94,3 +94,21 @@ restare riconoscibile.
    `GeneratedPlatformArt`.
 4. Per la composizione architettonica usa `Environment/Landmarks` e
    `Environment/Architecture`; non disegnare collisioni nell'immagine.
+
+## Nemici: still + sheet (contratto Hollow Knight)
+
+Gameplay e arte sono due file diversi. Il codice chiede solo nomi clip
+(`idle`, `walk`, `wake`, `windup`, `attack`, `hurt`, `death`, `jump`).
+L'illustratrice può:
+
+1. Sostituire il ritratto still (`30_tide_bloater.png`, ecc.).
+2. Aggiungere `30_tide_bloater_sheet.png` (8 celle in riga) per le animazioni.
+3. Oppure assegnare un `SpriteFrames` nel `EnemyArtKit` (`Enemies/Art/*.tres`).
+
+Regole Team Cherry che Caligo replica:
+
+- Pivot ai piedi: il `CharacterBody2D` sta a terra, lo sprite è figlio.
+- Hitbox e hurtbox sono Area2D, non pixel dello sheet.
+- Telegraph (`wake`, `windup`) ha una posa unica, diversa dall'idle.
+- I frame si possono riusare tra clip: una cella, tante animazioni.
+- Il codice non legge i pixel. Cambia solo il kit / lo sheet.

@@ -36,6 +36,7 @@ Write-Host "PARSE_OK"
 $tests = @(
     @{ kind = "script"; path = "res://tests/smoke_test.gd"; token = "CALIGO_SMOKE_OK"; timeout = 45000 },
     @{ kind = "script"; path = "res://tests/artist_drop_pipeline_test.gd"; token = "CALIGO_ARTIST_DROP_OK"; timeout = 20000 },
+    @{ kind = "script"; path = "res://tests/enemy_art_kit_test.gd"; token = "CALIGO_ENEMY_ART_KIT_OK"; timeout = 30000 },
     @{ kind = "script"; path = "res://tests/fishing_reentry_reel_test.gd"; token = "FISHING_REENTRY_REEL_TEST_OK"; timeout = 30000 },
     @{ kind = "script"; path = "res://tests/fishing_attract_swim_test.gd"; token = "FISHING_ATTRACT_SWIM_TEST_OK"; timeout = 30000 },
     @{ kind = "scene"; path = "res://tests/player_jump_test.tscn"; token = "CALIGO_JUMP_TEST"; timeout = 30000 },

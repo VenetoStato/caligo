@@ -54,6 +54,8 @@ Landscape/Dogana/ArtistDrop/BOARD.html
 # Local test redirects
 _t_out.txt
 _t_err.txt
+_v_out.txt
+_v_err.txt
 _guided_out.txt
 _guided_err.txt
 tools/__pycache__/

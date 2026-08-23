@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="DoganaArtProfile" load_steps=23 format=3]
+[gd_resource type="Resource" script_class="DoganaArtProfile" load_steps=26 format=3]
 
 [ext_resource type="Script" path="res://Levels/Scenes/Dogana/dogana_art_profile.gd" id="1_profile"]
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/Illustrated/arrival.png" id="2_arrival"]
@@ -22,6 +22,9 @@
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/module_collegamento_salute.png" id="21_connector"]
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/module_salute.png" id="22_salute"]
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/salute_interior_v2.png" id="24_salute_interior"]
+[ext_resource type="Resource" path="res://Enemies/Art/tide_bloater_kit.tres" id="25_bloater_kit"]
+[ext_resource type="Resource" path="res://Enemies/Art/lagoon_oracle_kit.tres" id="26_oracle_kit"]
+[ext_resource type="Resource" path="res://Enemies/Art/drowned_warden_kit.tres" id="27_warden_kit"]
 
 [resource]
 script = ExtResource("1_profile")
@@ -46,3 +49,6 @@ fishbone_wall = ExtResource("11_wall")
 tide_bloater = ExtResource("12_bloater")
 lagoon_oracle = ExtResource("13_oracle")
 drowned_warden = ExtResource("14_boss")
+tide_bloater_kit = ExtResource("25_bloater_kit")
+lagoon_oracle_kit = ExtResource("26_oracle_kit")
+drowned_warden_kit = ExtResource("27_warden_kit")

@@ -15,6 +15,7 @@ func _ready() -> void:
 	var interior := get_tree().get_first_node_in_group("dogana_salute_interior_art") as Sprite2D
 	if interior and art_profile.salute_interior:
 		interior.texture = art_profile.salute_interior
+	call_deferred("_apply_character_art")
 
 
 func _apply_texture(node_path: NodePath, texture: Texture2D) -> void:
@@ -33,14 +34,24 @@ func _apply_character_art() -> void:
 		var key := str(enemy.get_meta("art_slot", "")).strip_edges()
 		if key.is_empty():
 			continue
+		var kit := _kit_for_slot(key)
+		if kit and enemy.has_method("apply_art_kit"):
+			enemy.call("apply_art_kit", kit)
+			continue
 		var tex := _texture_for_slot(key)
 		if tex == null:
 			continue
 		if enemy.has_method("apply_variant_art"):
 			enemy.call("apply_variant_art", tex)
 	var boss := get_tree().get_first_node_in_group("dogana_boss")
-	if boss and art_profile.drowned_warden:
-		if "variant_texture" in boss:
+	if boss == null:
+		return
+	if art_profile.drowned_warden_kit and boss.has_method("apply_art_kit"):
+		boss.call("apply_art_kit", art_profile.drowned_warden_kit)
+	elif art_profile.drowned_warden:
+		if boss.has_method("apply_variant_art"):
+			boss.call("apply_variant_art", art_profile.drowned_warden)
+		elif "variant_texture" in boss:
 			boss.set("variant_texture", art_profile.drowned_warden)
 		var boss_sprite := boss.get_node_or_null("Sprite2D") as Sprite2D
 		if boss_sprite:
@@ -55,5 +66,17 @@ func _texture_for_slot(slot: String) -> Texture2D:
 			return art_profile.lagoon_oracle
 		"drowned_warden":
 			return art_profile.drowned_warden
+		_:
+			return null
+
+
+func _kit_for_slot(slot: String) -> EnemyArtKit:
+	match slot:
+		"tide_bloater":
+			return art_profile.tide_bloater_kit
+		"lagoon_oracle":
+			return art_profile.lagoon_oracle_kit
+		"drowned_warden":
+			return art_profile.drowned_warden_kit
 		_:
 			return null
