@@ -16,11 +16,38 @@ func _ready() -> void:
 			return
 
 	var packed := load("res://Levels/Scenes/punta_della_dogana.tscn") as PackedScene
+	var map_art := load("res://Landscape/Dogana/Generated/dogana_map_sideview_v2.png") as Texture2D
+	if map_art == null or map_art.get_width() < 1500 or map_art.get_height() < 700:
+		_fail("The illustrated Punta side-view map asset is missing or too small.")
+		return
 	var level := packed.instantiate()
 	level.set("persistence_enabled", false)
 	add_child(level)
 	await get_tree().process_frame
 	await get_tree().physics_frame
+	var sideview_modules := get_tree().get_nodes_in_group("dogana_sideview_module")
+	if sideview_modules.size() != 6:
+		_fail("Punta architecture is not split into six artist-replaceable modules.")
+		return
+	var expected_order := 0
+	var previous_x := -INF
+	for module_node in sideview_modules:
+		var module := module_node as Sprite2D
+		if module == null or not is_equal_approx(absf(module.scale.x), absf(module.scale.y)):
+			_fail("A Punta architecture module is horizontally or vertically stretched.")
+			return
+		if int(module.get_meta("module_order", -1)) != expected_order or module.position.x <= previous_x:
+			_fail("Punta architecture module ordering is incoherent.")
+			return
+		if not is_equal_approx(float(module.get_meta("baseline_y", -1.0)), 530.0):
+			_fail("Punta architecture modules do not share the same authored baseline.")
+			return
+		var image := module.texture.get_image()
+		if image == null or image.get_pixel(0, 0).a > 0.02:
+			_fail("A Punta architecture module still has an opaque preview background.")
+			return
+		previous_x = module.position.x
+		expected_order += 1
 
 	var grace := level.get_node("Gameplay/GraceSites/Pontile")
 	var player := level.get_node("Player") as CharacterBody2D

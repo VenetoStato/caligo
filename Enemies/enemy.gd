@@ -69,18 +69,21 @@ enum AttackPattern {
 @export var charge_duration := 0.42
 @export var spiral_spin := 1.8
 
-@export_category("Respawn")
-@export var respawn_enabled := true
-@export var respawn_delay := 9.0
-@export var respawn_safe_distance := 300.0
+@export_category("Grace reset")
 @export var post_respawn_wake_delay := 3.5
 @export var activation_managed := false
+
+@export_category("Fishing combat")
+## I nemici pesanti possono essere agganciati e storditi dalla lenza, ma non trascinati.
+@export var combat_hook_heavy := false
+@export var combat_hook_launch_speed := 560.0
+@export var combat_hook_power_launch_speed := 760.0
 
 @export_category("Visual")
 @export var sprite_node: Node2D = null
 ## Colore dello sprite quando viene colpito (flash molto visibile)
-@export var hit_flash_color: Color = Color(2.2, 0.25, 0.25, 1.0)
-@export var hit_flash_duration: float = 0.22
+@export var hit_flash_color: Color = Color(2.6, 0.55, 0.22, 1.0)
+@export var hit_flash_duration: float = 0.28
 ## Scena particelle quando colpito (es. BlackParticle); vuoto = nessuna
 @export var hit_particle_scene: PackedScene = null
 
@@ -109,8 +112,6 @@ var _home_position := Vector2.ZERO
 var _special_timer := 1.0
 var _special_windup_remaining := 0.0
 var _special_target_direction := Vector2.RIGHT
-var _respawn_generation := 0
-var _respawn_timer: Timer
 var _base_sprite_position := Vector2.ZERO
 var _attack_kick := 0.0
 var _pending_melee_damage := 1
@@ -123,6 +124,23 @@ var _melee_windup_remaining := 0.0
 var _strafe_timer := 0.0
 var _strafe_sign := 1.0
 var _patrol_dir := 1.0
+var _patrol_turn_cooldown := 0.0
+var _chase_switch_cooldown := 0.0
+var _chase_dir := 1.0
+var _combat_hooked := false
+var _stagger_timer := 0.0
+var _duel_timer := 0.0
+var _duel_committed := false
+var _hover_timer := 0.0
+var _hover_mode := 0
+var _patrol_pause := 0.0
+var _step_cycle := 0.0
+var _combat_hook_owner: Node2D = null
+var _combat_hook_pull_velocity := Vector2.ZERO
+
+const PATROL_TURN_INTERVAL := 0.38
+const CHASE_TURN_INTERVAL := 0.28
+const CHASE_DEAD_ZONE := 34.0
 
 func _ready():
 	add_to_group("enemy")
@@ -158,18 +176,40 @@ func _ready():
 		_attack_hitbox.body_entered.connect(_on_attack_hit_body)
 		_attack_hitbox.monitoring = false
 		_attack_hitbox.collision_mask = 2  # layer 2 = player, così ti colpisce anche quando salta
-	_respawn_timer = Timer.new()
-	_respawn_timer.name = "RespawnTimer"
-	_respawn_timer.one_shot = true
-	_respawn_timer.timeout.connect(_on_respawn_timeout)
-	add_child(_respawn_timer)
 	# Layer 2, mask 1: collide solo con terreno (layer 1), non col player = non ti finisce sopra
 	collision_layer = 2
 	collision_mask = 1
-	z_index = 5 if variant_texture else -1
+	floor_snap_length = 18.0
+	floor_max_angle = deg_to_rad(60.0)
+	floor_constant_speed = true
+	floor_stop_on_slope = false
+	# Tutti gli archetipi devono stare davanti a piattaforme e fondali. Il vecchio
+	# z=-1 dei gamberetti li faceva sparire dietro il bordo della banchina.
+	z_index = 6
 	_patrol_dir = 1.0 if randf() < 0.5 else -1.0
+	_chase_dir = _patrol_dir
 	play_idle()
 	queue_redraw()
+	if not hovering:
+		call_deferred("_snap_to_floor")
+
+
+func apply_variant_art(texture: Texture2D) -> void:
+	# Entry point per l'art profile: una texture statica deve disattivare i frame
+	# della sprite sheet, altrimenti i frame inesistenti diventano glitch visivi.
+	if texture == null or sprite_node == null or not (sprite_node is Sprite2D):
+		return
+	variant_texture = texture
+	var sprite := sprite_node as Sprite2D
+	sprite.texture = texture
+	sprite.hframes = 1
+	sprite.vframes = 1
+	sprite.frame = 0
+	if _anim:
+		_anim.active = false
+	_original_sprite_scale = sprite.scale
+	_base_sprite_position = sprite.position
+	_apply_archetype_look()
 
 
 func _normalize_collision_to_feet() -> void:
@@ -187,10 +227,15 @@ func _normalize_collision_to_feet() -> void:
 		var hcol := _hurtbox.get_node_or_null("CollisionShape2D") as CollisionShape2D
 		if hcol:
 			var hshape := RectangleShape2D.new()
-			var hurt := body_world_size * Vector2(1.35, 1.2)
+			var hurt := body_world_size * (Vector2(1.7, 2.35) if hovering else Vector2(1.45, 1.35))
 			hshape.size = Vector2(hurt.x / sx, hurt.y / sy)
 			hcol.shape = hshape
-			hcol.position = Vector2(0.0, -hurt.y * 0.5 / sy)
+			hcol.position = Vector2(0.0, -hurt.y * (0.62 if hovering else 0.5) / sy)
+			hcol.disabled = false
+		_hurtbox.monitorable = true
+		_hurtbox.monitoring = true
+		_hurtbox.collision_layer = 2
+		_hurtbox.collision_mask = 4
 	if _attack_hitbox:
 		var acol := _attack_hitbox.get_node_or_null("CollisionShape2D") as CollisionShape2D
 		if acol:
@@ -203,6 +248,42 @@ func _normalize_collision_to_feet() -> void:
 
 func _physics_process(delta: float) -> void:
 	if state == State.DEAD:
+		return
+	_patrol_turn_cooldown = maxf(0.0, _patrol_turn_cooldown - delta)
+	_chase_switch_cooldown = maxf(0.0, _chase_switch_cooldown - delta)
+	# La lenza prende temporaneamente il controllo del moto. I pesanti si piantano
+	# a terra; i leggeri seguono una velocita' fisica verso la canna.
+	if _stagger_timer > 0.0 and not _combat_hooked:
+		_stagger_timer = maxf(0.0, _stagger_timer - delta)
+		velocity.x = move_toward(velocity.x, 0.0, move_friction * 1.6 * delta)
+		if not hovering:
+			velocity.y += gravity * delta
+		if sprite_node:
+			var wobble := sin(Time.get_ticks_msec() * 0.021) * 0.14 * _stagger_timer
+			sprite_node.rotation = wobble
+			# Vira in ambra acceso: e' l'unico segnale che dice "colpiscimi ora".
+			var flash: float = 0.62 + 0.38 * sin(Time.get_ticks_msec() * 0.017)
+			sprite_node.modulate = _original_modulate.lerp(
+				Color(1.35, 0.86, 0.4, 1.0), clampf(_stagger_timer * 1.6, 0.0, 1.0) * flash
+			)
+		move_and_slide()
+		queue_redraw()
+		return
+	if sprite_node and _stagger_timer <= 0.0:
+		if not is_zero_approx(sprite_node.rotation):
+			sprite_node.rotation = move_toward(sprite_node.rotation, 0.0, delta * 3.0)
+		if not sprite_node.modulate.is_equal_approx(_original_modulate) and _hit_flash_timer <= 0.0:
+			sprite_node.modulate = sprite_node.modulate.lerp(_original_modulate, delta * 6.0)
+	if _combat_hooked:
+		if combat_hook_heavy:
+			velocity.x = move_toward(velocity.x, 0.0, move_friction * 2.5 * delta)
+		else:
+			velocity.x = move_toward(velocity.x, _combat_hook_pull_velocity.x, 1250.0 * delta)
+			velocity.y = move_toward(velocity.y, _combat_hook_pull_velocity.y, 1050.0 * delta)
+		if not hovering:
+			velocity.y += gravity * 0.55 * delta
+		move_and_slide()
+		queue_redraw()
 		return
 	# Le varianti illustrate usano animazione procedurale; i gamberetti
 	# conservano le animazioni a frame del loro AnimationPlayer.
@@ -241,7 +322,7 @@ func _physics_process(delta: float) -> void:
 			velocity.y += gravity * delta
 		move_and_slide()
 		if is_on_wall():
-			_patrol_dir *= -1.0
+			_turn_patrol()
 		_flip_patrol_facing()
 		if not hovering and _anim and _melee_windup_remaining <= 0.0:
 			if absf(velocity.x) > 8.0 and _anim.has_animation("Walk"):
@@ -275,7 +356,16 @@ func _physics_process(delta: float) -> void:
 	if to_player.length() > disengage_range or global_position.distance_to(_home_position) > leash_distance:
 		_disengage()
 		return
-	var dir_x: float = sign(to_player.x)
+	var wanted_chase_dir := signf(to_player.x)
+	if (
+		absf(to_player.x) > CHASE_DEAD_ZONE
+		and wanted_chase_dir != 0.0
+		and wanted_chase_dir != _chase_dir
+		and _chase_switch_cooldown <= 0.0
+	):
+		_chase_dir = wanted_chase_dir
+		_chase_switch_cooldown = CHASE_TURN_INTERVAL
+	var dir_x: float = _chase_dir
 	var dist: float = to_player.length()
 	_strafe_timer -= delta
 	if _strafe_timer <= 0.0:
@@ -309,7 +399,18 @@ func _physics_process(delta: float) -> void:
 		elif attack_pattern == AttackPattern.CHARGE_BURST and dist < 90.0:
 			desired_x = -dir_x * move_speed * 0.4
 		else:
-			desired_x = dir_x * move_speed
+			# Duello invece di corsa frontale: entra in misura, la tiene
+			# girandoci intorno, arretra e ogni tanto affonda davvero.
+			_duel_timer -= delta
+			if _duel_timer <= 0.0:
+				_duel_committed = not _duel_committed
+				_duel_timer = randf_range(0.45, 0.75) if _duel_committed else randf_range(0.9, 1.8)
+			if _duel_committed or dist > attack_range * 1.5:
+				desired_x = dir_x * move_speed
+			elif dist < attack_range * 0.62:
+				desired_x = -dir_x * move_speed * 0.6
+			else:
+				desired_x = _strafe_sign * move_speed * 0.45
 		if windup_slow:
 			desired_x *= 0.22
 		var accel := move_acceleration if absf(desired_x) > 1.0 else move_friction
@@ -331,9 +432,35 @@ func _physics_process(delta: float) -> void:
 
 	# Gravità e salto periodico; gli oracoli restano sospesi e seguono in verticale.
 	if hovering:
+		# Ciclo di volo: pedina in quota, sale a prendere aria, poi picchia.
+		# Prima stava semplicemente all'altezza del player, ed era piatto.
+		_hover_timer -= delta
+		if _hover_timer <= 0.0:
+			match _hover_mode:
+				0:
+					_hover_mode = 1
+					_hover_timer = randf_range(0.7, 1.1)
+				1:
+					_hover_mode = 2
+					_hover_timer = randf_range(0.55, 0.85)
+				_:
+					_hover_mode = 0
+					_hover_timer = randf_range(1.4, 2.4)
 		var hover_amp := 9.0 if state == State.AGGRO else 6.0
-		var hover_target := player.global_position.y - 28.0 + sin(_breath_timer * 1.7) * hover_amp
-		velocity.y = clampf((hover_target - global_position.y) * 2.8, -85.0, 85.0)
+		var hover_offset := -28.0
+		var vertical_speed := 2.8
+		match _hover_mode:
+			1:
+				hover_offset = -132.0
+				vertical_speed = 3.4
+			2:
+				hover_offset = 6.0
+				vertical_speed = 5.6
+		var hover_target := (
+			player.global_position.y + hover_offset + sin(_breath_timer * 1.7) * hover_amp
+		)
+		var limit := 190.0 if _hover_mode == 2 else 95.0
+		velocity.y = clampf((hover_target - global_position.y) * vertical_speed, -limit, limit)
 	else:
 		velocity.y += gravity * delta
 		jump_timer -= delta
@@ -384,6 +511,17 @@ func _update_melee_attack(delta: float, dist: float) -> void:
 			_attack_hitbox.monitoring = true
 			_attack_hitbox_disable_timer = 0.34 if _pending_melee_damage > attack_damage else 0.24
 		_attack_kick = 1.0
+		# Un colpo deve avere peso anche senza mostrare hitbox di debug.
+		PARTICLE_BURST.spawn(
+			get_tree().current_scene,
+			global_position + Vector2(30.0 if facing_right else -30.0, -12.0),
+			Color(0.95, 0.58, 0.34, 0.82),
+			7 if _pending_melee_damage <= attack_damage else 12,
+			Vector2.RIGHT if facing_right else Vector2.LEFT,
+			28.0,
+			82.0,
+			0.34
+		)
 		if _anim and _anim.has_animation("Attack"):
 			_anim.play("Attack")
 		return
@@ -618,17 +756,25 @@ func _apply_archetype_look() -> void:
 
 
 func _update_patrol(_delta: float) -> void:
+	# Ronda con soste: si ferma, si guarda intorno e riparte. Il pendolo
+	# continuo a velocita' fissa era la cosa che leggeva piu' meccanica.
+	if _patrol_pause > 0.0:
+		_patrol_pause = maxf(0.0, _patrol_pause - _delta)
+		velocity.x = move_toward(velocity.x, 0.0, move_friction * _delta)
+		if hovering:
+			velocity.y = sin(_breath_timer * 1.9) * 22.0
+		return
 	var target_x := _home_position.x + _patrol_dir * patrol_range
 	if hovering:
 		# Oracoli: pendolo orizzontale intorno alla casa.
 		if absf(global_position.x - target_x) < 10.0:
-			_patrol_dir *= -1.0
+			_turn_patrol()
 		velocity.x = _patrol_dir * move_speed * patrol_speed_multiplier
 		return
 	if absf(global_position.x - target_x) < 12.0:
-		_patrol_dir *= -1.0
-	if _patrol_edge_ahead():
-		_patrol_dir *= -1.0
+		_turn_patrol()
+	elif _patrol_edge_ahead():
+		_turn_patrol()
 	var desired := _patrol_dir * move_speed * patrol_speed_multiplier
 	# Se troppo fuori dal tratto, tira verso il bordo del patrol.
 	if absf(global_position.x - _home_position.x) > patrol_range + 24.0:
@@ -642,13 +788,41 @@ func _patrol_edge_ahead() -> bool:
 	var space := get_world_2d().direct_space_state
 	if space == null:
 		return false
-	var from := global_position + Vector2(_patrol_dir * patrol_edge_check_distance, -4.0)
-	var to := from + Vector2(0.0, 36.0)
+	var from := global_position + Vector2(_patrol_dir * patrol_edge_check_distance, -18.0)
+	var to := from + Vector2(0.0, 104.0)
 	var query := PhysicsRayQueryParameters2D.create(from, to)
 	query.collision_mask = 1
 	query.exclude = [self]
 	var hit := space.intersect_ray(query)
 	return hit.is_empty()
+
+
+func _turn_patrol() -> bool:
+	if _patrol_turn_cooldown > 0.0:
+		return false
+	_patrol_dir *= -1.0
+	_patrol_turn_cooldown = PATROL_TURN_INTERVAL
+	if randf() < 0.45:
+		_patrol_pause = randf_range(0.6, 1.5)
+	return true
+
+
+func _snap_to_floor() -> void:
+	if hovering or state == State.DEAD:
+		return
+	var space := get_world_2d().direct_space_state
+	if space == null:
+		return
+	var from := global_position + Vector2(0.0, -80.0)
+	var to := global_position + Vector2(0.0, 160.0)
+	var query := PhysicsRayQueryParameters2D.create(from, to)
+	query.collision_mask = 1
+	query.exclude = [self]
+	var hit := space.intersect_ray(query)
+	if hit.is_empty():
+		return
+	global_position.y = (hit.position as Vector2).y
+	_home_position.y = global_position.y
 
 
 func _flip_patrol_facing() -> void:
@@ -688,7 +862,7 @@ func _is_player_sanctuary_safe(p: Node2D) -> bool:
 
 
 func _draw() -> void:
-	_draw_hurtbox_silhouette()
+	# Le hitbox sono solo collisioni: non devono mai comparire nel gioco.
 	if _melee_windup_remaining > 0.0:
 		var mprog := 1.0 - _melee_windup_remaining / maxf(melee_windup * 1.25, 0.01)
 		var mcolor := Color(0.95, 0.45, 0.3, 0.35 + mprog * 0.5)
@@ -759,11 +933,10 @@ func _update_variant_animation(delta: float) -> void:
 		return
 	_breath_timer += delta
 	_attack_kick = move_toward(_attack_kick, 0.0, delta * 3.8)
+	# Le texture illustrate non hanno frame animati: niente bob/rotazioni che le fanno
+	# scivolare o deformare. Solo un respiro minimo e il kick dell'attacco.
 	var moving := state == State.AGGRO and absf(velocity.x) > 4.0
-	var cadence := 6.2 if moving else 2.4
-	var wave := sin(_breath_timer * cadence)
-	var bob := sin(_breath_timer * (2.2 if hovering else cadence)) * (5.5 if hovering else 2.2)
-	var squash := absf(wave) * 0.06 if moving and not hovering else 0.022 * wave
+	var squash := sin(_breath_timer * (4.0 if moving else 2.0)) * (0.018 if moving else 0.009)
 	var windup_progress := 0.0
 	if _special_windup_remaining > 0.0:
 		windup_progress = 1.0 - _special_windup_remaining / maxf(special_windup, 0.01)
@@ -771,12 +944,32 @@ func _update_variant_animation(delta: float) -> void:
 		windup_progress = 1.0 - _melee_windup_remaining / maxf(melee_windup, 0.01)
 	var pulse := sin(windup_progress * PI * 5.0) * windup_progress * 0.07
 	var facing_sign := 1.0 if facing_right else -1.0
-	var lean := clampf(velocity.x / maxf(move_speed, 1.0), -1.0, 1.0) * 0.08
 	var kick_offset := -_special_target_direction * _attack_kick * 10.0
 	if _melee_windup_remaining <= 0.0 and _attack_kick > 0.0:
 		kick_offset = Vector2(facing_sign * _attack_kick * 10.0, -_attack_kick * 4.0)
-	sprite_node.position = _base_sprite_position + Vector2(0, bob) + kick_offset
-	sprite_node.rotation = lean + sin(_breath_timer * 1.8) * (0.05 if hovering else 0.025) + windup_progress * facing_sign * -0.12
+	# Passo: il ciclo avanza con lo spostamento reale, cosi' il rimbalzo resta
+	# agganciato ai piedi invece di galleggiare a tempo fisso.
+	var gait := Vector2.ZERO
+	var gait_roll := 0.0
+	if hovering:
+		var flap := sin(_breath_timer * 8.4)
+		gait = Vector2(0.0, flap * 2.2)
+		gait_roll = clampf(velocity.x * 0.0011, -0.16, 0.16) + flap * 0.02
+	elif absf(velocity.x) > 6.0:
+		_step_cycle += delta * clampf(absf(velocity.x) / maxf(move_speed, 1.0), 0.25, 2.2) * 7.4
+		gait = Vector2(0.0, -absf(sin(_step_cycle)) * 1.9)
+		gait_roll = sin(_step_cycle * 0.5) * 0.035 + facing_sign * 0.03
+	else:
+		_step_cycle = 0.0
+		# Ferma di ronda: sguardo che spazza la banchina.
+		if state == State.IDLE:
+			gait_roll = sin(_breath_timer * 0.9) * 0.045
+	# Micro-respiro verticale: rende viva l'illustrazione senza farla fluttuare
+	# rispetto ai piedi o deformarla come il vecchio bob.
+	sprite_node.position = (
+		_base_sprite_position + Vector2(0.0, sin(_breath_timer * 2.0) * 0.65) + gait + kick_offset
+	)
+	sprite_node.rotation = windup_progress * facing_sign * -0.06 + gait_roll
 	sprite_node.scale = Vector2(
 		_original_sprite_scale.x * (1.0 + squash + pulse + _attack_kick * 0.07),
 		_original_sprite_scale.y * (1.0 - squash + pulse * 0.5 - _attack_kick * 0.045)
@@ -797,14 +990,14 @@ func take_damage(amount: int = 1, source_position: Vector2 = Vector2.ZERO) -> vo
 	if state == State.DEAD:
 		return
 	current_health = max(0, current_health - amount)
-	# Flash colore per far vedere che è stato colpito
 	_hit_flash_timer = hit_flash_duration
+	_attack_kick = 0.55
 	if sprite_node:
 		sprite_node.modulate = hit_flash_color
-	# Particelle al colpo
+		sprite_node.scale = _original_sprite_scale * Vector2(1.18, 0.82)
 	_spawn_hit_particles(source_position)
-	# Quando colpisci uno, tutti i gamberetti (gruppo "enemy") vanno in aggro (anche se questo muore)
 	_alert_nearby_enemies()
+	queue_redraw()
 
 	if current_health <= 0:
 		_die()
@@ -827,6 +1020,90 @@ func take_damage(amount: int = 1, source_position: Vector2 = Vector2.ZERO) -> vo
 			_anim.play("Hit")
 		elif _anim and _anim.has_animation("Walk"):
 			_anim.play("Walk")
+
+
+func can_be_combat_hooked() -> bool:
+	return state != State.DEAD and visible
+
+
+func is_combat_hook_heavy() -> bool:
+	return combat_hook_heavy
+
+
+func begin_combat_hook(owner: Node2D) -> bool:
+	if not can_be_combat_hooked() or owner == null:
+		return false
+	_combat_hooked = true
+	_combat_hook_owner = owner
+	_combat_hook_pull_velocity = Vector2.ZERO
+	if combat_hook_heavy:
+		velocity.x = 0.0
+	state = State.AGGRO
+	player = owner
+	_special_windup_remaining = 0.0
+	_melee_windup_remaining = 0.0
+	if _attack_hitbox:
+		_attack_hitbox.set_deferred("monitoring", false)
+	return true
+
+
+func apply_combat_hook_pull(target: Vector2, pull_speed: float) -> bool:
+	if not _combat_hooked or state == State.DEAD:
+		return false
+	if combat_hook_heavy:
+		_combat_hook_pull_velocity = Vector2.ZERO
+		return false
+	var to_target := target - global_position
+	if to_target.length_squared() < 1.0:
+		_combat_hook_pull_velocity = Vector2.ZERO
+		return true
+	var direction := to_target.normalized()
+	# Una componente verticale controllata crea un arco leggibile senza far
+	# attraversare soffitti o piattaforme sottili.
+	direction.y = minf(direction.y, -0.18)
+	_combat_hook_pull_velocity = direction.normalized() * pull_speed
+	return true
+
+
+func release_combat_hook(launch_direction := Vector2.ZERO, powered := false) -> void:
+	if not _combat_hooked:
+		return
+	_combat_hooked = false
+	_combat_hook_owner = null
+	_combat_hook_pull_velocity = Vector2.ZERO
+	if state == State.DEAD:
+		return
+	if not combat_hook_heavy and launch_direction.length_squared() > 0.01:
+		var direction := launch_direction.normalized()
+		direction.y = minf(direction.y, -0.28 if powered else -0.18)
+		var speed := combat_hook_power_launch_speed if powered else combat_hook_launch_speed
+		velocity = direction.normalized() * speed
+		_knockback_timer = 0.42 if powered else 0.28
+	state = State.AGGRO
+	player = get_tree().get_first_node_in_group("player") as Node2D
+
+
+func is_combat_hooked() -> bool:
+	return _combat_hooked
+
+
+## Sbilanciamento dopo essere stato trascinato sotto la canna: il nemico resta
+## scoperto e lo dichiara con la posa, cosi' il colpo forte diventa leggibile.
+func stagger(duration: float) -> void:
+	if state == State.DEAD:
+		return
+	_stagger_timer = maxf(_stagger_timer, duration)
+	_melee_windup_remaining = 0.0
+	_special_windup_remaining = 0.0
+	velocity.x *= 0.2
+	if _attack_hitbox:
+		_attack_hitbox.set_deferred("monitoring", false)
+	if _anim and _anim.has_animation("Hit"):
+		_anim.play("Hit")
+
+
+func is_staggered() -> bool:
+	return _stagger_timer > 0.0
 
 ## Raggio entro cui un nemico colpito "allerta" gli altri (solo questi vanno in aggro)
 const ALERT_NEARBY_RADIUS: float = 220.0
@@ -869,8 +1146,8 @@ func _draw_hurtbox_silhouette() -> void:
 	if not combat_visible:
 		return
 	var scale_safe := maxf(absf(scale.x), 0.001)
-	var half := Vector2(18.0, 22.0) / scale_safe
-	var center := Vector2(0.0, -10.0 / scale_safe)
+	var half := Vector2(22.0, 28.0 if hovering else 22.0) / scale_safe
+	var center := Vector2(0.0, (-18.0 if hovering else -10.0) / scale_safe)
 	var fill := Color(0.95, 0.28, 0.22, 0.12)
 	var edge := Color(1.0, 0.45, 0.32, 0.55)
 	if _hit_flash_timer > 0.0:
@@ -907,7 +1184,7 @@ func _spawn_hit_particles(source_position: Vector2) -> void:
 	if p.has_method("set_color"):
 		p.call("set_color", Color(0.9, 0.35, 0.2, 0.9))
 	if p.has_method("set_amount"):
-		p.call("set_amount", 8)
+		p.call("set_amount", 14)
 	if p.has_method("play"):
 		p.call("play")
 
@@ -915,8 +1192,8 @@ func _die() -> void:
 	if state == State.DEAD:
 		return
 	state = State.DEAD
-	if _respawn_timer:
-		_respawn_timer.stop()
+	_combat_hooked = false
+	_combat_hook_owner = null
 	if _hurtbox:
 		_hurtbox.monitoring = false
 		_hurtbox.set_deferred("monitoring", false)
@@ -931,10 +1208,10 @@ func _die() -> void:
 	var pos_global: Vector2 = global_position
 	const DEAD_GAMBERETTO_PATH := "res://Landscape/Sprites/dead gamberetto.png"
 	var tex: Texture2D = variant_texture if variant_texture else load(DEAD_GAMBERETTO_PATH) as Texture2D
-	# Mantieni la taglia del vivo (prima era 0.08 fissi → cadaverini minuscoli).
-	var visual_scale := absf(scale.x) * (absf(_original_sprite_scale.x) if _original_sprite_scale.x != 0.0 else 2.0)
-	var dead_scale_uniform := clampf(visual_scale, 0.12, 0.28)
-	var dead_scale: Vector2 = Vector2(dead_scale_uniform, dead_scale_uniform)
+	# Mantieni la stessa taglia del vivo (niente clamp che gonfia/restringe il cadavere).
+	var live_scale_x := absf(scale.x) * (absf(_original_sprite_scale.x) if _original_sprite_scale.x != 0.0 else 1.0)
+	var live_scale_y := absf(scale.y) * (absf(_original_sprite_scale.y) if _original_sprite_scale.y != 0.0 else 1.0)
+	var dead_scale := Vector2(maxf(live_scale_x, 0.04), maxf(live_scale_y, 0.04))
 
 	var rb: RigidBody2D = RigidBody2D.new()
 	rb.name = "Dead Gamberetto"
@@ -958,7 +1235,7 @@ func _die() -> void:
 		spr.scale = dead_scale
 		rb.add_child(spr)
 
-	rb.z_index = -1
+	rb.z_index = 5
 	# Posizione in coordinate locali del parent, così quando viene aggiunto è già al posto giusto
 	rb.position = parent_node.to_local(pos_global)
 	parent_node.call_deferred("add_child", rb)
@@ -973,41 +1250,11 @@ func _die() -> void:
 	rb.add_child(cleanup_timer)
 	visible = false
 	set_physics_process(false)
-	if respawn_enabled:
-		call_deferred("_schedule_respawn")
-	else:
-		queue_free()
-
-
-func _schedule_respawn() -> void:
-	if state != State.DEAD:
-		return
-	_respawn_generation += 1
-	var generation := _respawn_generation
-	_respawn_timer.stop()
-	_respawn_timer.start(respawn_delay)
-	# Token: se reset_to_home interrompe, la generazione cambia e il timeout viene ignorato.
-	_respawn_timer.set_meta("generation", generation)
-
-
-func _on_respawn_timeout() -> void:
-	if state != State.DEAD:
-		return
-	if _respawn_timer and int(_respawn_timer.get_meta("generation", -1)) != _respawn_generation:
-		return
-	var current_player := get_tree().get_first_node_in_group("player") as Node2D
-	if current_player and current_player.global_position.distance_to(_home_position) < respawn_safe_distance:
-		_respawn_timer.start(0.75)
-		if _respawn_timer:
-			_respawn_timer.set_meta("generation", _respawn_generation)
-		return
-	reset_to_home()
+	# Rimane dormiente dove e stato sconfitto. Solo dogana_level, quando il
+	# giocatore usa una grazia, puo richiamare reset_to_home().
 
 
 func reset_to_home() -> void:
-	_respawn_generation += 1
-	if _respawn_timer:
-		_respawn_timer.stop()
 	global_position = _home_position
 	velocity = Vector2.ZERO
 	state = State.IDLE
@@ -1022,9 +1269,12 @@ func reset_to_home() -> void:
 	_knockback_timer = 0.0
 	_hit_flash_timer = 0.0
 	_attack_has_hit = false
+	_combat_hooked = false
+	_combat_hook_owner = null
+	_combat_hook_pull_velocity = Vector2.ZERO
 	collision_layer = 2
 	collision_mask = 1
-	visible = true
+	visible = not activation_managed
 	if sprite_node:
 		sprite_node.modulate = _original_modulate
 		sprite_node.scale = _original_sprite_scale

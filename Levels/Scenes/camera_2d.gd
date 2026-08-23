@@ -28,6 +28,9 @@ extends Camera2D
 @export var grain_amount: float = 0.12
 @export var grain_size: float = 1.25
 @export var grain_speed: float = 1.5
+@export var grain_midtones: float = 1.0
+@export var grain_shadows: float = 0.25
+@export var grain_highs: float = 0.35
 @export var desaturate: float = 0.06
 
 # Post-produzione estesa
@@ -38,9 +41,20 @@ extends Camera2D
 @export var bloom: float = 0.22
 @export var bloom_threshold: float = 0.62
 @export var haze: float = 0.08
-@export var shadow_tint: Color = Color(0.12, 0.28, 0.32, 1.0)
-@export var highlight_tint: Color = Color(0.95, 0.92, 0.82, 1.0)
-@export var haze_color: Color = Color(0.55, 0.78, 0.82, 1.0)
+@export var ink_strength: float = 0.18
+@export var ink_threshold: float = 0.075
+@export var motion_breath: float = 0.16
+@export var shadow_tint: Color = Color(0.2, 0.19, 0.38, 1.0)
+@export var mid_tint: Color = Color(0.31, 0.62, 0.63, 1.0)
+@export var highlight_tint: Color = Color(0.89, 0.97, 0.93, 1.0)
+@export var haze_color: Color = Color(0.58, 0.76, 0.88, 1.0)
+
+# Palette: quanto le tinte vengono attratte verso acqua/verde/viola e quanto
+# l'immagine viene resa pastello.
+@export var palette_unify: float = 0.5
+@export var palette_pastel: float = 0.55
+@export var palette_sat_cap: float = 0.52
+@export var exposure: float = 1.1
 
 var _target: Node2D
 var _look_vec: Vector2 = Vector2.ZERO
@@ -58,8 +72,11 @@ var _post_rect: ColorRect
 var _post_mat: ShaderMaterial
 var _postfx_dirty := true
 var _last_postfx_key := ""
+var _rest_zoom := Vector2.ONE
+var _zoom_pulse_tween: Tween
 
 func _ready() -> void:
+	_rest_zoom = zoom
 	_apply_mobile_postfx_budget()
 	if target_path != NodePath():
 		_target = get_node_or_null(target_path) as Node2D
@@ -77,6 +94,16 @@ func _ready() -> void:
 ## Chiama per far tremare lo schermo. intensity 0..1 (es. 0.15 = leggero, 0.4 = forte)
 func add_shake(intensity: float = 0.2) -> void:
 	_shake_trauma = min(1.0, _shake_trauma + intensity)
+
+
+## Impulso di lente locale: nessun campionamento dello schermo e nessun blur GPU.
+func add_zoom_pulse(amount: float = 0.018, duration: float = 0.3) -> void:
+	if _zoom_pulse_tween and _zoom_pulse_tween.is_valid():
+		_zoom_pulse_tween.kill()
+	zoom = _rest_zoom
+	_zoom_pulse_tween = create_tween()
+	_zoom_pulse_tween.tween_property(self, "zoom", _rest_zoom * (1.0 + amount), duration * 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_zoom_pulse_tween.tween_property(self, "zoom", _rest_zoom, duration * 0.78).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 func set_camera_target(node: Node2D, smooth_attach_frames: int = 0):
 	"""Imposta il target da seguire (es. quando passi dalla barca o character_beginning -> Player).
@@ -119,6 +146,7 @@ func _apply_mobile_postfx_budget() -> void:
 	chroma = minf(chroma, 0.25)
 	grain_amount = minf(grain_amount, 0.06)
 	haze = minf(haze, 0.04)
+	ink_strength = minf(ink_strength, 0.12)
 	grade_strength = minf(grade_strength, 0.18)
 	_postfx_dirty = true
 
@@ -126,12 +154,13 @@ func _apply_mobile_postfx_budget() -> void:
 func _apply_postfx_params() -> void:
 	if _post_mat == null:
 		return
-	var key := "%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s" % [
+	var key := "%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s|%s" % [
 		str(postfx_enabled),
 		vignette_strength, vignette_softness, vignette_radius,
 		grain_amount, grain_size, grain_speed, desaturate,
-		contrast, saturation, grade_strength, chroma, bloom, bloom_threshold, haze,
-		str(shadow_tint), str(highlight_tint), str(haze_color)
+		contrast, saturation, grade_strength, chroma, bloom, bloom_threshold, haze, ink_strength, ink_threshold, motion_breath,
+		palette_unify, palette_pastel, palette_sat_cap, exposure,
+		str(shadow_tint), str(mid_tint), str(highlight_tint), str(haze_color)
 	]
 	if key == _last_postfx_key and not _postfx_dirty:
 		return
@@ -144,6 +173,9 @@ func _apply_postfx_params() -> void:
 	_post_mat.set_shader_parameter("u_grain_amount", grain_amount)
 	_post_mat.set_shader_parameter("u_grain_size", grain_size)
 	_post_mat.set_shader_parameter("u_grain_speed", grain_speed)
+	_post_mat.set_shader_parameter("u_grain_midtones", grain_midtones)
+	_post_mat.set_shader_parameter("u_grain_shadows", grain_shadows)
+	_post_mat.set_shader_parameter("u_grain_highs", grain_highs)
 
 	_post_mat.set_shader_parameter("u_desaturate", desaturate)
 	_post_mat.set_shader_parameter("u_contrast", contrast)
@@ -153,9 +185,17 @@ func _apply_postfx_params() -> void:
 	_post_mat.set_shader_parameter("u_bloom", bloom)
 	_post_mat.set_shader_parameter("u_bloom_threshold", bloom_threshold)
 	_post_mat.set_shader_parameter("u_haze", haze)
+	_post_mat.set_shader_parameter("u_ink_strength", ink_strength)
+	_post_mat.set_shader_parameter("u_ink_threshold", ink_threshold)
+	_post_mat.set_shader_parameter("u_motion_breath", motion_breath)
 	_post_mat.set_shader_parameter("u_shadow_tint", shadow_tint)
+	_post_mat.set_shader_parameter("u_mid_tint", mid_tint)
 	_post_mat.set_shader_parameter("u_highlight_tint", highlight_tint)
 	_post_mat.set_shader_parameter("u_haze_color", haze_color)
+	_post_mat.set_shader_parameter("u_palette_unify", palette_unify)
+	_post_mat.set_shader_parameter("u_palette_pastel", palette_pastel)
+	_post_mat.set_shader_parameter("u_palette_sat_cap", palette_sat_cap)
+	_post_mat.set_shader_parameter("u_exposure", exposure)
 
 func _process(delta: float) -> void:
 	if _target == null:

@@ -1,5 +1,5 @@
 extends Node2D
-## Nebbia ambientale Dogana: volumi world-space (shader) + mote discreti.
+## Nebbia ambientale Dogana: soli veli world-space morbidi, senza particelle.
 ## Interazione: solo apertura soft vicino al player — niente scie blu.
 
 const FOG_SHADER := preload("res://Levels/Scenes/Dogana/dogana_fog.gdshader")
@@ -7,18 +7,14 @@ const FOG_SHADER := preload("res://Levels/Scenes/Dogana/dogana_fog.gdshader")
 var _player: CharacterBody2D
 var _fog_mats: Array[ShaderMaterial] = []
 var _mobile := false
-var _soft_tex: GradientTexture2D
-var _motes: CPUParticles2D
 
 const WORLD_RECT := Rect2(-700.0, -1500.0, 7200.0, 2600.0)
 
 
 func _ready() -> void:
-	z_index = -1
+	z_index = 0
 	_mobile = OS.get_name() == "Android" or OS.has_feature("mobile")
-	_soft_tex = _make_soft_cloud_texture()
 	_build_fog_volumes()
-	_build_ambient_motes()
 	set_process(true)
 
 
@@ -28,70 +24,54 @@ func _process(_delta: float) -> void:
 	_update_fog_interaction()
 
 
-func _make_soft_cloud_texture() -> GradientTexture2D:
-	var gradient := Gradient.new()
-	gradient.offsets = PackedFloat32Array([0.0, 0.4, 0.75, 1.0])
-	gradient.colors = PackedColorArray([
-		Color(0.78, 0.9, 0.92, 0.45),
-		Color(0.6, 0.78, 0.82, 0.18),
-		Color(0.4, 0.58, 0.64, 0.04),
-		Color(0.25, 0.35, 0.4, 0.0),
-	])
-	var tex := GradientTexture2D.new()
-	tex.gradient = gradient
-	tex.width = 48 if _mobile else 72
-	tex.height = 48 if _mobile else 72
-	tex.fill = GradientTexture2D.FILL_RADIAL
-	tex.fill_from = Vector2(0.5, 0.5)
-	tex.fill_to = Vector2(1.0, 0.5)
-	return tex
-
-
 func _build_fog_volumes() -> void:
 	var img := Image.create(1, 1, false, Image.FORMAT_RGBA8)
 	img.fill(Color.WHITE)
 	var white_tex := ImageTexture.create_from_image(img)
-	var layers := [
+	# Un velo unico su mobile: tre quad FBM a schermo intero sono troppo per GLES.
+	var layers: Array = [
 		{
 			"name": "FogFar",
-			"z": -4,
-			"density": 0.38,
-			"scale": 0.0024,
+			"z": -19,
+			"density": 0.42 if _mobile else 0.52,
+			"scale": 0.0018,
 			"wind": Vector2(0.012, 0.003),
-			"color": Color(0.68, 0.8, 0.84, 0.42),
+			"color": Color(0.60, 0.76, 0.80, 0.58 if _mobile else 0.62),
 			"layer": 0.0,
-			"disturb": 0.22,
-			"radius": 150.0,
-			"octaves": 3 if _mobile else 4,
-		},
-		{
-			"name": "FogMid",
-			"z": -1,
-			"density": 0.42,
-			"scale": 0.0034,
-			"wind": Vector2(0.02, 0.005),
-			"color": Color(0.74, 0.86, 0.88, 0.4),
-			"layer": 0.45,
-			"disturb": 0.35,
-			"radius": 120.0,
-			"octaves": 3 if _mobile else 4,
-		},
-		{
-			"name": "FogNear",
-			"z": 3,
-			"density": 0.18,
-			"scale": 0.0046,
-			"wind": Vector2(0.028, 0.006),
-			"color": Color(0.8, 0.9, 0.92, 0.28),
-			"layer": 1.0,
-			"disturb": 0.45,
-			"radius": 100.0,
-			"octaves": 3,
+			"disturb": 0.16,
+			"radius": 110.0,
+			"octaves": 2 if _mobile else 3,
 		},
 	]
+	if not _mobile:
+		layers.append({
+			"name": "FogMid",
+			"z": -9,
+			"density": 0.38,
+			"scale": 0.0026,
+			"wind": Vector2(0.02, 0.005),
+			"color": Color(0.68, 0.82, 0.84, 0.36),
+			"layer": 0.45,
+			"disturb": 0.26,
+			"radius": 95.0,
+			"octaves": 3,
+		})
+		layers.append({
+			"name": "FogNear",
+			"z": 3,
+			"density": 0.22,
+			"scale": 0.0038,
+			"wind": Vector2(0.028, 0.006),
+			"color": Color(0.76, 0.88, 0.9, 0.28),
+			"layer": 1.0,
+			"disturb": 0.32,
+			"radius": 80.0,
+			"octaves": 2,
+		})
 	for cfg in layers:
 		var poly := Polygon2D.new()
 		poly.name = str(cfg.name)
+		poly.z_as_relative = false
 		poly.z_index = int(cfg.z)
 		poly.polygon = PackedVector2Array([
 			WORLD_RECT.position,
@@ -123,30 +103,6 @@ func _build_fog_volumes() -> void:
 		poly.material = mat
 		add_child(poly)
 		_fog_mats.append(mat)
-
-
-func _build_ambient_motes() -> void:
-	_motes = CPUParticles2D.new()
-	_motes.name = "LagoonMotes"
-	_motes.texture = _soft_tex
-	_motes.z_index = 2
-	_motes.amount = 12 if _mobile else 22
-	_motes.lifetime = 9.0
-	_motes.preprocess = 9.0
-	_motes.randomness = 0.92
-	_motes.local_coords = false
-	_motes.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	_motes.emission_rect_extents = Vector2(WORLD_RECT.size.x * 0.5, WORLD_RECT.size.y * 0.28)
-	_motes.position = WORLD_RECT.get_center() + Vector2(0, 80)
-	_motes.direction = Vector2(0.35, -0.15)
-	_motes.spread = 35.0
-	_motes.gravity = Vector2(-0.4, -1.2)
-	_motes.initial_velocity_min = 3.0
-	_motes.initial_velocity_max = 8.0
-	_motes.scale_amount_min = 0.12
-	_motes.scale_amount_max = 0.32
-	_motes.color = Color(0.6, 0.82, 0.8, 0.08)
-	add_child(_motes)
 
 
 func _update_fog_interaction() -> void:

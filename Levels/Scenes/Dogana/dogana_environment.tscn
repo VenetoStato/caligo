@@ -1,95 +1,194 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=21 format=3]
 
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/lagoon_backdrop.svg" id="1_bg"]
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/salute_silhouette.svg" id="2_salute"]
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/san_giorgio_silhouette.svg" id="3_giorgio"]
-[ext_resource type="Texture2D" path="res://Landscape/Dogana/dogana_wedge.svg" id="4_wedge"]
-[ext_resource type="Texture2D" path="res://Landscape/Dogana/tower_atlanti_fortuna.svg" id="5_tower"]
-[ext_resource type="Texture2D" path="res://Landscape/Dogana/dock_boat.svg" id="6_boat"]
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/Illustrated/arrival.png" id="7_arrival"]
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/Illustrated/customs.png" id="8_customs"]
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/Illustrated/canal.png" id="9_canal"]
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/Illustrated/fortuna.png" id="10_fortuna"]
-[ext_resource type="Texture2D" path="res://Landscape/Dogana/Illustrated/archive.png" id="11_archive"]
 [ext_resource type="Shader" path="res://Levels/Scenes/Dogana/background_blend.gdshader" id="12_blend"]
 [ext_resource type="Script" path="res://Levels/Scenes/Dogana/dogana_atmosphere.gd" id="13_atmosphere"]
 [ext_resource type="Script" path="res://Levels/Scenes/Dogana/dogana_art_director.gd" id="14_art_director"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/module_torre_fortuna.png" id="15_torre"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/module_dogana_ovest.png" id="16_dogana_w"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/module_dogana_est.png" id="17_dogana_e"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/module_seminario.png" id="18_seminario"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/module_collegamento_salute.png" id="19_connector"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/module_salute.png" id="20_salute"]
+[ext_resource type="Script" path="res://Levels/Scenes/Dogana/dogana_depth_layers.gd" id="21_depth"]
+[ext_resource type="Shader" path="res://Levels/Scenes/Dogana/background_softfocus.gdshader" id="22_softfocus"]
 
 [sub_resource type="ShaderMaterial" id="PanoramaBlend"]
 shader = ExtResource("12_blend")
-shader_parameter/edge_fade = 0.16
-shader_parameter/vertical_fade = 0.0
+shader_parameter/edge_fade = 0.22
+shader_parameter/vertical_fade = 0.12
 shader_parameter/atmosphere_tint = Color(0.82, 0.93, 0.97, 1)
 shader_parameter/tint_strength = 0.08
 
-[sub_resource type="ShaderMaterial" id="ArchiveBlend"]
-shader = ExtResource("12_blend")
-shader_parameter/edge_fade = 0.18
-shader_parameter/vertical_fade = 0.2
-shader_parameter/atmosphere_tint = Color(0.68, 0.92, 0.88, 1)
-shader_parameter/tint_strength = 0.12
+[sub_resource type="ShaderMaterial" id="PanoramaSoftFocus"]
+shader = ExtResource("22_softfocus")
+shader_parameter/blur_radius = 2.2
+shader_parameter/edge_fade = 0.16
+shader_parameter/atmosphere_tint = Color(0.68, 0.82, 0.86, 1)
+shader_parameter/tint_strength = 0.14
 
 [node name="DoganaEnvironment" type="Node2D"]
 script = ExtResource("14_art_director")
 
+[node name="DepthLayers" type="Node2D" parent="."]
+script = ExtResource("21_depth")
+
 [node name="SkyAndLagoon" type="Node2D" parent="." groups=["dogana_background"]]
 z_index = -20
-modulate = Color(0.38, 0.48, 0.56, 0.5)
+modulate = Color(0.72, 0.82, 0.88, 1)
 
 [node name="BackdropA" type="Sprite2D" parent="SkyAndLagoon"]
+material = SubResource("PanoramaBlend")
 position = Vector2(640, 360)
+scale = Vector2(1.06, 1.04)
 texture = ExtResource("1_bg")
 
 [node name="BackdropB" type="Sprite2D" parent="SkyAndLagoon"]
+material = SubResource("PanoramaBlend")
 position = Vector2(1920, 360)
+scale = Vector2(1.06, 1.04)
 texture = ExtResource("1_bg")
-flip_h = true
 
 [node name="BackdropC" type="Sprite2D" parent="SkyAndLagoon"]
+material = SubResource("PanoramaBlend")
 position = Vector2(3200, 360)
+scale = Vector2(1.06, 1.04)
 texture = ExtResource("1_bg")
 
 [node name="BackdropD" type="Sprite2D" parent="SkyAndLagoon"]
+material = SubResource("PanoramaBlend")
 position = Vector2(4480, 360)
+scale = Vector2(1.06, 1.04)
 texture = ExtResource("1_bg")
-flip_h = true
+
+[node name="BackdropE" type="Sprite2D" parent="SkyAndLagoon"]
+material = SubResource("PanoramaBlend")
+position = Vector2(5760, 360)
+scale = Vector2(1.06, 1.04)
+texture = ExtResource("1_bg")
+
+[node name="BackdropF" type="Sprite2D" parent="SkyAndLagoon"]
+material = SubResource("PanoramaBlend")
+position = Vector2(6400, 360)
+scale = Vector2(1.06, 1.04)
+texture = ExtResource("1_bg")
 
 [node name="IllustratedPanorama" type="Node2D" parent="." groups=["dogana_illustrated_background"]]
+visible = false
 z_index = -18
+modulate = Color(0.62, 0.72, 0.78, 0.34)
+
+[node name="ModularArchitecture" type="Node2D" parent="." groups=["dogana_modular_architecture"]]
+z_index = -17
+
+[node name="TorreFortuna" type="Sprite2D" parent="ModularArchitecture" groups=["dogana_artist_replaceable", "dogana_sideview_module"]]
+position = Vector2(268, 308.2)
+scale = Vector2(0.4, 0.4)
+modulate = Color(0.9, 0.93, 0.94, 0.98)
+texture = ExtResource("15_torre")
+metadata/artist_slot = "torre_fortuna"
+metadata/module_order = 0
+metadata/baseline_y = 530.0
+metadata/replace_without_touching_collision = true
+
+[node name="DoganaOvest" type="Sprite2D" parent="ModularArchitecture" groups=["dogana_artist_replaceable", "dogana_sideview_module"]]
+position = Vector2(1279.425, 327.275)
+scale = Vector2(0.85, 0.85)
+modulate = Color(0.9, 0.93, 0.94, 0.98)
+texture = ExtResource("16_dogana_w")
+metadata/artist_slot = "dogana_ovest"
+metadata/module_order = 1
+metadata/baseline_y = 530.0
+metadata/replace_without_touching_collision = true
+
+[node name="DoganaEst" type="Sprite2D" parent="ModularArchitecture" groups=["dogana_artist_replaceable", "dogana_sideview_module"]]
+position = Vector2(2799.425, 327.275)
+scale = Vector2(0.85, 0.85)
+modulate = Color(0.9, 0.93, 0.94, 0.98)
+texture = ExtResource("17_dogana_e")
+metadata/artist_slot = "dogana_est"
+metadata/module_order = 2
+metadata/baseline_y = 530.0
+metadata/replace_without_touching_collision = true
+
+[node name="Seminario" type="Sprite2D" parent="ModularArchitecture" groups=["dogana_artist_replaceable", "dogana_sideview_module"]]
+position = Vector2(4034, 261.5)
+scale = Vector2(0.75, 0.75)
+modulate = Color(0.9, 0.93, 0.94, 0.98)
+texture = ExtResource("18_seminario")
+metadata/artist_slot = "seminario"
+metadata/module_order = 3
+metadata/baseline_y = 530.0
+metadata/replace_without_touching_collision = true
+
+[node name="CollegamentoSalute" type="Sprite2D" parent="ModularArchitecture" groups=["dogana_artist_replaceable", "dogana_sideview_module"]]
+position = Vector2(4764.6, 366.875)
+scale = Vector2(0.45, 0.45)
+modulate = Color(0.86, 0.9, 0.91, 0.98)
+texture = ExtResource("19_connector")
+metadata/artist_slot = "collegamento_salute"
+metadata/module_order = 4
+metadata/baseline_y = 530.0
+metadata/replace_without_touching_collision = true
+
+[node name="SantaMariaDellaSalute" type="Sprite2D" parent="ModularArchitecture" groups=["dogana_artist_replaceable", "dogana_sideview_module"]]
+position = Vector2(5452.925, 209.975)
+scale = Vector2(0.85, 0.85)
+modulate = Color(0.92, 0.94, 0.95, 0.98)
+texture = ExtResource("20_salute")
+metadata/artist_slot = "salute"
+metadata/module_order = 5
+metadata/baseline_y = 530.0
+metadata/replace_without_touching_collision = true
 
 [node name="Arrival" type="Sprite2D" parent="IllustratedPanorama"]
-material = SubResource("PanoramaBlend")
+material = SubResource("PanoramaSoftFocus")
 position = Vector2(640, 360)
 scale = Vector2(1.2, 1.2)
 modulate = Color(0.84, 0.9, 0.92, 0.94)
 texture = ExtResource("7_arrival")
 
 [node name="Customs" type="Sprite2D" parent="IllustratedPanorama"]
-material = SubResource("PanoramaBlend")
+material = SubResource("PanoramaSoftFocus")
 position = Vector2(1920, 360)
 scale = Vector2(1.2, 1.2)
 modulate = Color(0.84, 0.9, 0.92, 0.94)
 texture = ExtResource("8_customs")
 
 [node name="GrandCanal" type="Sprite2D" parent="IllustratedPanorama"]
-material = SubResource("PanoramaBlend")
+material = SubResource("PanoramaSoftFocus")
 position = Vector2(3200, 360)
 scale = Vector2(1.2, 1.2)
 modulate = Color(0.84, 0.9, 0.92, 0.94)
 texture = ExtResource("9_canal")
 
 [node name="Fortuna" type="Sprite2D" parent="IllustratedPanorama"]
-material = SubResource("PanoramaBlend")
+material = SubResource("PanoramaSoftFocus")
 position = Vector2(4480, 360)
 scale = Vector2(1.2, 1.2)
 modulate = Color(0.84, 0.9, 0.92, 0.94)
 texture = ExtResource("10_fortuna")
 
+[node name="SaluteFill" type="Sprite2D" parent="IllustratedPanorama"]
+material = SubResource("PanoramaSoftFocus")
+position = Vector2(5600, 360)
+scale = Vector2(1.15, 1.15)
+modulate = Color(0.78, 0.86, 0.9, 0.72)
+texture = ExtResource("10_fortuna")
+flip_h = true
+
 [node name="Landmarks" type="Node2D" parent="." groups=["dogana_landmarks"]]
 z_index = -12
-visible = false
+modulate = Color(0.7, 0.8, 0.84, 0.34)
 
 [node name="SantaMariaDellaSalute" type="Sprite2D" parent="Landmarks"]
+visible = false
 position = Vector2(660, 413)
 scale = Vector2(0.82, 0.82)
 modulate = Color(0.72, 0.75, 0.78, 0.72)
@@ -100,42 +199,6 @@ position = Vector2(4390, 410)
 scale = Vector2(0.72, 0.72)
 modulate = Color(0.68, 0.72, 0.76, 0.68)
 texture = ExtResource("3_giorgio")
-
-[node name="Architecture" type="Node2D" parent="." groups=["dogana_architecture"]]
-visible = false
-z_index = -4
-modulate = Color(0.48, 0.58, 0.59, 0.72)
-
-[node name="ArrivalBoatAndDock" type="Sprite2D" parent="Architecture"]
-position = Vector2(430, 464)
-texture = ExtResource("6_boat")
-
-[node name="CentralWedge" type="Sprite2D" parent="Architecture"]
-position = Vector2(2630, 376)
-texture = ExtResource("4_wedge")
-
-[node name="TowerAtlantiGlobeFortuna" type="Sprite2D" parent="Architecture"]
-position = Vector2(4230, 250)
-texture = ExtResource("5_tower")
-
-[node name="SecretArchiveArtwork" type="Sprite2D" parent="." groups=["dogana_secret_artwork"]]
-material = SubResource("ArchiveBlend")
-z_index = -2
-position = Vector2(1580, 760)
-scale = Vector2(0.66, 0.66)
-modulate = Color(0.72, 0.86, 0.84, 0)
-texture = ExtResource("11_archive")
-metadata/secret_id = "archive"
-
-[node name="SecretOssuaryArtwork" type="Sprite2D" parent="." groups=["dogana_secret_artwork"]]
-material = SubResource("ArchiveBlend")
-z_index = -2
-position = Vector2(3830, 145)
-scale = Vector2(0.42, 0.42)
-modulate = Color(0.66, 0.82, 0.8, 0)
-texture = ExtResource("11_archive")
-flip_h = true
-metadata/secret_id = "ossuary"
 
 [node name="Atmosphere" type="Node2D" parent="."]
 script = ExtResource("13_atmosphere")

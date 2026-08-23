@@ -228,7 +228,12 @@ func _player_jumps_to_pier() -> void:
 		if _player_anim and _player_anim.has_animation("Idle"):
 			_player_anim.play("Idle")
 	if _camera and _camera.has_method("add_shake"):
-		_camera.call("add_shake", 0.12)
+		_camera.call("add_shake", 0.07)
+	if _camera and _camera.has_method("add_zoom_pulse"):
+		_camera.call("add_zoom_pulse", 0.018, 0.3)
+	if _ambient and _ambient.has_method("play_landing_effect"):
+		_ambient.call("play_landing_effect", land_position)
+	_splash_near_boat(34.0)
 
 
 func _skip_to_end() -> void:

@@ -22,6 +22,28 @@ func _ready():
 	collision_layer = 0
 	collision_mask = 2
 	monitoring = true
+	call_deferred("_snap_visual_to_ground")
+
+
+func _snap_visual_to_ground() -> void:
+	# I collezionabili sono props da pavimento: allinea l'origine alla prima
+	# collisione statica sottostante e conserva lo sprite sopra la quota.
+	var space := get_world_2d().direct_space_state
+	var query := PhysicsRayQueryParameters2D.create(global_position + Vector2(0, -120), global_position + Vector2(0, 180), 1)
+	query.exclude = [get_rid()]
+	var hit := space.intersect_ray(query)
+	if not hit.is_empty():
+		var floor_y := (hit.position as Vector2).y
+		global_position.y = floor_y
+		if _sprite is Sprite2D:
+			var sprite := _sprite as Sprite2D
+			var image := sprite.texture.get_image() if sprite.texture else null
+			if image:
+				var used := image.get_used_rect()
+				if used.size.y > 0:
+					var opaque_bottom := float(used.end.y) - float(image.get_height()) * 0.5
+					var current_bottom := sprite.position.y + opaque_bottom * absf(sprite.scale.y)
+					sprite.position.y -= current_bottom
 
 func _on_body_entered(body: Node2D) -> void:
 	if _collected:

@@ -6,13 +6,15 @@ extends Node2D
 func _ready() -> void:
 	if art_profile == null:
 		return
-	_apply_texture("IllustratedPanorama/Arrival", art_profile.arrival_background)
-	_apply_texture("IllustratedPanorama/Customs", art_profile.customs_background)
-	_apply_texture("IllustratedPanorama/GrandCanal", art_profile.canal_background)
-	_apply_texture("IllustratedPanorama/Fortuna", art_profile.fortuna_background)
-	_apply_texture("SecretArchiveArtwork", art_profile.archive_background)
-	_apply_texture("SecretOssuaryArtwork", art_profile.archive_background)
-	call_deferred("_apply_character_art")
+	_apply_texture("ModularArchitecture/TorreFortuna", art_profile.torre_fortuna)
+	_apply_texture("ModularArchitecture/DoganaOvest", art_profile.dogana_ovest)
+	_apply_texture("ModularArchitecture/DoganaEst", art_profile.dogana_est)
+	_apply_texture("ModularArchitecture/Seminario", art_profile.seminario)
+	_apply_texture("ModularArchitecture/CollegamentoSalute", art_profile.collegamento_salute)
+	_apply_texture("ModularArchitecture/SantaMariaDellaSalute", art_profile.salute)
+	var interior := get_tree().get_first_node_in_group("dogana_salute_interior_art") as Sprite2D
+	if interior and art_profile.salute_interior:
+		interior.texture = art_profile.salute_interior
 
 
 func _apply_texture(node_path: NodePath, texture: Texture2D) -> void:
@@ -30,15 +32,12 @@ func _apply_character_art() -> void:
 			continue
 		var key := str(enemy.get_meta("art_slot", "")).strip_edges()
 		if key.is_empty():
-			key = _guess_art_slot(str(enemy.name))
+			continue
 		var tex := _texture_for_slot(key)
 		if tex == null:
 			continue
-		if "variant_texture" in enemy:
-			enemy.set("variant_texture", tex)
-		var sprite := enemy.get_node_or_null("Sprite2D") as Sprite2D
-		if sprite:
-			sprite.texture = tex
+		if enemy.has_method("apply_variant_art"):
+			enemy.call("apply_variant_art", tex)
 	var boss := get_tree().get_first_node_in_group("dogana_boss")
 	if boss and art_profile.drowned_warden:
 		if "variant_texture" in boss:
@@ -46,17 +45,6 @@ func _apply_character_art() -> void:
 		var boss_sprite := boss.get_node_or_null("Sprite2D") as Sprite2D
 		if boss_sprite:
 			boss_sprite.texture = art_profile.drowned_warden
-
-
-func _guess_art_slot(node_name: String) -> String:
-	var lower := node_name.to_lower()
-	if "oracle" in lower or "lagoon" in lower:
-		return "lagoon_oracle"
-	if "warden" in lower or "boss" in lower or "custode" in lower:
-		return "drowned_warden"
-	if "bloater" in lower or "gamber" in lower or "tide" in lower:
-		return "tide_bloater"
-	return ""
 
 
 func _texture_for_slot(slot: String) -> Texture2D:

@@ -6,11 +6,10 @@ extends Node
 const SECTION_SAMPLES := [
 	{"id": "arrival", "pos": Vector2(500, 400), "floor_y": 460.0},
 	{"id": "customs", "pos": Vector2(1500, 420), "floor_y": 485.0},
-	{"id": "canal", "pos": Vector2(3425, 410), "floor_y": 491.0},
-	{"id": "fortuna", "pos": Vector2(4290, 400), "floor_y": 441.0},
+	{"id": "canal", "pos": Vector2(3425, 410), "floor_y": 485.0},
+	{"id": "fortuna", "pos": Vector2(4400, 400), "floor_y": 485.0},
 	{"id": "salute", "pos": Vector2(5180, 420), "floor_y": 485.0},
-	{"id": "archive", "pos": Vector2(1500, 800), "floor_y": 842.0},
-	{"id": "palace", "pos": Vector2(2300, -220), "floor_y": -140.0},
+	{"id": "salute", "pos": Vector2(5180, -580), "floor_y": -500.0},
 ]
 
 
@@ -72,7 +71,7 @@ func _ready() -> void:
 		var body_bottom := collision.global_position.y + shape.size.y * 0.5
 		var expected_floor := float(sample["floor_y"])
 		if not player.is_on_floor() or absf(body_bottom - expected_floor) > 12.0:
-			# Soft assist once, then re-check (palace/archive can need a snap).
+			# Soft assist once, then re-check after a teleport between modules.
 			player.global_position.y = expected_floor - shape.size.y * 0.5 - collision.position.y
 			player.velocity = Vector2.ZERO
 			for _j in 8:

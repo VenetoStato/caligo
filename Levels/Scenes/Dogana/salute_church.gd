@@ -10,13 +10,12 @@ extends Node2D
 func _ready() -> void:
 	add_to_group("dogana_salute_church")
 	z_index = -3
-	_build_dome_silhouette()
-	_build_octagon_floor()
-	_build_pillars()
-	_build_apse_altar()
-	_build_entrance_portal()
-	_build_side_chapels()
-	_label_space()
+	# La basilica e' ora il modulo illustrato sostituibile `salute`. Le vecchie
+	# primitive procedurali (cupola, ottagono, pilastri e grandi corde) si
+	# sovrapponevano alla facciata creando geometrie trasparenti incoerenti.
+	# Questo nodo conserva solo l'identita' logica dell'arena boss.
+	set_meta("visual_source", "artist_module_salute")
+	set_process(false)
 
 
 func _build_dome_silhouette() -> void:

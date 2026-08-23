@@ -13,8 +13,8 @@ config_version=5
 config/name="Caligo"
 run/main_scene="res://splash_screen.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
-config/icon="res://icon.svg"
 run/max_fps=120
+config/icon="res://icon.svg"
 
 [autoload]
 
@@ -37,6 +37,10 @@ version_control/autoload_on_startup=true
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/psd_import_plugin/plugin.cfg")
+
+[gui]
+
+theme/custom="res://UI/caligo_ui_theme.tres"
 
 [input]
 
@@ -155,20 +159,13 @@ pause_menu={
 
 pointing/emulate_touch_from_mouse=true
 
-[gui]
-
-theme/custom="res://UI/caligo_ui_theme.tres"
-
 [plugins]
 
 enabled=PackedStringArray("res://addons/psd_import_plugin/plugin.cfg", "res://addons/parallax_editor_preview/plugin.cfg")
-
-[physics]
-
-common/physics_ticks_per_second=60
 
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
+environment/defaults/default_clear_color=Color(0.004, 0.016, 0.022, 1)

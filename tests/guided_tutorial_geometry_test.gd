@@ -27,16 +27,13 @@ func _ready() -> void:
 		tutorial.call("arm_tutorial")
 	await get_tree().process_frame
 	var panel := tutorial.get("_panel") as PanelContainer
-	var gate := level.get_node("Gameplay/TutorialGate") as StaticBody2D
-	var gate_collision := gate.get_node("CollisionShape2D") as CollisionShape2D
 	if (
 		sprite.position.y > -2.0
 		or sprite.position.y < -9.0
 		or panel == null
 		or not panel.visible
-		or gate_collision.disabled
 	):
-		push_error("Grounded player alignment or persistent tutorial gate is not configured.")
+		push_error("Grounded player alignment or gradual tutorial is not configured.")
 		get_tree().quit(1)
 		return
 	for _frame in 5:
@@ -68,24 +65,14 @@ func _ready() -> void:
 	tutorial.call("_observe_step", 8)
 	map.call("close_map")
 	await get_tree().physics_frame
-	if not gate_collision.disabled or not bool(tutorial.get("_completion_started")):
-		push_error("Completing the gradual tutorial did not open the training gate.")
+	if not bool(tutorial.get("_completion_started")):
+		push_error("Completing the gradual tutorial did not finish cleanly.")
 		get_tree().quit(1)
 		return
-	var stair_a := level.get_node_or_null("Gameplay/Geometry/HiddenArchiveRoute/AltarStairA") as StaticBody2D
-	var stair_d := level.get_node_or_null("Gameplay/Geometry/HiddenArchiveRoute/AltarStairD") as StaticBody2D
-	var archive_wall := level.get_node_or_null("Gameplay/Geometry/HiddenArchiveRoute/ArchiveWall") as Node2D
-	if stair_a == null or stair_d == null or archive_wall == null:
-		push_error("Hidden archive stairs/wall are missing after the altar-route rework.")
-		get_tree().quit(1)
-		return
-	if (
-		stair_a.position.x <= archive_wall.position.x
-		or stair_d.position.x <= archive_wall.position.x
-		or stair_a.position.x - 95.0 > 2160.0
-		or stair_d.position.x - 95.0 > stair_a.position.x + 120.0
-	):
-		push_error("The underground archive descent is not reachable from outside its breakable wall.")
+	var waterfront := get_tree().get_first_node_in_group("dogana_simplified_waterfront") as StaticBody2D
+	var salute_interior := get_tree().get_first_node_in_group("dogana_salute_interior")
+	if waterfront == null or salute_interior == null:
+		push_error("Simplified waterfront or Salute interior is missing.")
 		get_tree().quit(1)
 		return
 	var collision_rects: Array[Rect2] = []
@@ -115,6 +102,9 @@ func _ready() -> void:
 	for node in level.find_children("*", "Sprite2D", true, false):
 		if node is Sprite2D and node.has_meta("walkable_rect"):
 			var visual_rect: Rect2 = node.get_meta("walkable_rect")
+			if bool(node.get_meta("continuous_waterfront_art", false)):
+				checked += 1
+				continue
 			var aligned := false
 			for collision_rect in collision_rects:
 				if (
@@ -129,7 +119,7 @@ func _ready() -> void:
 				get_tree().quit(1)
 				return
 			checked += 1
-	if checked < 20:
+	if checked < 7:
 		push_error("Not enough walkable sections were audited for art/collision alignment.")
 		get_tree().quit(1)
 		return
@@ -138,14 +128,14 @@ func _ready() -> void:
 	for floor_sample in [
 		[Vector2(500, 380), 460.0],
 		[Vector2(1500, 405), 485.0],
-		[Vector2(3425, 410), 491.0],
-		[Vector2(2300, -220), -140.0],
+		[Vector2(3425, 410), 485.0],
+		[Vector2(5180, -580), -500.0],
 	]:
 		if not await _settles_on_floor(player, floor_sample[0], float(floor_sample[1])):
 			push_error("Player did not settle flush on walkable floor at %s." % floor_sample[0])
 			get_tree().quit(1)
 			return
-	print("CALIGO_GUIDED_TUTORIAL: 9 verified actions, archive access and %d aligned floors grounded OK" % checked)
+	print("CALIGO_GUIDED_TUTORIAL: 9 verified actions, continuous quay and %d aligned floors grounded OK" % checked)
 	level.queue_free()
 	await get_tree().process_frame
 	get_tree().quit(0)

@@ -65,7 +65,7 @@ func _damage_overlaps() -> void:
 	for body in get_overlapping_bodies():
 		if body is Node2D and body.is_in_group("player") and body not in _damaged:
 			_damaged.append(body)
-			if body.has_method("take_damage"):
+			if damage > 0 and body.has_method("take_damage"):
 				body.call_deferred("take_damage", damage, global_position)
 
 

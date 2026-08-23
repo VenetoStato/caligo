@@ -7,6 +7,94 @@ func play_arrival_burst(origin: Vector2 = Vector2(80, 420)) -> void:
 	_spawn_hiding_figure(origin + Vector2(200, 10))
 
 
+func play_landing_effect(origin: Vector2) -> void:
+	_spawn_landing_dust(origin)
+	_spawn_landing_afterimage(origin)
+	_spawn_landing_ring(origin)
+
+
+func _spawn_landing_dust(origin: Vector2) -> void:
+	var particles := CPUParticles2D.new()
+	particles.name = "ArrivalLandingDust"
+	particles.z_index = 7
+	particles.one_shot = true
+	particles.amount = 14 if not OS.has_feature("mobile") else 8
+	particles.lifetime = 0.72
+	particles.explosiveness = 0.94
+	particles.randomness = 0.72
+	particles.direction = Vector2.UP
+	particles.spread = 132.0
+	particles.gravity = Vector2(0, 78)
+	particles.initial_velocity_min = 34.0
+	particles.initial_velocity_max = 108.0
+	particles.damping_min = 8.0
+	particles.damping_max = 24.0
+	# 40 px di texture: scala sub-unitaria per granelli da 5-22 px, non bolle giganti.
+	particles.scale_amount_min = 0.12
+	particles.scale_amount_max = 0.55
+	particles.color = Color(0.62, 0.77, 0.75, 0.62)
+	particles.texture = _make_soft_disc()
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.16, 0.62, 1.0])
+	fade.colors = PackedColorArray([
+		Color(1, 1, 1, 0), Color(1, 1, 1, 0.9),
+		Color(1, 1, 1, 0.34), Color(1, 1, 1, 0),
+	])
+	particles.color_ramp = fade
+	add_child(particles)
+	particles.global_position = origin + Vector2(0, 3)
+	particles.emitting = true
+	get_tree().create_timer(1.1).timeout.connect(particles.queue_free)
+
+
+func _spawn_landing_afterimage(origin: Vector2) -> void:
+	var player := get_tree().get_first_node_in_group("player") as Node2D
+	var source := player.get_node_or_null("Sprite2D") as Sprite2D if player else null
+	if source == null or source.texture == null:
+		return
+	for index in 3:
+		var ghost := Sprite2D.new()
+		ghost.z_index = 5
+		ghost.texture = source.texture
+		ghost.hframes = source.hframes
+		ghost.vframes = source.vframes
+		ghost.frame = source.frame
+		ghost.flip_h = source.flip_h
+		ghost.scale = source.scale
+		ghost.position = origin + source.position + Vector2(-7.0 - index * 5.0, -2.0 - index * 2.5)
+		ghost.modulate = Color(0.25, 0.62, 0.62, 0.15 - index * 0.03)
+		add_child(ghost)
+		var tween := create_tween().set_parallel(true)
+		tween.tween_property(ghost, "position", ghost.position + Vector2(-14, -5), 0.34 + index * 0.06)
+		tween.tween_property(ghost, "modulate:a", 0.0, 0.28 + index * 0.06)
+		tween.chain().tween_callback(ghost.queue_free)
+
+
+func _spawn_landing_ring(origin: Vector2) -> void:
+	var ring := _LandingRing.new()
+	ring.z_index = 6
+	ring.position = origin + Vector2(0, 3)
+	add_child(ring)
+	ring.play()
+
+
+func _make_soft_disc() -> GradientTexture2D:
+	var gradient := Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 0.42, 0.78, 1.0])
+	gradient.colors = PackedColorArray([
+		Color(1, 1, 1, 0.86), Color(1, 1, 1, 0.36),
+		Color(1, 1, 1, 0.08), Color(1, 1, 1, 0),
+	])
+	var texture := GradientTexture2D.new()
+	texture.gradient = gradient
+	texture.width = 40
+	texture.height = 40
+	texture.fill = GradientTexture2D.FILL_RADIAL
+	texture.fill_from = Vector2(0.5, 0.5)
+	texture.fill_to = Vector2(1.0, 0.5)
+	return texture
+
+
 func _spawn_takeoff_flock(origin: Vector2) -> void:
 	for index in 8:
 		var bird := _FlightBird.new()
@@ -122,3 +210,21 @@ class _HidingSilhouette extends Node2D:
 			cloak
 		)
 		draw_circle(Vector2(0, -16), 5.5, cloak)
+
+
+class _LandingRing extends Node2D:
+	var _progress := 0.0
+
+	func play() -> void:
+		var tween := create_tween()
+		tween.tween_method(_set_progress, 0.0, 1.0, 0.42).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_callback(queue_free)
+
+	func _set_progress(value: float) -> void:
+		_progress = value
+		queue_redraw()
+
+	func _draw() -> void:
+		var width := lerpf(10.0, 72.0, _progress)
+		var alpha := (1.0 - _progress) * 0.48
+		draw_arc(Vector2.ZERO, width, PI + 0.18, TAU - 0.18, 28, Color(0.56, 0.82, 0.78, alpha), lerpf(3.2, 0.8, _progress), true)

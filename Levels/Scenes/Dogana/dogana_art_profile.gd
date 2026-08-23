@@ -9,18 +9,24 @@ extends Resource
 ## `python tools/sync_artist_drop.py` (vedi LEGGIMI.md).
 
 @export_category("Environment sections")
+@export var torre_fortuna: Texture2D
+@export var dogana_ovest: Texture2D
+@export var dogana_est: Texture2D
+@export var seminario: Texture2D
+@export var collegamento_salute: Texture2D
+@export var salute: Texture2D
+@export var salute_interior: Texture2D
 @export var arrival_background: Texture2D
 @export var customs_background: Texture2D
 @export var canal_background: Texture2D
 @export var fortuna_background: Texture2D
-@export var archive_background: Texture2D
 
 @export_category("Architecture kit")
 @export var walkable_platform: Texture2D
 @export var central_wedge: Texture2D
 @export var tide_altar: Texture2D
-@export var tide_altar_scale := Vector2(0.145, 0.145)
-@export var tide_altar_offset := Vector2(0.0, -58.0)
+@export var tide_altar_scale := Vector2(0.158, 0.158)
+@export var tide_altar_offset := Vector2(0.0, -71.0)
 
 @export_category("Breakables")
 @export var fishing_cache: Texture2D

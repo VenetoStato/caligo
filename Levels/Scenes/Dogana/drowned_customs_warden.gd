@@ -7,6 +7,8 @@ const PARTICLE_BURST := preload("res://Fx/particle_burst.gd")
 const AREA_ATTACK_SCRIPT := preload("res://Enemies/enemy_area_attack.gd")
 const PROJECTILE_SCRIPT := preload("res://Enemies/enemy_projectile.gd")
 const TELEGRAPH_SCRIPT := preload("res://Levels/Scenes/Dogana/boss_telegraph.gd")
+const FOOTSTEP_DUST := preload("res://Fx/footstep_dust.gd")
+const FLOOD_SURGE_SCRIPT := preload("res://Levels/Scenes/Dogana/boss_flood_surge.gd")
 
 const MAX_BOSS_TRANSIENTS := 72
 
@@ -20,8 +22,11 @@ const MAX_BOSS_TRANSIENTS := 72
 @export var heavy_attack_damage := 2
 @export var gravity := 620.0
 
-enum State { DORMANT, CHASE, WINDUP, LUNGE, SLAM, WAVE, SWEEP, SPIRAL, RING, STREAM, CROSS, RECOVER, DEAD }
-enum AttackKind { LUNGE, SLAM, WAVE, SWEEP, SPIRAL, RING, STREAM, CROSS }
+enum State { DORMANT, CHASE, WINDUP, LUNGE, SLAM, WAVE, SWEEP, SPIRAL, RING, STREAM, CROSS, RECOVER, DEAD, FAN, PILLARS, FLOOD }
+enum AttackKind { LUNGE, SLAM, WAVE, SWEEP, SPIRAL, RING, STREAM, CROSS, FAN, PILLARS, FLOOD }
+
+const ARENA_LEFT := 4640.0
+const ARENA_RIGHT := 5700.0
 
 @onready var _sprite: Sprite2D = $Sprite2D
 @onready var _hurtbox: Area2D = $Hurtbox
@@ -35,9 +40,9 @@ var _attack_timer := 0.0
 var _invulnerability_timer := 0.0
 var _attack_has_hit := false
 var _base_scale := Vector2.ONE
-var _health_layer: CanvasLayer
-var _health_bar: ProgressBar
-var _health_panel: PanelContainer
+var _wound_overlay: Sprite2D
+var _wound_light: PointLight2D
+var _wound_pulse := 0.0
 var _pending_kind := AttackKind.LUNGE
 var _pending_damage := 1
 var _wave_shots_left := 0
@@ -54,6 +59,20 @@ var _spiral_shots_left := 0
 var _spiral_timer := 0.0
 var _cross_waves_left := 0
 var _cross_timer := 0.0
+var _fan_waves_left := 0
+var _fan_timer := 0.0
+var _pillar_waves_left := 0
+var _pillar_timer := 0.0
+var _last_attack_kind := -1
+var _attack_chain_step := 0
+var _phase := 1
+var _phase_transitioning := false
+var _home_position := Vector2.ZERO
+var _base_sprite_position := Vector2.ZERO
+var _anim_state := "dormant"
+var _anim_phase := 0.0
+var _step_phase := 0.0
+var _hurt_anim := 0.0
 
 
 func _ready() -> void:
@@ -61,6 +80,8 @@ func _ready() -> void:
 	add_to_group("dogana_boss")
 	current_health = max_health
 	_base_scale = _sprite.scale
+	_base_sprite_position = _sprite.position
+	_home_position = global_position
 	_hurtbox.area_entered.connect(_on_hurtbox_area_entered)
 	_attack_hitbox.body_entered.connect(_on_attack_hit_body)
 	_attack_hitbox.monitoring = false
@@ -91,19 +112,25 @@ func _physics_process(delta: float) -> void:
 	match state:
 		State.DORMANT:
 			velocity.x = move_toward(velocity.x, 0.0, 800.0 * delta)
-			_sprite.scale = _base_scale * (1.0 + sin(Time.get_ticks_msec() * 0.003) * 0.018)
-			if absf(to_player.x) <= aggro_range:
+			# Il boss vive nell'interno della Salute, sopra la mappa esterna: usare
+			# solo X lo svegliava attraverso il soffitto mentre eri sul sagrato.
+			if to_player.length() <= aggro_range:
 				_awaken()
 		State.CHASE:
 			var chase_speed := move_speed * (1.22 if _is_enraged() else 1.0)
-			velocity.x = signf(to_player.x) * chase_speed
-			_sprite.rotation = sin(Time.get_ticks_msec() * 0.009) * 0.018
+			# Il Custode non si incolla al player: mantiene una fascia di duello e
+			# lascia spazio leggibile per dash, salto e contrattacco.
+			var desired_distance := 150.0 if _phase == 1 else 185.0
+			if absf(to_player.x) > desired_distance + 28.0:
+				velocity.x = signf(to_player.x) * chase_speed
+			elif absf(to_player.x) < desired_distance - 42.0:
+				velocity.x = -signf(to_player.x) * chase_speed * 0.62
+			else:
+				velocity.x = move_toward(velocity.x, 0.0, 850.0 * delta)
 			if _attack_timer <= 0.0 and absf(to_player.x) <= attack_range:
 				_begin_windup(to_player)
 		State.WINDUP:
 			velocity.x = move_toward(velocity.x, 0.0, 1200.0 * delta)
-			var pulse := 1.0 + sin(_state_timer * 40.0) * 0.04
-			_sprite.scale = _base_scale * Vector2(1.0 / pulse, pulse)
 			if _state_timer <= 0.0:
 				_commit_attack(to_player)
 		State.LUNGE:
@@ -138,17 +165,35 @@ func _physics_process(delta: float) -> void:
 			velocity.x = move_toward(velocity.x, 0.0, 900.0 * delta)
 			if _cross_waves_left <= 0 and _state_timer <= 0.0:
 				_begin_recovery(0.68)
+		State.FAN:
+			_update_fan(delta, to_player)
+			velocity.x = move_toward(velocity.x, 0.0, 800.0 * delta)
+			if _fan_waves_left <= 0 and _state_timer <= 0.0:
+				_begin_recovery(0.62)
+		State.PILLARS:
+			_update_pillars(delta)
+			velocity.x = move_toward(velocity.x, 0.0, 900.0 * delta)
+			if _pillar_waves_left <= 0 and _state_timer <= 0.0:
+				_begin_recovery(0.76)
+		State.FLOOD:
+			# Durante la marea il Custode resta piantato a invocarla: e' la
+			# finestra in cui conviene appendersi e non pensare a colpirlo.
+			velocity.x = move_toward(velocity.x, 0.0, 950.0 * delta)
+			if _state_timer <= 0.0:
+				_begin_recovery(0.8)
 		State.SWEEP:
 			if _state_timer <= 0.0:
 				_begin_recovery(0.95)
 		State.RECOVER:
 			velocity.x = move_toward(velocity.x, 0.0, 760.0 * delta)
-			_sprite.rotation = lerpf(_sprite.rotation, 0.0, delta * 8.0)
-			_sprite.scale = _sprite.scale.lerp(_base_scale, delta * 9.0)
 			if _state_timer <= 0.0:
+				_phase_transitioning = false
 				state = State.CHASE
 
+	_animate(delta)
+	_update_wound_signal(delta)
 	move_and_slide()
+	global_position.x = clampf(global_position.x, ARENA_LEFT, ARENA_RIGHT)
 
 
 func _is_enraged() -> bool:
@@ -159,12 +204,160 @@ func _is_desperate() -> bool:
 	return current_health <= maxi(1, max_health / 3)
 
 
+func get_animation_state() -> String:
+	return _anim_state
+
+
+## Il Custode e' un unico sprite dipinto: le animazioni sono pose procedurali
+## per stato (respiro, passo, carica, affondo, colpo subito), cosi' ogni fase
+## dello scontro resta leggibile senza uno spritesheet.
+func _animate(delta: float) -> void:
+	_hurt_anim = maxf(0.0, _hurt_anim - delta * 4.5)
+	var next_state := _animation_state_for(state)
+	if next_state != _anim_state:
+		_anim_state = next_state
+		_anim_phase = 0.0
+	_anim_phase += delta
+
+	var facing := 1.0 if _sprite.flip_h else -1.0
+	var offset := Vector2.ZERO
+	var squash := Vector2.ONE
+	var lean := 0.0
+
+	match _anim_state:
+		"dormant":
+			var breath := sin(_anim_phase * 1.35)
+			squash = Vector2(1.0 - breath * 0.014, 1.0 + breath * 0.022)
+			offset.y = breath * 3.0
+			lean = sin(_anim_phase * 0.6) * 0.012
+		"chase":
+			_advance_step_cycle(delta)
+			var cycle := _step_phase * TAU
+			offset = Vector2(sin(cycle) * 4.0, -absf(sin(cycle)) * 7.0)
+			squash = Vector2(1.0 + absf(sin(cycle)) * 0.02, 1.0 - absf(sin(cycle)) * 0.03)
+			lean = 0.05 + sin(cycle * 0.5) * 0.02
+		"windup":
+			var coil := clampf(_anim_phase * 3.2, 0.0, 1.0)
+			squash = Vector2(1.0 + coil * 0.09, 1.0 - coil * 0.11 + sin(_anim_phase * 46.0) * 0.02 * coil)
+			offset.y = coil * 12.0
+			lean = -coil * 0.1
+		"attack":
+			var pose := _attack_pose()
+			offset = pose[0]
+			squash = pose[1]
+			lean = pose[2]
+		"recover":
+			var settle := clampf(_anim_phase * 2.4, 0.0, 1.0)
+			squash = Vector2.ONE.lerp(Vector2(0.97, 1.04), 1.0 - settle)
+			offset.y = (1.0 - settle) * 6.0
+			lean = (1.0 - settle) * -0.08
+
+	if _hurt_anim > 0.0:
+		offset.x -= _hurt_anim * 9.0
+		lean += _hurt_anim * 0.12
+		squash *= Vector2(1.0 + _hurt_anim * 0.05, 1.0 - _hurt_anim * 0.06)
+
+	var blend := clampf(delta * 20.0, 0.0, 1.0)
+	_sprite.position = _base_sprite_position + Vector2(offset.x * facing, offset.y)
+	_sprite.scale = _sprite.scale.lerp(_base_scale * squash, blend)
+	_sprite.rotation = lerpf(_sprite.rotation, lean * facing, blend)
+
+
+func _attack_pose() -> Array:
+	match state:
+		State.LUNGE:
+			return [Vector2(14.0, -4.0), Vector2(1.12, 0.9), 0.26]
+		State.SWEEP:
+			var swing := sin(clampf(_anim_phase / 0.42, 0.0, 1.0) * PI)
+			return [Vector2(swing * 18.0, 0.0), Vector2(1.0 + swing * 0.1, 1.0 - swing * 0.08), swing * 0.34]
+		State.SLAM:
+			var airborne := clampf(_anim_phase * 2.6, 0.0, 1.0)
+			return [Vector2(0.0, -airborne * 10.0), Vector2(1.0 - airborne * 0.08, 1.0 + airborne * 0.12), -0.18 * (1.0 - airborne)]
+		State.PILLARS:
+			# Braccia al cielo mentre chiama le colonne di marea.
+			return [Vector2(0.0, -10.0 + sin(_anim_phase * 26.0) * 2.5), Vector2(0.9, 1.16), 0.0]
+		State.FLOOD:
+			# Affondato sulle ginocchia mentre richiama l'acqua alta.
+			var call_pose := sin(_anim_phase * 9.0)
+			return [Vector2(0.0, 6.0 + call_pose * 2.0), Vector2(1.14, 0.86 + call_pose * 0.03), 0.0]
+		_:
+			# Pattern a proiettili: torace aperto e respiro rapido.
+			var cast := sin(_anim_phase * 14.0)
+			return [Vector2(-6.0, -4.0 + cast * 2.0), Vector2(0.94 + cast * 0.03, 1.08 - cast * 0.03), -0.06]
+
+
+func _animation_state_for(current: int) -> String:
+	match current:
+		State.DORMANT:
+			return "dormant"
+		State.CHASE:
+			return "chase"
+		State.WINDUP:
+			return "windup"
+		State.RECOVER:
+			return "recover"
+		State.DEAD:
+			return "dead"
+	return "attack"
+
+
+func _advance_step_cycle(delta: float) -> void:
+	var pace := clampf(absf(velocity.x) / maxf(move_speed, 1.0), 0.0, 1.6)
+	if pace < 0.12:
+		return
+	var previous := _step_phase
+	_step_phase = fposmod(_step_phase + delta * (1.3 + pace * 1.4), 1.0)
+	if _step_phase < previous or (previous < 0.5 and _step_phase >= 0.5):
+		_spawn_step_dust()
+
+
+func _spawn_step_dust() -> void:
+	if not is_on_floor():
+		return
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	FOOTSTEP_DUST.spawn(scene, global_position + Vector2(0, -6), signf(velocity.x), OS.has_feature("mobile"))
+
+
+## Morire nell'arena deve poter far ricominciare lo scontro da capo.
+func reset_encounter() -> void:
+	if state == State.DEAD:
+		return
+	for attack in get_tree().get_nodes_in_group("enemy_transient_attack"):
+		if is_instance_valid(attack):
+			attack.queue_free()
+	state = State.DORMANT
+	current_health = max_health
+	_phase = 1
+	_phase_transitioning = false
+	_last_attack_kind = -1
+	_attack_chain_step = 0
+	_invulnerability_timer = 0.0
+	_attack_timer = 0.0
+	_state_timer = 0.0
+	_hurt_anim = 0.0
+	_anim_state = "dormant"
+	_anim_phase = 0.0
+	velocity = Vector2.ZERO
+	global_position = _home_position
+	_disable_melee_hitbox()
+	_sprite.modulate = Color.WHITE
+	_sprite.position = _base_sprite_position
+	_sprite.scale = _base_scale
+	_sprite.rotation = 0.0
+	_wound_pulse = 0.0
+	if _wound_overlay:
+		_wound_overlay.modulate.a = 0.0
+	if _wound_light:
+		_wound_light.energy = 0.0
+
+
 func _awaken() -> void:
 	state = State.CHASE
 	_attack_timer = 1.1
-	if _health_layer:
-		_health_layer.visible = true
 	boss_awakened.emit()
+	_spawn_phase_ring(Color(0.42, 0.96, 0.82, 0.9), 105.0)
 	var tween := create_tween()
 	tween.tween_property(_sprite, "modulate", Color(0.55, 1.15, 1.05, 1.0), 0.16)
 	tween.tween_property(_sprite, "modulate", Color.WHITE, 0.36)
@@ -207,38 +400,54 @@ func _begin_windup(to_player: Vector2) -> void:
 			_state_timer = 0.68
 			_pending_damage = heavy_attack_damage
 			_sprite.modulate = Color(1.05, 0.72, 0.35, 1.0)
+		AttackKind.FAN:
+			_state_timer = 0.58
+			_pending_damage = attack_damage
+			_sprite.modulate = Color(0.48, 0.92, 1.18, 1.0)
+		AttackKind.PILLARS:
+			_state_timer = 0.78
+			_pending_damage = heavy_attack_damage
+			_sprite.modulate = Color(0.88, 0.42, 1.12, 1.0)
+		AttackKind.FLOOD:
+			_state_timer = 0.9
+			_pending_damage = heavy_attack_damage
+			_sprite.modulate = Color(0.3, 0.66, 1.15, 1.0)
 
 
 func _pick_attack(to_player: Vector2) -> AttackKind:
 	var dist := absf(to_player.x)
 	var options: Array[AttackKind] = []
+	# Pool per fase: pochi pattern coerenti e imparabili. Le varianti dense
+	# entrano solo dopo che il player ha letto il moveset base.
 	if dist <= 120.0:
 		options.append(AttackKind.SWEEP)
 		options.append(AttackKind.LUNGE)
 		options.append(AttackKind.SLAM)
-		options.append(AttackKind.RING)
 	elif dist <= 240.0:
 		options.append(AttackKind.LUNGE)
 		options.append(AttackKind.SLAM)
 		options.append(AttackKind.WAVE)
-		options.append(AttackKind.STREAM)
-		options.append(AttackKind.CROSS)
 	else:
 		options.append(AttackKind.WAVE)
-		options.append(AttackKind.SPIRAL)
-		options.append(AttackKind.STREAM)
-		options.append(AttackKind.CROSS)
-		if _is_enraged():
-			options.append(AttackKind.RING)
+		options.append(AttackKind.FAN)
 	if _is_enraged():
-		options.append(AttackKind.SPIRAL)
 		options.append(AttackKind.STREAM)
 		options.append(AttackKind.RING)
+		options.append(AttackKind.PILLARS)
+		options.append(AttackKind.FLOOD)
 	if _is_desperate():
 		options.append(AttackKind.SPIRAL)
 		options.append(AttackKind.CROSS)
-		options.append(AttackKind.STREAM)
-	return options[randi() % options.size()]
+	var filtered: Array[AttackKind] = []
+	for kind in options:
+		if int(kind) != _last_attack_kind:
+			filtered.append(kind)
+	if filtered.is_empty():
+		filtered = options
+	var chosen := filtered[randi() % filtered.size()]
+	_last_attack_kind = int(chosen)
+	_attack_chain_step += 1
+	return chosen
 
 
 func _commit_attack(to_player: Vector2) -> void:
@@ -260,6 +469,12 @@ func _commit_attack(to_player: Vector2) -> void:
 			_begin_stream(to_player)
 		AttackKind.CROSS:
 			_begin_cross()
+		AttackKind.FAN:
+			_begin_fan(to_player)
+		AttackKind.PILLARS:
+			_begin_pillars()
+		AttackKind.FLOOD:
+			_begin_flood()
 
 
 func _begin_lunge(to_player: Vector2) -> void:
@@ -426,6 +641,23 @@ func _fire_ring_burst() -> void:
 	_shake_camera(0.16)
 
 
+## Attacco ambientale: il Custode chiama l'acqua alta e allaga la navata da
+## parete a parete. Il pavimento smette di essere un posto sicuro.
+func _begin_flood() -> void:
+	state = State.FLOOD
+	_state_timer = 2.3
+	_disable_melee_hitbox()
+	var floor_y := global_position.y
+	var surge := FLOOD_SURGE_SCRIPT.new() as Area2D
+	var span := Vector2(ARENA_RIGHT - ARENA_LEFT + 260.0, 104.0)
+	surge.call("setup", span, heavy_attack_damage, 0.92 if _is_desperate() else 1.2, 1.1)
+	get_tree().current_scene.add_child(surge)
+	surge.global_position = Vector2(
+		(ARENA_LEFT + ARENA_RIGHT) * 0.5, floor_y - span.y * 0.5 + 26.0
+	)
+	_shake_camera(0.22)
+
+
 func _begin_stream(to_player: Vector2) -> void:
 	state = State.STREAM
 	_stream_shots_left = 16 if _is_desperate() else (12 if _is_enraged() else 8)
@@ -510,6 +742,84 @@ func _fire_cross_wave() -> void:
 	_shake_camera(0.14)
 
 
+func _begin_fan(to_player: Vector2) -> void:
+	state = State.FAN
+	_fan_waves_left = 4 if _is_desperate() else (3 if _is_enraged() else 2)
+	_fan_timer = 0.0
+	_state_timer = 0.14 + float(_fan_waves_left) * 0.24
+	_pattern_phase = -0.08
+	_disable_melee_hitbox()
+	_fire_fan_wave(to_player)
+	_fan_waves_left -= 1
+
+
+func _update_fan(delta: float, to_player: Vector2) -> void:
+	if _fan_waves_left <= 0:
+		return
+	_fan_timer -= delta
+	if _fan_timer > 0.0:
+		return
+	_fan_timer = 0.22
+	_pattern_phase *= -1.0
+	_fire_fan_wave(to_player)
+	_fan_waves_left -= 1
+
+
+func _fire_fan_wave(to_player: Vector2) -> void:
+	var base_dir := to_player.normalized() if to_player.length_squared() > 0.01 else Vector2.RIGHT
+	base_dir.y = clampf(base_dir.y, -0.28, 0.12)
+	base_dir = base_dir.normalized()
+	var count := 7 if _is_desperate() else 5
+	for index in count:
+		var centered := float(index) - float(count - 1) * 0.5
+		var offset := centered * 0.13 + _pattern_phase
+		_spawn_boss_projectile(
+			base_dir.rotated(offset),
+			142.0 + absf(centered) * 7.0,
+			attack_damage,
+			Color(0.38, 0.86, 1.0, 1.0),
+			5.2,
+			3.1
+		)
+	_shake_camera(0.13)
+
+
+func _begin_pillars() -> void:
+	state = State.PILLARS
+	_pillar_waves_left = 3 if _is_desperate() else 2
+	_pillar_timer = 0.0
+	_state_timer = 0.3 + float(_pillar_waves_left) * 0.5
+	_disable_melee_hitbox()
+	_spawn_pillar_line()
+	_pillar_waves_left -= 1
+
+
+func _update_pillars(delta: float) -> void:
+	if _pillar_waves_left <= 0:
+		return
+	_pillar_timer -= delta
+	if _pillar_timer > 0.0:
+		return
+	_pillar_timer = 0.48
+	_spawn_pillar_line()
+	_pillar_waves_left -= 1
+
+
+func _spawn_pillar_line() -> void:
+	if player == null or not is_instance_valid(player):
+		return
+	var spacing := 96.0
+	var phase_offset := 48.0 if _pillar_waves_left % 2 == 0 else 0.0
+	for index in 5:
+		if get_tree().get_nodes_in_group("enemy_transient_attack").size() >= MAX_BOSS_TRANSIENTS:
+			break
+		var area := AREA_ATTACK_SCRIPT.new() as Area2D
+		area.call("setup", 34.0, heavy_attack_damage, Color(0.72, 0.32, 0.95, 1.0), 0.62, 0.18)
+		get_tree().current_scene.add_child(area)
+		area.global_position = Vector2(player.global_position.x + (float(index) - 2.0) * spacing + phase_offset, player.global_position.y + 18.0)
+	_shake_camera(0.18)
+
+
 func _spawn_boss_projectile(
 	direction: Vector2,
 	shot_speed: float,
@@ -533,13 +843,14 @@ func _begin_sweep(to_player: Vector2) -> void:
 	_state_timer = 0.42
 	velocity.x = signf(to_player.x) * 140.0
 	_enable_melee_hitbox(1.35)
-	_sprite.rotation = signf(to_player.x) * 0.18
 	_shake_camera(0.2)
 
 
 func _begin_recovery(duration: float) -> void:
 	state = State.RECOVER
-	_state_timer = duration * (0.7 if _is_desperate() else (0.78 if _is_enraged() else 1.0))
+	# Finestra punibile sempre presente; l'ultima fase accelera la cadenza ma
+	# non cancella la possibilita' di rispondere.
+	_state_timer = maxf(0.48, duration * (0.82 if _is_desperate() else (0.9 if _is_enraged() else 1.0)))
 	_attack_timer = attack_cooldown * (0.62 if _is_desperate() else (0.72 if _is_enraged() else 1.0))
 	_disable_melee_hitbox()
 	_slam_armed = false
@@ -548,6 +859,8 @@ func _begin_recovery(duration: float) -> void:
 	_ring_bursts_left = 0
 	_stream_shots_left = 0
 	_cross_waves_left = 0
+	_fan_waves_left = 0
+	_pillar_waves_left = 0
 	_sprite.modulate = Color.WHITE
 
 
@@ -576,22 +889,55 @@ func _on_hurtbox_area_entered(area: Area2D) -> void:
 
 
 func take_damage(amount: int = 1, source_position: Vector2 = Vector2.ZERO) -> void:
-	if state == State.DEAD or _invulnerability_timer > 0.0:
+	if state == State.DEAD or _invulnerability_timer > 0.0 or _phase_transitioning:
 		return
 	if state == State.DORMANT:
 		_awaken()
 	_invulnerability_timer = 0.14
+	_hurt_anim = 1.0
 	current_health = maxi(0, current_health - amount)
-	if _health_bar:
-		_health_bar.value = current_health
+	if current_health <= 0:
+		_die()
+		return
+	var next_phase := 3 if _is_desperate() else (2 if _is_enraged() else 1)
+	if next_phase > _phase:
+		_phase = next_phase
+		_begin_phase_transition()
 	var away := signf(global_position.x - source_position.x)
 	velocity.x = away * 130.0
 	var tween := create_tween()
 	tween.tween_property(_sprite, "modulate", Color(1.6, 0.34, 0.28, 1.0), 0.05)
 	tween.tween_property(_sprite, "modulate", Color.WHITE, 0.15)
 	_shake_camera(0.16)
-	if current_health <= 0:
-		_die()
+
+
+func _begin_phase_transition() -> void:
+	if state == State.DEAD:
+		return
+	_phase_transitioning = true
+	_disable_melee_hitbox()
+	state = State.RECOVER
+	_state_timer = 1.05
+	_attack_timer = 1.15
+	velocity = Vector2.ZERO
+	for attack in get_tree().get_nodes_in_group("enemy_transient_attack"):
+		if is_instance_valid(attack):
+			attack.queue_free()
+	var tint := Color(0.32, 0.94, 0.82, 0.95) if _phase == 2 else Color(0.82, 0.46, 1.0, 0.95)
+	_spawn_phase_ring(tint, 155.0 if _phase == 2 else 205.0)
+	_shake_camera(0.48 if _phase == 2 else 0.65)
+	var tween := create_tween()
+	tween.tween_property(_sprite, "modulate", tint * 1.25, 0.18)
+	tween.tween_property(_sprite, "modulate", Color.WHITE, 0.72)
+	tween.tween_callback(func(): _phase_transitioning = false)
+
+
+func _spawn_phase_ring(tint: Color, radius: float) -> void:
+	var ring := AREA_ATTACK_SCRIPT.new() as Area2D
+	# Solo spettacolo/respinta leggibile: danno zero durante la transizione.
+	ring.call("setup", radius, 0, tint, 0.72, 0.12)
+	get_tree().current_scene.add_child(ring)
+	ring.global_position = global_position + Vector2(0, -48)
 
 
 func _on_attack_hit_body(body: Node2D) -> void:
@@ -607,6 +953,7 @@ func _on_attack_hit_body(body: Node2D) -> void:
 
 func _die() -> void:
 	state = State.DEAD
+	_anim_state = "dead"
 	velocity = Vector2.ZERO
 	collision_layer = 0
 	collision_mask = 0
@@ -616,11 +963,10 @@ func _die() -> void:
 		_telegraph.visible = false
 	_spawn_death_motes()
 	boss_defeated.emit()
-	if _health_panel:
-		var ui_tween := create_tween()
-		ui_tween.tween_property(_health_panel, "position:y", 8.0, 0.4)
-		ui_tween.parallel().tween_property(_health_panel, "modulate:a", 0.0, 0.4)
-		ui_tween.tween_callback(_health_layer.queue_free)
+	if _wound_light:
+		var glow_tween := create_tween()
+		glow_tween.tween_property(_wound_light, "energy", 2.4, 0.22)
+		glow_tween.tween_property(_wound_light, "energy", 0.0, 0.9)
 	var tween := create_tween().set_parallel(true)
 	tween.tween_property(_sprite, "modulate:a", 0.0, 1.0)
 	tween.tween_property(_sprite, "scale", _base_scale * 1.22, 1.0)
@@ -640,8 +986,8 @@ func restore_defeated() -> void:
 	_sprite.hide()
 	if _telegraph:
 		_telegraph.visible = false
-	if _health_layer:
-		_health_layer.queue_free()
+	if _wound_light:
+		_wound_light.queue_free()
 	set_physics_process(false)
 
 
@@ -698,48 +1044,60 @@ func _spawn_death_motes() -> void:
 		tween.chain().tween_callback(mote.queue_free)
 
 
+## Niente barra: il Custode dichiara le proprie condizioni col corpo. Le
+## fratture luminose si aprono man mano che incassa e l'alone vira dal verde
+## d'acqua all'ambra, cosi' si legge quanto manca guardando lui, non la UI.
 func _build_health_ui() -> void:
-	_health_layer = CanvasLayer.new()
-	_health_layer.layer = 28
-	_health_layer.visible = false
-	add_child(_health_layer)
+	_wound_overlay = Sprite2D.new()
+	_wound_overlay.name = "WoundGlow"
+	_wound_overlay.texture = _sprite.texture
+	_wound_overlay.hframes = _sprite.hframes
+	_wound_overlay.vframes = _sprite.vframes
+	_wound_overlay.frame = _sprite.frame
+	_wound_overlay.region_enabled = _sprite.region_enabled
+	_wound_overlay.region_rect = _sprite.region_rect
+	var additive := CanvasItemMaterial.new()
+	additive.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	_wound_overlay.material = additive
+	_wound_overlay.modulate = Color(0.3, 0.72, 0.6, 0.0)
+	_sprite.add_child(_wound_overlay)
 
-	_health_panel = PanelContainer.new()
-	_health_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	_health_panel.position = Vector2(-240.0, 42.0)
-	_health_panel.custom_minimum_size = Vector2(480.0, 66.0)
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.018, 0.035, 0.04, 0.92)
-	panel_style.border_color = Color(0.52, 0.48, 0.34, 0.86)
-	panel_style.set_border_width_all(2)
-	panel_style.set_corner_radius_all(3)
-	panel_style.set_content_margin_all(10)
-	_health_panel.add_theme_stylebox_override("panel", panel_style)
-	_health_layer.add_child(_health_panel)
+	_wound_light = PointLight2D.new()
+	_wound_light.name = "WoundLight"
+	_wound_light.texture = _make_glow_texture()
+	_wound_light.texture_scale = 2.6
+	_wound_light.energy = 0.0
+	_wound_light.shadow_enabled = false
+	add_child(_wound_light)
 
-	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 5)
-	_health_panel.add_child(column)
-	var title := Label.new()
-	title.text = "IL CUSTODE DELLA SALUTE"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 16)
-	title.add_theme_color_override("font_color", Color(0.78, 0.73, 0.57, 1.0))
-	column.add_child(title)
 
-	_health_bar = ProgressBar.new()
-	_health_bar.max_value = max_health
-	_health_bar.value = current_health
-	_health_bar.show_percentage = false
-	_health_bar.custom_minimum_size = Vector2(450.0, 13.0)
-	var background := StyleBoxFlat.new()
-	background.bg_color = Color(0.04, 0.08, 0.09, 1.0)
-	background.border_color = Color(0.17, 0.25, 0.24, 1.0)
-	background.set_border_width_all(1)
-	var fill := StyleBoxFlat.new()
-	fill.bg_color = Color(0.18, 0.68, 0.59, 0.96)
-	fill.border_color = Color(0.56, 0.82, 0.7, 1.0)
-	fill.set_border_width_all(1)
-	_health_bar.add_theme_stylebox_override("background", background)
-	_health_bar.add_theme_stylebox_override("fill", fill)
-	column.add_child(_health_bar)
+func _make_glow_texture() -> GradientTexture2D:
+	var gradient := Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 0.35, 1.0])
+	gradient.colors = PackedColorArray([
+		Color(1, 1, 1, 0.85), Color(1, 1, 1, 0.24), Color(1, 1, 1, 0),
+	])
+	var texture := GradientTexture2D.new()
+	texture.gradient = gradient
+	texture.width = 128
+	texture.height = 128
+	texture.fill = GradientTexture2D.FILL_RADIAL
+	texture.fill_from = Vector2(0.5, 0.5)
+	texture.fill_to = Vector2(1.0, 0.5)
+	return texture
+
+
+func _update_wound_signal(delta: float) -> void:
+	if _wound_overlay == null:
+		return
+	var wear := 1.0 - clampf(float(current_health) / float(maxi(max_health, 1)), 0.0, 1.0)
+	_wound_pulse += delta * (2.4 + wear * 5.0)
+	var breath := 0.6 + 0.4 * sin(_wound_pulse)
+	var tint := Color(0.24, 0.7, 0.62).lerp(Color(0.92, 0.46, 0.2), wear)
+	_wound_overlay.modulate = Color(
+		tint.r, tint.g, tint.b, (0.06 + wear * 0.62) * breath + _hurt_anim * 0.5
+	)
+	if _wound_light:
+		_wound_light.color = tint
+		_wound_light.energy = (0.15 + wear * 0.95) * breath
+		_wound_light.enabled = state != State.DORMANT

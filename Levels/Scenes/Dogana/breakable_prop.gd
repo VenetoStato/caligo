@@ -23,6 +23,23 @@ func _ready() -> void:
 	_hits_left = hits_required
 	_apply_visual_variant()
 	_hurtbox.area_entered.connect(_on_hurtbox_entered)
+	# Le cache sono piazzate per gameplay: all'avvio si appoggiano alla collisione reale,
+	# così non restano sospese se una rampa o un ponte viene spostato nell'art pass.
+	call_deferred("_snap_to_ground")
+
+
+func _snap_to_ground() -> void:
+	var space := get_world_2d().direct_space_state
+	if space == null:
+		return
+	var from := global_position + Vector2(0.0, -260.0)
+	var to := global_position + Vector2(0.0, 300.0)
+	var query := PhysicsRayQueryParameters2D.create(from, to)
+	query.collision_mask = 1
+	query.exclude = [self]
+	var hit := space.intersect_ray(query)
+	if not hit.is_empty():
+		global_position.y = (hit.position as Vector2).y
 
 
 func _apply_visual_variant() -> void:
@@ -41,6 +58,26 @@ func _apply_visual_variant() -> void:
 			_visual.texture = art_profile.fishing_cache
 			_visual.scale = art_profile.fishing_cache_scale
 			_visual.position = art_profile.fishing_cache_offset
+	# Non lavare il PNG: lascia muschio, corda, crepe.
+	_visual.modulate = Color(0.96, 0.97, 0.95, 1.0)
+	_seat_visual_on_anchor()
+
+
+## Gli offset a mano del profilo artistico lasciavano qualche pixel di stacco
+## fra la base disegnata e il punto d'appoggio: qui si misura il PNG.
+func _seat_visual_on_anchor() -> void:
+	if _visual == null or _visual.texture == null:
+		return
+	var image := _visual.texture.get_image()
+	if image == null:
+		return
+	if image.is_compressed() and image.decompress() != OK:
+		return
+	var used := image.get_used_rect()
+	if used.size.y <= 0:
+		return
+	var bottom_from_center := float(used.end.y) - float(image.get_height()) * 0.5
+	_visual.position.y = -bottom_from_center * absf(_visual.scale.y)
 
 
 func _on_hurtbox_entered(area: Area2D) -> void:

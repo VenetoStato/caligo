@@ -15,8 +15,6 @@ enum Step {
 	COMPLETE,
 }
 
-const DISPLAY_FONT := preload("res://UI/Fonts/CormorantGaramond.ttf")
-const BODY_FONT := preload("res://UI/Fonts/SourceSans3.ttf")
 const STEP_ORDER: Array[Step] = [
 	Step.MOVE,
 	Step.INTERACT,
@@ -29,14 +27,16 @@ const STEP_ORDER: Array[Step] = [
 	Step.MAP,
 ]
 
+## Ritardo prima che il glifo compaia: se l'azione la scopri da solo non vedi
+## mai nulla. Il suggerimento arriva solo quando resti davvero fermo.
+const HINT_DELAY := 4.2
+
 var _player: CharacterBody2D
 var _panel: PanelContainer
 var _fishing_panel: PanelContainer
-var _eyebrow: Label
-var _title: Label
-var _instruction: Label
-var _key_label: Label
-var _progress: Label
+var _mark: HintMark
+var _hint_wait := 0.0
+var _hint_shown := false
 var _start_position := Vector2.INF
 var _completed: Dictionary = {}
 var _observed: Dictionary = {}
@@ -45,9 +45,6 @@ var _completion_started := false
 var _player_signal_connected := false
 var _fish_signal_connected := false
 var _step_transition: Tween
-var _section_tween: Tween
-var _section_veil: ColorRect
-var _last_section := ""
 var _armed := false
 
 
@@ -132,6 +129,22 @@ func _process(_delta: float) -> void:
 		_observe_step(Step.MAP)
 	if not _armed:
 		return
+	_update_hint_fade(_delta)
+
+
+## Il glifo emerge dal nero solo dopo l'attesa e pulsa appena, come un riflesso.
+func _update_hint_fade(delta: float) -> void:
+	if _panel == null or _completion_started:
+		return
+	if _current_step == Step.COMPLETE:
+		return
+	_hint_wait += delta
+	if _hint_wait < HINT_DELAY:
+		_panel.modulate.a = move_toward(_panel.modulate.a, 0.0, delta * 3.0)
+		return
+	_hint_shown = true
+	var breathe: float = 0.42 + 0.12 * sin(Time.get_ticks_msec() * 0.0021)
+	_panel.modulate.a = move_toward(_panel.modulate.a, breathe, delta * 0.9)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -243,98 +256,61 @@ func _refresh_step() -> void:
 
 func _apply_step_copy(step: Step) -> void:
 	var touch := OS.get_name() == "Android"
-	var copy := _get_step_copy(step, touch)
 	if _step_transition and _step_transition.is_valid():
 		_step_transition.kill()
 	_panel.visible = true
-	_step_transition = create_tween()
-	if _title.text.is_empty():
-		_panel.modulate.a = 0.0
-	else:
-		_step_transition.tween_property(_panel, "modulate:a", 0.0, 0.18).set_trans(Tween.TRANS_SINE)
-	_step_transition.tween_callback(_set_step_copy.bind(step, copy))
-	_step_transition.tween_property(_panel, "modulate:a", 0.82, 0.28).set_trans(Tween.TRANS_SINE)
+	_panel.modulate.a = 0.0
+	_hint_wait = 0.0
+	_hint_shown = false
+	_mark.show_mark(_step_mark(step), _step_key(step, touch))
 
 
-func _set_step_copy(step: Step, copy: Dictionary) -> void:
-	_last_section = _get_section_label(step)
-	_eyebrow.text = "%s   ·   %02d / %02d" % [_last_section, _completed_count() + 1, STEP_ORDER.size()]
-	_title.text = str(copy.title)
-	_instruction.text = str(copy.instruction)
-	_key_label.text = str(copy.key)
-	_progress.text = _build_progress_text()
-	_panel.visible = true
-
-
-func _get_section_label(step: Step) -> String:
-	if step in [Step.MOVE, Step.INTERACT]:
-		return "SEZIONE I  ·  IL PONTILE"
-	if step in [Step.JUMP, Step.DOUBLE_JUMP, Step.DASH]:
-		return "SEZIONE II  ·  MOVIMENTO"
-	if step == Step.ATTACK:
-		return "SEZIONE III  ·  OGGETTI FRAGILI"
-	if step in [Step.CAST, Step.REEL]:
-		return "SEZIONE IV  ·  PESCA"
-	return "SEZIONE V  ·  ORIENTAMENTO"
-
-
-func _get_step_copy(step: Step, touch: bool) -> Dictionary:
+## Il disegno dice cosa fare, il tasto dice con cosa farlo.
+func _step_mark(step: Step) -> HintMark.Mark:
 	match step:
 		Step.MOVE:
-			return {
-				"title": "Muoviti",
-				"instruction": "Vai verso l'altare sul pontile.",
-				"key": "◀ ▶" if touch else "A / D",
-			}
+			return HintMark.Mark.MOVE
 		Step.INTERACT:
-			return {
-				"title": "Altare",
-				"instruction": "Tieni premuto sull'altare per riposare e fissare il respawn.",
-				"key": "TIENI ✦" if touch else "TIENI E",
-			}
+			return HintMark.Mark.INTERACT
 		Step.JUMP:
-			return {
-				"title": "Salto",
-				"instruction": "Salta una volta sul pontile.",
-				"key": "↑" if touch else "SPAZIO",
-			}
+			return HintMark.Mark.JUMP
 		Step.DOUBLE_JUMP:
-			return {
-				"title": "Doppio salto",
-				"instruction": "In aria, salta di nuovo.",
-				"key": "↑↑" if touch else "SPAZIO ×2",
-			}
+			return HintMark.Mark.DOUBLE_JUMP
 		Step.DASH:
-			return {
-				"title": "Scatto",
-				"instruction": "Esegui uno scatto a terra o in aria.",
-				"key": "⚡" if touch else "SHIFT",
-			}
+			return HintMark.Mark.DASH
 		Step.ATTACK:
-			return {
-				"title": "Attacco",
-				"instruction": "Rompi la cassa sul pontile.",
-				"key": "⚔" if touch else "CLICK",
-			}
+			return HintMark.Mark.ATTACK
 		Step.CAST:
-			return {
-				"title": "Pesca",
-				"instruction": "Con F lanci la lenza (e un po' di pastura). Mira al varco d'acqua.",
-				"key": "LENZA" if touch else "F",
-			}
+			return HintMark.Mark.CAST
 		Step.REEL:
-			return {
-				"title": "Tira",
-				"instruction": "Quando abborda: tieni R per recuperare, rilascia se la lenza diventa rossa. Serve una cattura.",
-				"key": "R" if touch else "R (tieni / rilascia)",
-			}
+			return HintMark.Mark.REEL
 		Step.MAP:
-			return {
-				"title": "Mappa",
-				"instruction": "Apri la mappa della laguna.",
-				"key": "MAPPA" if touch else "M",
-			}
-	return {"title": "", "instruction": "", "key": ""}
+			return HintMark.Mark.MAP
+	return HintMark.Mark.NONE
+
+
+## Su touch il comando e' un pulsante a schermo: il tasto non si scrive.
+func _step_key(step: Step, touch: bool) -> String:
+	if touch:
+		return ""
+	match step:
+		Step.MOVE:
+			return "A D"
+		Step.INTERACT:
+			return "E"
+		Step.JUMP, Step.DOUBLE_JUMP:
+			return "SPAZIO"
+		Step.DASH:
+			return "SHIFT"
+		Step.ATTACK:
+			return "CLICK"
+		Step.CAST:
+			return "F"
+		Step.REEL:
+			return "R"
+		Step.MAP:
+			return "M"
+	return ""
 
 
 func _completed_count() -> int:
@@ -345,42 +321,19 @@ func _completed_count() -> int:
 	return count
 
 
-func _build_progress_text() -> String:
-	var markers: PackedStringArray = []
-	for step in STEP_ORDER:
-		markers.append("◆" if bool(_completed.get(step, false)) else "◇")
-	return "  ".join(markers)
-
-
 func _unlock_tutorial_gate() -> void:
-	var gate := get_tree().get_first_node_in_group("dogana_tutorial_gate")
-	if gate and gate.has_method("unlock"):
-		gate.call("unlock")
 	var cam := get_tree().get_first_node_in_group("camera")
 	if cam and cam.has_method("add_shake"):
-		cam.call("add_shake", 0.38)
-	var level := get_tree().current_scene
-	if level and level.has_method("_show_message"):
-		level.call("_show_message", "IL VARCO È APERTO — prosegui sul pontile")
+		cam.call("add_shake", 0.16)
 
 
 func _show_completion() -> void:
 	if _completion_started:
 		return
 	_completion_started = true
-	_eyebrow.text = "OK"
-	_title.text = "Varco aperto"
-	_instruction.text = "Puoi lasciare il pontile."
-	_key_label.text = ""
-	_progress.text = ""
+	_mark.clear_mark()
 	tutorial_completed.emit()
-	var completion_timer := Timer.new()
-	completion_timer.one_shot = true
-	completion_timer.wait_time = 3.5
-	completion_timer.process_callback = Timer.TIMER_PROCESS_IDLE
-	completion_timer.timeout.connect(_fade_completed_tutorial)
-	add_child(completion_timer)
-	completion_timer.start()
+	_fade_completed_tutorial()
 
 
 func _fade_completed_tutorial() -> void:
@@ -390,61 +343,20 @@ func _fade_completed_tutorial() -> void:
 
 
 func _build_panel() -> void:
-	# Niente velo a tutto schermo: troppo invasivo.
-	_section_veil = null
-
 	_panel = PanelContainer.new()
 	_panel.name = "GuidedTutorial"
-	_panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_panel.offset_left = 16.0
-	_panel.offset_bottom = -16.0
-	_panel.offset_top = -96.0
-	_panel.custom_minimum_size = Vector2(240.0, 0.0)
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.01, 0.03, 0.04, 0.72)
-	style.border_color = Color(0.55, 0.5, 0.32, 0.55)
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(6)
-	style.set_content_margin_all(10)
-	style.shadow_color = Color(0, 0, 0, 0.35)
-	style.shadow_size = 4
-	_panel.add_theme_stylebox_override("panel", style)
-	_panel.modulate.a = 0.82
+	# Nessuna cornice, nessuno sfondo: il glifo galleggia sulla scena.
+	_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	_panel.modulate.a = 0.0
 	add_child(_panel)
 
-	var content := VBoxContainer.new()
-	content.add_theme_constant_override("separation", 2)
-	_panel.add_child(content)
-	_eyebrow = Label.new()
-	_eyebrow.add_theme_font_override("font", BODY_FONT)
-	_eyebrow.add_theme_font_size_override("font_size", 11)
-	_eyebrow.add_theme_color_override("font_color", Color(0.55, 0.85, 0.78, 0.85))
-	content.add_child(_eyebrow)
-	_title = Label.new()
-	_title.add_theme_font_override("font", DISPLAY_FONT)
-	_title.add_theme_font_size_override("font_size", 18)
-	_title.add_theme_color_override("font_color", Color(0.95, 0.9, 0.72, 0.95))
-	content.add_child(_title)
-	_instruction = Label.new()
-	_instruction.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_instruction.add_theme_font_override("font", BODY_FONT)
-	_instruction.add_theme_font_size_override("font_size", 12)
-	_instruction.add_theme_color_override("font_color", Color(0.86, 0.9, 0.88, 0.9))
-	content.add_child(_instruction)
-	_key_label = Label.new()
-	_key_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	_key_label.add_theme_font_override("font", BODY_FONT)
-	_key_label.add_theme_font_size_override("font_size", 13)
-	_key_label.add_theme_color_override("font_color", Color(0.5, 0.92, 0.8, 0.95))
-	content.add_child(_key_label)
-	_progress = Label.new()
-	_progress.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	_progress.add_theme_font_override("font", BODY_FONT)
-	_progress.add_theme_font_size_override("font_size", 10)
-	_progress.add_theme_color_override("font_color", Color(0.75, 0.7, 0.5, 0.7))
-	content.add_child(_progress)
+	_mark = HintMark.new()
+	_mark.name = "HintMark"
+	_panel.add_child(_mark)
 
 
 func _apply_responsive_layout() -> void:
@@ -452,10 +364,11 @@ func _apply_responsive_layout() -> void:
 		return
 	var viewport_size := CaligoResponsiveLayout.viewport_size(self)
 	var compact := CaligoResponsiveLayout.is_compact(viewport_size)
-	var margin := clampf(viewport_size.x * 0.02, 10.0, 18.0)
-	_panel.offset_left = margin
+	var margin := clampf(viewport_size.y * 0.09, 40.0, 76.0)
+	var mark_height := 40.0 if compact else 46.0
 	_panel.offset_bottom = -margin
-	_panel.offset_top = - (88.0 if compact else 100.0)
-	_panel.custom_minimum_size.x = clampf(viewport_size.x * 0.28, 200.0, 280.0)
-	_title.add_theme_font_size_override("font_size", 16 if compact else 18)
-	_instruction.add_theme_font_size_override("font_size", 11 if compact else 12)
+	_panel.offset_top = -margin - mark_height
+	_panel.offset_left = -70.0
+	_panel.offset_right = 70.0
+	if _mark:
+		_mark.set_scale_compact(compact)

@@ -40,13 +40,13 @@ var _commands_pc: Array = [
 ]
 # Comandi touch/Android (pulsanti a schermo)
 var _commands_touch: Array = [
-	["MUOVITI", "◀  ▶", "Comandi trasparenti a sinistra"],
-	["SALTA", "↑", "Premi ancora per il doppio salto"],
+	["MUOVITI", "FRECCE", "Comandi trasparenti a sinistra"],
+	["SALTA", "SALTO", "Premi ancora per il doppio salto"],
 	["ATTACCA", "Z", "Colpo rapido con l'amo"],
 	["SCATTA", "D", "Attraversa rapidamente il pericolo"],
 	["PESCA", "LENZA", "Lancia verso un pesce"],
 	["RECUPERA", "TIRA", "La preda pescata recupera vita"],
-	["INTERAGISCI", "✦", "Altari, porte e passaggi"],
+	["INTERAGISCI", "USA", "Altari, porte e passaggi"],
 	["ABILITÀ SIGILLATA", "AMO", "Si sblocca sconfiggendo il Custode"],
 ]
 

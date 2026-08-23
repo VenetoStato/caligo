@@ -34,9 +34,14 @@ Lo script:
 
 ## Slot principali
 
+Gli slot `00a_…` → `00f_…` compongono la facciata laterale modulare:
+Torre → Dogana ovest → Dogana est → Seminario → collegamento → Salute.
+Sono PNG trasparenti separati da cielo, acqua e collisioni. Ogni modulo può essere
+sostituito da solo; conserva il piede sul bordo inferiore del canvas.
+
 | File in ArtistDrop | Cosa è | Size consigliata |
 |---|---|---|
-| `01_arrival.png` … `05_archive.png` | Fondali sezioni | 1536×1024 |
+| `01_arrival.png` … `04_fortuna.png` | Fondali sezioni | 1536×1024 |
 | `10_quay_platform.png` | Pavimento calpestabile | 1024×371 |
 | `11_central_wedge.png` | Cuneo Dogana | 1280×502 |
 | `12_tide_altar.png` | Altare | 1024×1024 |
@@ -47,8 +52,14 @@ Lo script:
 | `31_lagoon_oracle.png` | Nemico | 431×512 |
 | `32_drowned_warden.png` | Boss | 512×512 |
 
+### Interno della Salute
+
+`00g_salute_interior.png` è il fondale laterale della navata e dell'arena boss
+(1774×887). Può essere sostituito senza toccare collisioni, porta o boss.
+
 ## Regole rapide
 
+- **Moduli laterali:** camera ortogonale, PNG trasparenti, piede sul bordo inferiore; niente vista aerea o isometrica.
 - **Fondali:** tieni l’orizzonte allineato agli altri.
 - **Platform:** il bordo calpestabile deve stare **in alto** nell’immagine.
 - **Props / nemici / altare:** PNG trasparente, poco padding vuoto.

@@ -46,6 +46,7 @@ func _ready():
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	if menu_btn:
 		menu_btn.pressed.connect(toggle)
+		_make_discreet_glyph(menu_btn, "\u2261")
 	if hook_indicator:
 		var current_path := get_tree().current_scene.scene_file_path if get_tree().current_scene else ""
 		hook_indicator.visible = current_path != DOGANA_SCENE
@@ -53,6 +54,9 @@ func _ready():
 	scenario_selector.add_item("Scenario 1", 0)
 	scenario_selector.add_item("Punta Dogana", 1)
 	scenario_selector.item_selected.connect(_on_scenario_selected)
+	# Il selettore e' uno strumento da sviluppo: vive nel menu, non incollato
+	# sopra l'inquadratura di gioco.
+	_move_scenario_selector_into_menu()
 	_sync_scenario_selector()
 	panel.visible = false
 	controls_panel.visible = false
@@ -109,6 +113,36 @@ func _style_menu_button(button: BaseButton) -> void:
 	button.add_theme_stylebox_override("pressed", pressed)
 	button.add_theme_color_override("font_color", Color(0.82, 0.9, 0.86, 1.0))
 	button.add_theme_color_override("font_hover_color", Color(1.0, 0.86, 0.55, 1.0))
+
+## I comandi permanenti a schermo diventano glifi appena accennati: restano
+## raggiungibili al tocco, ma non leggono piu' come interfaccia di sistema.
+func _make_discreet_glyph(button: Button, glyph: String) -> void:
+	button.text = glyph
+	button.flat = true
+	button.focus_mode = Control.FOCUS_NONE
+	button.tooltip_text = ""
+	button.custom_minimum_size = Vector2(30, 30)
+	button.size = Vector2(30, 30)
+	button.offset_right = button.offset_left + 30.0
+	button.offset_bottom = button.offset_top + 30.0
+	button.modulate = Color(1, 1, 1, 0.38)
+	button.add_theme_font_size_override("font_size", 18)
+	button.add_theme_color_override("font_color", Color(0.72, 0.79, 0.74, 1.0))
+	button.add_theme_color_override("font_hover_color", Color(0.96, 0.86, 0.55, 1.0))
+	button.mouse_entered.connect(func() -> void: button.modulate.a = 0.9)
+	button.mouse_exited.connect(func() -> void: button.modulate.a = 0.38)
+
+
+func _move_scenario_selector_into_menu() -> void:
+	if scenario_selector == null or vbox == null:
+		return
+	if scenario_selector.get_parent() == vbox:
+		return
+	scenario_selector.get_parent().remove_child(scenario_selector)
+	scenario_selector.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	vbox.add_child(scenario_selector)
+	vbox.move_child(scenario_selector, btn_quit.get_index())
+
 
 func _create_water_controls() -> void:
 	_btn_water = Button.new()

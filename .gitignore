@@ -57,3 +57,7 @@ _t_err.txt
 _guided_out.txt
 _guided_err.txt
 tools/__pycache__/
+tmp/
+zone_out.txt
+zone_err.txt
+Landscape/Dogana/ArtistDrop/*.import

@@ -16,8 +16,8 @@ enum QualityPreset { AUTO, ANDROID, PC }
 
 @export_category("Simulation")
 @export_enum("Auto", "Android", "PC") var quality_preset: int = QualityPreset.AUTO
-@export_range(32, 48, 1) var android_samples: int = 32
-@export_range(32, 48, 1) var pc_samples: int = 48
+@export_range(32, 48, 1) var android_samples: int = 48
+@export_range(48, 96, 1) var pc_samples: int = 96
 @export_range(4, 8, 1) var android_passes: int = 4
 @export_range(4, 8, 1) var pc_passes: int = 8
 @export_range(1.0, 80.0, 0.5) var k: float = 22.0
@@ -41,10 +41,10 @@ enum QualityPreset { AUTO, ANDROID, PC }
 @export var character_vertical_drag: float = 2.2
 
 @export_category("Visual")
-@export var shallow_color: Color = Color(0.08, 0.30, 0.36, 0.48)
-@export var deep_color: Color = Color(0.015, 0.09, 0.16, 0.74)
-@export var foam_color: Color = Color(0.52, 0.80, 0.82, 0.52)
-@export_range(0.0, 0.5, 0.01) var reflection_strength: float = 0.09
+@export var shallow_color: Color = Color(0.10, 0.36, 0.43, 0.86)
+@export var deep_color: Color = Color(0.025, 0.14, 0.24, 0.93)
+@export var foam_color: Color = Color(0.62, 0.86, 0.88, 0.72)
+@export_range(0.0, 0.6, 0.01) var reflection_strength: float = 0.34
 @export_range(0.0, 0.04, 0.001) var refraction_strength: float = 0.012
 @export var visual_splash_min_impulse: float = 42.0
 @export var visual_splash_interval: float = 0.14
@@ -126,7 +126,7 @@ func _select_quality() -> void:
 	var use_android := quality_preset == QualityPreset.ANDROID
 	if quality_preset == QualityPreset.AUTO:
 		use_android = OS.has_feature("mobile") or OS.get_name() == "Android"
-	spring_number = clampi(android_samples if use_android else pc_samples, 32, 48)
+	spring_number = clampi(android_samples if use_android else pc_samples, 32, 96)
 	passes = clampi(android_passes if use_android else pc_passes, 4, 8)
 
 
@@ -171,6 +171,12 @@ func _create_visuals() -> void:
 	_water_material.set_shader_parameter("foam_color", foam_color)
 	_water_material.set_shader_parameter("reflection_strength", reflection_strength)
 	_water_material.set_shader_parameter("refraction_strength", refraction_strength)
+	# Lo shader ragiona in pixel sotto il pelo dell'acqua: senza queste misure
+	# schiuma e riflesso diventano percentuali della profondita' del bacino.
+	_water_material.set_shader_parameter("water_depth", maxf(bottom - target_height, 1.0))
+	_water_material.set_shader_parameter(
+		"surface_width", maxf(absf(_surface_right.x - _surface_left.x), 1.0)
+	)
 	water_polygon.material = _water_material
 	add_child(water_polygon)
 

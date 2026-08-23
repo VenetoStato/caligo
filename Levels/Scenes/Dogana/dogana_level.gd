@@ -22,7 +22,7 @@ var _current_grace := ""
 var _discovered_regions: Dictionary = {"arrival": true}
 var _last_region := ""
 var _boss_is_defeated := false
-var _has_palace_seal := false
+var _boss_arena_locked := false
 var _grab_hook_unlocked := false
 var _encounter_update_timer := 0.0
 var _managed_encounters: Array[CharacterBody2D] = []
@@ -33,6 +33,9 @@ const GRACE_CHARGE_TIME := 3.0
 
 
 func _ready() -> void:
+	# Lo stato di pausa appartiene ai modal della scena corrente; non va ereditato
+	# da una lettura/mappa rimasta aperta durante un reload o un test.
+	get_tree().paused = false
 	_player = get_node_or_null(player_path) as CharacterBody2D
 	var spawn := get_node_or_null(spawn_path) as Marker2D
 	if spawn:
@@ -57,12 +60,7 @@ func _ready() -> void:
 		if interactable is Area2D:
 			interactable.body_entered.connect(_on_interactable_entered.bind(interactable))
 			interactable.body_exited.connect(_on_interactable_exited.bind(interactable))
-	for hidden_area in get_tree().get_nodes_in_group("dogana_hidden_reveal"):
-		if hidden_area is Area2D:
-			hidden_area.body_entered.connect(_on_hidden_area_entered.bind(hidden_area))
-	for wall in get_tree().get_nodes_in_group("dogana_breakable"):
-		if wall.has_signal("wall_broken"):
-			wall.wall_broken.connect(_on_secret_wall_broken.bind(wall))
+	_update_passage_availability(false)
 	for boss in get_tree().get_nodes_in_group("dogana_boss"):
 		if boss.has_signal("boss_awakened"):
 			boss.boss_awakened.connect(_on_boss_awakened)
@@ -75,10 +73,8 @@ func _ready() -> void:
 			grace.body_exited.connect(_on_grace_exited.bind(grace))
 	if persistence_enabled:
 		_load_graces()
-	_restore_palace_progress()
 	_restore_boss_progress()
 	_apply_grab_hook_unlock()
-	_restore_discovered_artwork()
 	_initialize_graces()
 	_configure_encounter_culling()
 	for water in get_tree().get_nodes_in_group("water"):
@@ -189,11 +185,25 @@ func _on_player_respawned() -> void:
 	for corpse in get_tree().get_nodes_in_group("dead_enemy"):
 		if is_instance_valid(corpse):
 			corpse.queue_free()
-	# Reset Souls-style solo dei vivi / in attesa: i timer di respawn vengono
-	# invalidati da reset_to_home via _respawn_generation.
+	# La morte del player non rigenera i nemici. Il reset avviene soltanto
+	# quando il giocatore attiva o usa volontariamente una grazia.
+	# Il Custode fa eccezione: morire nell'arena deve poter far ricominciare
+	# lo scontro, altrimenti resta sigillato con un boss a mezza vita.
+	_reset_boss_encounter()
+	_update_encounter_culling()
+
+
+func _reset_enemies_at_grace() -> void:
+	for attack in get_tree().get_nodes_in_group("enemy_transient_attack"):
+		if is_instance_valid(attack):
+			attack.queue_free()
+	for corpse in get_tree().get_nodes_in_group("dead_enemy"):
+		if is_instance_valid(corpse):
+			corpse.queue_free()
 	for enemy in get_tree().get_nodes_in_group("enemy"):
 		if enemy.has_method("reset_to_home"):
 			enemy.call("reset_to_home")
+	_reset_boss_encounter()
 	_update_encounter_culling()
 
 
@@ -204,43 +214,62 @@ func _configure_encounter_culling() -> void:
 	for child in encounters.get_children():
 		if child is CharacterBody2D and child.is_in_group("enemy"):
 			var enemy := child as CharacterBody2D
-			enemy.set("activation_managed", true)
+			enemy.set("activation_managed", false)
+			enemy.set_physics_process(true)
+			enemy.set_process(true)
 			_managed_encounters.append(enemy)
-	_update_encounter_culling()
+	# No enemy process culling: patrol e wake restano affidabili.
 
 
 func _update_encounter_culling() -> void:
+	# Dogana ha pochi encounter: niente culling del process, che spezzava patrol e wake.
+	for enemy in _managed_encounters:
+		if not is_instance_valid(enemy):
+			continue
+		var is_dead := int(enemy.get("state")) == 2
+		enemy.visible = not is_dead
+		if not is_dead:
+			enemy.set_physics_process(true)
+			enemy.set_process(true)
+	return
 	if _player == null:
 		return
-	var player_in_palace := _player.global_position.y < -100.0
+	var player_in_salute := _player.global_position.y < -100.0
 	for enemy in _managed_encounters:
 		if not is_instance_valid(enemy):
 			continue
 		var dead := int(enemy.get("state")) == 2
-		var near_player := enemy.global_position.distance_squared_to(_player.global_position) <= 1100.0 * 1100.0
-		var active := not dead and near_player and not player_in_palace
-		enemy.set_physics_process(active)
-		enemy.set_process(active)
+		var dist_sq := enemy.global_position.distance_squared_to(_player.global_position)
+		var near_player := dist_sq <= 1600.0 * 1600.0
+		# Con 11 encounter il culling dell'AI non porta un vantaggio reale, ma può congelare
+		# un enemy appena entra in camera. L'AI di Dogana resta quindi sempre attiva fuori dal palazzo.
+		var active := not dead and not player_in_salute
 		if dead:
 			enemy.visible = false
-			enemy.process_mode = Node.PROCESS_MODE_DISABLED
-		elif active:
-			enemy.visible = true
+			enemy.set_physics_process(false)
+			enemy.set_process(false)
+			continue
+		enemy.visible = near_player or dist_sq <= 2200.0 * 2200.0
+		enemy.set_physics_process(active)
+		enemy.set_process(active)
+		if active:
 			enemy.process_mode = Node.PROCESS_MODE_INHERIT
-			# Quando rientra in range, assicurati che possa muoversi (patrol/aggro).
 			if int(enemy.get("state")) == 0:
 				var vel: Variant = enemy.get("velocity")
 				if vel is Vector2 and absf((vel as Vector2).x) < 1.0:
 					enemy.set("_patrol_dir", 1.0 if randf() < 0.5 else -1.0)
+					enemy.set("velocity", Vector2(
+						float(enemy.get("_patrol_dir")) * float(enemy.get("move_speed")) * 0.55,
+						(vel as Vector2).y
+					))
 		else:
-			enemy.visible = false
-			enemy.process_mode = Node.PROCESS_MODE_DISABLED
+			enemy.process_mode = Node.PROCESS_MODE_INHERIT
 
 
 func _update_water_culling() -> void:
 	if _player == null:
 		return
-	var player_in_palace := _player.global_position.y < -100.0
+	var player_in_salute := _player.global_position.y < -100.0
 	for water in _managed_waters:
 		if not is_instance_valid(water) or not water.has_method("get_water_bounds_global_rect"):
 			continue
@@ -251,7 +280,7 @@ func _update_water_culling() -> void:
 		)
 		water.process_mode = (
 			Node.PROCESS_MODE_INHERIT
-			if near_horizontal and not player_in_palace
+			if near_horizontal and not player_in_salute
 			else Node.PROCESS_MODE_DISABLED
 		)
 
@@ -267,6 +296,11 @@ func _on_finish_entered(body: Node2D) -> void:
 func _on_interactable_entered(body: Node2D, interactable: Area2D) -> void:
 	if body != _player:
 		return
+	var enabled_region := str(interactable.get_meta("enabled_region", ""))
+	if enabled_region == "surface" and _player.global_position.y < -100.0:
+		return
+	if enabled_region == "interior" and _player.global_position.y >= -100.0:
+		return
 	_nearby_interactable = interactable
 	_set_interactable_aura(interactable, true)
 	DoganaFx.burst(
@@ -279,8 +313,6 @@ func _on_interactable_entered(body: Node2D, interactable: Area2D) -> void:
 		32.0,
 		0.4
 	)
-	var prompt := str(interactable.get_meta("prompt", "[E] Interagisci"))
-	_show_message(prompt)
 
 
 func _on_interactable_exited(body: Node2D, interactable: Area2D) -> void:
@@ -293,16 +325,13 @@ func _activate_interactable(interactable: Area2D) -> void:
 	var action := str(interactable.get_meta("action", "lore"))
 	var origin := interactable.global_position + Vector2(0, -24)
 	var scene := get_tree().current_scene
-	if action == "open_gate":
-		_open_canal_gate(interactable)
-		DoganaFx.pulse_ring(scene, origin, Color(0.45, 0.9, 0.85, 0.9))
-		DoganaFx.burst(scene, origin, Color(0.4, 0.95, 0.85, 0.9), 16, Vector2.UP, 30.0, 100.0, 0.7)
-	elif action in ["palace_enter", "palace_exit", "palace_lift"]:
-		_use_palace_passage(interactable)
-	elif action == "palace_seal":
-		_collect_palace_seal(interactable)
-		DoganaFx.pulse_ring(scene, origin, Color(0.95, 0.8, 0.35, 0.95))
-		DoganaFx.burst(scene, origin, Color(0.95, 0.78, 0.35, 0.95), 18, Vector2.UP, 35.0, 110.0, 0.75)
+	if action in ["salute_enter", "salute_exit"]:
+		_use_salute_passage(interactable)
+	elif action == "read" or action == "lore":
+		_open_lore(
+			str(interactable.get_meta("entry_title", interactable.get_meta("prompt", "Registro"))),
+			str(interactable.get_meta("message", "Le pagine sono illeggibili."))
+		)
 	elif action == "bell":
 		var camera := get_tree().get_first_node_in_group("camera")
 		if camera and camera.has_method("add_shake"):
@@ -313,7 +342,10 @@ func _activate_interactable(interactable: Area2D) -> void:
 	else:
 		DoganaFx.pulse_ring(scene, origin, Color(0.55, 0.85, 0.8, 0.75))
 		DoganaFx.burst(scene, origin, Color(0.7, 0.9, 0.85, 0.8), 10, Vector2.UP, 18.0, 55.0, 0.55)
-		_show_message(str(interactable.get_meta("message", "Le pietre conservano una storia dimenticata.")))
+		_open_lore(
+			str(interactable.get_meta("entry_title", interactable.get_meta("prompt", "Memoria"))),
+			str(interactable.get_meta("message", "Le pietre conservano una storia dimenticata."))
+		)
 
 
 func _set_interactable_aura(interactable: Area2D, on: bool) -> void:
@@ -326,32 +358,34 @@ func _set_interactable_aura(interactable: Area2D, on: bool) -> void:
 			7
 		)
 	aura.emitting = on
+	_set_interactable_mark(interactable, on)
 
 
-func _open_canal_gate(interactable: Area2D) -> void:
-	if interactable.get_meta("activated", false):
-		_show_message("IL PASSAGGIO DEL CANALE È APERTO")
-		return
-	if not _has_palace_seal:
-		_show_message("LA PARATIA È SIGILLATA  •  TROVA IL SIGILLO NEL PALAZZO DEI TRIBUTI")
-		return
-	interactable.set_meta("activated", true)
-	var gate := get_node_or_null("Gameplay/Geometry/CanalGate") as StaticBody2D
-	if gate:
-		var collision := gate.get_node_or_null("CollisionShape2D") as CollisionShape2D
-		if collision:
-			collision.set_deferred("disabled", true)
-		var tween := create_tween().set_parallel(true)
-		tween.tween_property(gate, "position:y", gate.position.y - 820.0, 0.9).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN_OUT)
-		tween.tween_property(gate, "modulate:a", 0.42, 0.9)
-	_mark_access_open("canal_gate")
-	var lever := interactable.get_node_or_null("Lever") as Node2D
-	if lever:
-		create_tween().tween_property(lever, "rotation", 0.8, 0.22)
-	_show_message("IL PASSAGGIO DEL CANALE È APERTO")
+## Al posto della scritta "[E] ...": un rombo di luce che ondeggia sopra
+## l'oggetto. Dice "qui si puo' agire" senza spiegare niente.
+func _set_interactable_mark(interactable: Area2D, on: bool) -> void:
+	var mark := interactable.get_node_or_null("ReadyMark") as Line2D
+	if mark == null:
+		if not on:
+			return
+		mark = Line2D.new()
+		mark.name = "ReadyMark"
+		mark.width = 1.6
+		mark.z_index = 40
+		mark.default_color = Color(0.88, 0.8, 0.52, 0.0)
+		mark.points = PackedVector2Array([
+			Vector2(0, -6), Vector2(5, 0), Vector2(0, 6), Vector2(-5, 0), Vector2(0, -6)
+		])
+		mark.position = Vector2(0, -36)
+		interactable.add_child(mark)
+		var bob := mark.create_tween().set_loops()
+		bob.tween_property(mark, "position:y", -42.0, 1.3).set_trans(Tween.TRANS_SINE)
+		bob.tween_property(mark, "position:y", -36.0, 1.3).set_trans(Tween.TRANS_SINE)
+	var fade := mark.create_tween()
+	fade.tween_property(mark, "default_color:a", 0.7 if on else 0.0, 0.3)
 
 
-func _use_palace_passage(interactable: Area2D) -> void:
+func _use_salute_passage(interactable: Area2D) -> void:
 	if not _player:
 		return
 	var target := interactable.get_meta("target_position", Vector2.ZERO) as Vector2
@@ -359,47 +393,64 @@ func _use_palace_passage(interactable: Area2D) -> void:
 		return
 	_player.global_position = target
 	_player.velocity = Vector2.ZERO
+	_nearby_interactable = null
+	_update_passage_availability(target.y < -100.0)
+	var location := get_node_or_null("Interface/Location") as Label
+	if location:
+		location.modulate.a = 0.0
 	var camera := _player.get_node_or_null("Camera2D") as Camera2D
 	if camera:
 		camera.reset_smoothing()
-	var palace := get_tree().get_first_node_in_group("dogana_vertical_palace")
-	if palace and palace.has_method("set_encounters_active"):
-		palace.call("set_encounters_active", target.y < -100.0)
 	if target.y < -100.0:
-		_mark_region_discovered("palace")
-		_mark_access_open("palace")
-		_show_message("PALAZZO DEI TRIBUTI  •  IL PERCORSO PROSEGUE VERSO L'ALTO")
+		_mark_region_discovered("salute")
+		_mark_access_open("salute")
+		_show_message("SANTA MARIA DELLA SALUTE  •  IL CUSTODE ATTENDE NELLA NAVE")
 	else:
-		_show_message("RITORNO ALLA DOGANA DA MAR")
+		_show_message("RITORNO SUL SAGRATO DELLA SALUTE")
 
 
-func _collect_palace_seal(interactable: Area2D) -> void:
-	if _has_palace_seal:
-		_show_message("IL SIGILLO DELLE MAREE È GIÀ TUO")
+func _update_passage_availability(inside: bool) -> void:
+	for passage in get_tree().get_nodes_in_group("dogana_salute_passage"):
+		if not (passage is Area2D):
+			continue
+		var enabled_region := str(passage.get_meta("enabled_region", ""))
+		var enabled := (enabled_region == "interior") == inside
+		# Mentre il Custode e' sveglio la nave e' un'arena chiusa: la porta di
+		# ritorno non deve offrire una via di fuga a costo zero.
+		if _boss_arena_locked and enabled_region == "interior":
+			enabled = false
+		(passage as Area2D).monitoring = enabled
+		(passage as Area2D).monitorable = enabled
+
+
+func _player_is_inside_nave() -> bool:
+	return _player != null and is_instance_valid(_player) and _player.global_position.y < -100.0
+
+
+## I sigilli vivono nella nave insieme al boss: prima erano rimasti sul sagrato
+## esterno, quindi l'arena non si chiudeva mai davvero.
+func _set_boss_arena_sealed(sealed: bool) -> void:
+	_boss_arena_locked = sealed
+	for seal in get_tree().get_nodes_in_group("dogana_boss_seal"):
+		var collision := (seal as Node).get_node_or_null("CollisionShape2D") as CollisionShape2D
+		if collision:
+			collision.set_deferred("disabled", not sealed)
+		if seal is CanvasItem:
+			(seal as CanvasItem).modulate.a = 1.0
+	_update_passage_availability(_player_is_inside_nave())
+
+
+func _reset_boss_encounter() -> void:
+	if _boss_is_defeated:
 		return
-	_has_palace_seal = true
-	interactable.set_meta("activated", true)
-	interactable.set_meta("prompt", "[E] Il Sigillo delle Maree è stato recuperato")
-	var collision := interactable.get_node_or_null("CollisionShape2D") as CollisionShape2D
-	if collision:
-		collision.set_deferred("disabled", true)
-	var gate_lever := get_node_or_null("Gameplay/Interactions/GateLever") as Area2D
-	if gate_lever:
-		gate_lever.set_meta("prompt", "[E] Usa il Sigillo e solleva la paratia")
-	_mark_region_discovered("palace")
-	_save_graces()
-	_show_message("SIGILLO DELLE MAREE OTTENUTO  •  LA PARATIA PUÒ ESSERE APERTA")
+	_set_boss_arena_sealed(false)
+	for boss in get_tree().get_nodes_in_group("dogana_boss"):
+		if boss.has_method("reset_encounter"):
+			boss.call("reset_encounter")
 
 
 func _on_boss_awakened() -> void:
-	var entrance_seal := get_node_or_null("Gameplay/Geometry/BossArena/EntranceSeal") as StaticBody2D
-	if entrance_seal:
-		var seal_collision := entrance_seal.get_node_or_null("CollisionShape2D") as CollisionShape2D
-		if seal_collision:
-			seal_collision.set_deferred("disabled", false)
-		var seal_visual := entrance_seal.get_node_or_null("Visual") as CanvasItem
-		if seal_visual:
-			create_tween().tween_property(seal_visual, "modulate:a", 1.0, 0.28)
+	_set_boss_arena_sealed(true)
 	_show_message("IL CUSTODE SOMMERSO RISCOSSA IL SUO TRIBUTO")
 
 
@@ -410,20 +461,7 @@ func _on_boss_defeated() -> void:
 	_grab_hook_unlocked = true
 	_apply_grab_hook_unlock()
 	_save_graces()
-	var entrance_seal := get_node_or_null("Gameplay/Geometry/BossArena/EntranceSeal") as StaticBody2D
-	if entrance_seal:
-		var seal_collision := entrance_seal.get_node_or_null("CollisionShape2D") as CollisionShape2D
-		if seal_collision:
-			seal_collision.set_deferred("disabled", true)
-		var seal_visual := entrance_seal.get_node_or_null("Visual") as CanvasItem
-		if seal_visual:
-			create_tween().tween_property(seal_visual, "modulate:a", 0.0, 0.45)
-	var exit_wall := get_node_or_null("Gameplay/Geometry/BossArena/ExitWall") as StaticBody2D
-	if exit_wall:
-		var wall_collision := exit_wall.get_node_or_null("CollisionShape2D") as CollisionShape2D
-		if wall_collision:
-			wall_collision.set_deferred("disabled", true)
-		create_tween().tween_property(exit_wall, "modulate:a", 0.0, 0.7)
+	_set_boss_arena_sealed(false)
 	var finish := get_node_or_null("Gameplay/FortunaSummit") as Area2D
 	if finish:
 		var finish_collision := finish.get_node_or_null("CollisionShape2D") as CollisionShape2D
@@ -431,50 +469,6 @@ func _on_boss_defeated() -> void:
 			finish_collision.set_deferred("disabled", false)
 		finish.set_deferred("monitoring", true)
 	_show_message("CUSTODE SCONFITTO  •  OTTENUTO AMO DEL TRASCINAMENTO [C]")
-
-
-func _on_hidden_area_entered(body: Node2D, hidden_area: Area2D) -> void:
-	if body != _player:
-		return
-	_reveal_hidden_area(hidden_area)
-
-
-func _reveal_hidden_area(hidden_area: Area2D) -> void:
-	if hidden_area.get_meta("revealed", false):
-		return
-	hidden_area.set_meta("revealed", true)
-	var veil := hidden_area.get_node_or_null("Veil") as CanvasItem
-	if veil:
-		create_tween().tween_property(veil, "modulate:a", 0.0, 0.55)
-	var secret_id := str(hidden_area.get_meta("secret_id", "archive"))
-	_mark_access_open(secret_id)
-	for artwork in get_tree().get_nodes_in_group("dogana_secret_artwork"):
-		if str(artwork.get_meta("secret_id", "")) == secret_id:
-			create_tween().tween_property(artwork, "modulate:a", 0.9, 0.8)
-	_mark_region_discovered(secret_id)
-	var secret_names := {
-		"archive": "ARCHIVIO SOMMERSO",
-		"ossuary": "OSSARIO DELLA FORTUNA",
-		"palace_vault": "CAVEAU PROIBITO DEI TRIBUTI",
-	}
-	var secret_name := str(secret_names.get(secret_id, "STANZA DIMENTICATA"))
-	_show_message("PASSAGGIO SEGRETO — " + secret_name)
-
-
-func _on_secret_wall_broken(wall: Node2D) -> void:
-	var access_id := str(wall.get_meta("secret_id", ""))
-	if access_id.is_empty():
-		access_id = "ossuary" if wall.global_position.x > 3500.0 else "archive"
-	_mark_access_open(access_id)
-	# Rompere il muro apre il velo subito: il passaggio deve leggersi.
-	for hidden_area in get_tree().get_nodes_in_group("dogana_hidden_reveal"):
-		if not hidden_area is Area2D:
-			continue
-		if str(hidden_area.get_meta("secret_id", "")) != access_id:
-			continue
-		_reveal_hidden_area(hidden_area as Area2D)
-		return
-	_show_message("UN VARCO NASCOSTO SI È APERTO")
 
 
 func _mark_access_open(access_id: String) -> void:
@@ -487,8 +481,6 @@ func _on_grace_entered(body: Node2D, grace: Area2D) -> void:
 	if body != _player:
 		return
 	_nearby_grace = grace
-	var verb := "Riposa" if bool(grace.get("activated")) else "Risveglia"
-	_show_message("[E] %s — %s" % [verb, str(grace.get("display_name"))])
 
 
 func _on_grace_exited(body: Node2D, grace: Area2D) -> void:
@@ -506,6 +498,8 @@ func _activate_grace(grace: Area2D, show_message := true) -> void:
 	_apply_respawn(grace.call("get_respawn_position"))
 	if _player.has_method("heal"):
 		_player.call("heal", int(_player.get("max_health")))
+	if show_message:
+		_reset_enemies_at_grace()
 	_save_graces()
 	_sync_map()
 	if show_message:
@@ -557,19 +551,28 @@ func _sync_map() -> void:
 		map.call("configure_regions", _discovered_regions)
 
 
-func _on_fast_travel_requested(site_id: String) -> void:
-	if not bool(_activated_graces.get(site_id, false)):
+func _on_fast_travel_requested(site_id: String, debug_unlock := false) -> void:
+	if not bool(_activated_graces.get(site_id, false)) and not debug_unlock:
 		return
 	var grace := _grace_sites.get(site_id) as Area2D
 	if not grace:
 		return
 	var travel := func() -> void:
+		if debug_unlock:
+			_activated_graces[site_id] = true
+			grace.call("set_activated", true)
+			_save_graces()
 		_current_grace = site_id
 		_player.global_position = grace.call("get_respawn_position")
 		_player.velocity = Vector2.ZERO
 		_activate_grace(grace, false)
-		_show_message("VIAGGIO  •  %s" % str(grace.get("display_name")).to_upper())
-	if autoload_transition and autoload_transition.has_method("transition_with_callback"):
+		_sync_map()
+		_show_message("DEBUG - VIAGGIO ALLA GRAZIA - %s" % str(grace.get("display_name")).to_upper())
+	if debug_unlock:
+		# Il percorso debug deve essere immediato e deterministico anche con scena
+		# in pausa; evita che una dissolvenza editoriale trattenga il callback.
+		travel.call()
+	elif autoload_transition and autoload_transition.has_method("transition_with_callback"):
 		autoload_transition.call("transition_with_callback", travel)
 	else:
 		travel.call()
@@ -583,10 +586,9 @@ func _load_graces() -> void:
 	for site_id in ["pontile", "dogana", "fortuna"]:
 		if bool(config.get_value("graces", site_id, false)):
 			_activated_graces[site_id] = true
-	for region_id in ["arrival", "customs", "palace", "canal", "fortuna", "salute", "archive", "ossuary", "palace_vault"]:
+	for region_id in ["arrival", "customs", "canal", "fortuna", "salute"]:
 		if bool(config.get_value("map", region_id, region_id == "arrival")):
 			_discovered_regions[region_id] = true
-	_has_palace_seal = bool(config.get_value("progress", "palace_seal", false))
 	_grab_hook_unlocked = bool(config.get_value("progress", "grab_hook_unlocked", false))
 	_boss_is_defeated = bool(config.get_value("progress", "boss_defeated", false))
 
@@ -598,27 +600,11 @@ func _save_graces() -> void:
 	config.set_value("graces", "current", _current_grace)
 	for site_id in ["pontile", "dogana", "fortuna"]:
 		config.set_value("graces", site_id, bool(_activated_graces.get(site_id, false)))
-	for region_id in ["arrival", "customs", "palace", "canal", "fortuna", "salute", "archive", "ossuary", "palace_vault"]:
+	for region_id in ["arrival", "customs", "canal", "fortuna", "salute"]:
 		config.set_value("map", region_id, bool(_discovered_regions.get(region_id, false)))
-	config.set_value("progress", "palace_seal", _has_palace_seal)
 	config.set_value("progress", "grab_hook_unlocked", _grab_hook_unlocked)
 	config.set_value("progress", "boss_defeated", _boss_is_defeated)
 	config.save(GRACE_SAVE_PATH)
-
-
-func _restore_palace_progress() -> void:
-	if not _has_palace_seal:
-		return
-	var palace_seal := get_node_or_null("Gameplay/VerticalPalace/PalaceSeal") as Area2D
-	if palace_seal:
-		palace_seal.set_meta("activated", true)
-		palace_seal.set_meta("prompt", "[E] Il Sigillo delle Maree è stato recuperato")
-		var collision := palace_seal.get_node_or_null("CollisionShape2D") as CollisionShape2D
-		if collision:
-			collision.set_deferred("disabled", true)
-	var gate_lever := get_node_or_null("Gameplay/Interactions/GateLever") as Area2D
-	if gate_lever:
-		gate_lever.set_meta("prompt", "[E] Usa il Sigillo e solleva la paratia")
 
 
 func _restore_boss_progress() -> void:
@@ -627,14 +613,7 @@ func _restore_boss_progress() -> void:
 	for boss in get_tree().get_nodes_in_group("dogana_boss"):
 		if boss.has_method("restore_defeated"):
 			boss.call("restore_defeated")
-	var entrance_seal := get_node_or_null("Gameplay/Geometry/BossArena/EntranceSeal") as StaticBody2D
-	if entrance_seal:
-		var collision := entrance_seal.get_node_or_null("CollisionShape2D") as CollisionShape2D
-		if collision:
-			collision.set_deferred("disabled", true)
-		var visual := entrance_seal.get_node_or_null("Visual") as CanvasItem
-		if visual:
-			visual.hide()
+	_set_boss_arena_sealed(false)
 
 
 func _apply_grab_hook_unlock() -> void:
@@ -647,12 +626,8 @@ func _on_locked_skill_requested() -> void:
 
 
 func _get_player_region(world_position: Vector2) -> String:
-	if world_position.y < -100.0 and world_position.x > 2000.0 and world_position.x < 3340.0:
-		return "palace"
-	if world_position.y > 620.0 and world_position.x > 1080.0 and world_position.x < 2160.0:
-		return "archive"
-	if world_position.y < 265.0 and world_position.x > 3580.0 and world_position.x < 4070.0:
-		return "ossuary"
+	if world_position.y < -100.0 and world_position.x > 4000.0:
+		return "salute"
 	if world_position.x < 1200.0:
 		return "arrival"
 	if world_position.x < 2850.0:
@@ -672,20 +647,6 @@ func _mark_region_discovered(region_id: String) -> void:
 	_discovered_regions[region_id] = true
 	_save_graces()
 	_sync_map()
-
-
-func _restore_discovered_artwork() -> void:
-	for artwork in get_tree().get_nodes_in_group("dogana_secret_artwork"):
-		var secret_id := str(artwork.get_meta("secret_id", ""))
-		if bool(_discovered_regions.get(secret_id, false)):
-			artwork.modulate.a = 0.9
-	for hidden_area in get_tree().get_nodes_in_group("dogana_hidden_reveal"):
-		var secret_id := str(hidden_area.get_meta("secret_id", ""))
-		if bool(_discovered_regions.get(secret_id, false)):
-			hidden_area.set_meta("revealed", true)
-			var veil := hidden_area.get_node_or_null("Veil") as CanvasItem
-			if veil:
-				veil.modulate.a = 0.0
 
 
 func get_current_grace_name() -> String:
@@ -718,6 +679,14 @@ func _notify_region_music() -> void:
 					boss_alive = true
 					break
 		director.call("set_boss_active", boss_alive and _last_region == "salute")
+
+
+func _open_lore(title: String, body: String) -> void:
+	var reader := get_node_or_null("LoreReader")
+	if reader and reader.has_method("show_entry"):
+		reader.call("show_entry", title, body)
+	else:
+		_show_message(body)
 
 
 func _show_message(text: String) -> void:

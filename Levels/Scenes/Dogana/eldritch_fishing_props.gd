@@ -12,7 +12,7 @@ var _redraw_accumulator := 0.0
 
 
 func _ready() -> void:
-	z_index = 2
+	z_index = -2
 
 
 func _process(delta: float) -> void:
@@ -27,8 +27,6 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	_draw_secret_glyph(Vector2(1984, 756), 0.8)
-	_draw_secret_glyph(Vector2(4066, 145), 0.68)
 	_draw_motes()
 
 
@@ -123,12 +121,14 @@ func _draw_secret_glyph(at: Vector2, prop_scale: float) -> void:
 
 
 func _draw_motes() -> void:
-	for index in 18:
+	# Riflessi minuti confinati all'acqua: non devono sembrare oggetti sospesi
+	# davanti a tetti e facciate.
+	for index in 10:
 		var seed := float(index * 379)
 		var x := 650.0 + fmod(seed * 7.13, 3700.0)
-		var y := 120.0 + fmod(seed * 3.71, 650.0) + sin(_time * 0.7 + index) * 15.0
-		var alpha := 0.2 + (sin(_time * 1.8 + index * 2.1) + 1.0) * 0.16
-		draw_circle(Vector2(x, y), 1.5 + float(index % 3), Color(GLOW, alpha))
+		var y := 585.0 + fmod(seed * 3.71, 115.0) + sin(_time * 0.7 + index) * 5.0
+		var alpha := 0.05 + (sin(_time * 1.8 + index * 2.1) + 1.0) * 0.035
+		draw_circle(Vector2(x, y), 1.0 + float(index % 2), Color(GLOW, alpha))
 
 
 func _create_lantern_light(at: Vector2, energy: float) -> void:

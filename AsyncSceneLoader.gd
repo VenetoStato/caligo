@@ -129,6 +129,9 @@ func _finish_loading() -> void:
 		await get_tree().create_timer(remaining, true, false, true).timeout
 	_progress.value = 100.0
 	_status.text = "COSTRUENDO LE ULTIME LUCI…"
+	# Copertura piena prima del swap scena: niente frame di clear-color.
+	_overlay.visible = true
+	_overlay.modulate.a = 1.0
 	var error := get_tree().change_scene_to_packed(packed)
 	if error != OK:
 		_fail("Impossibile aprire la scena (%s)." % error_string(error))
@@ -136,8 +139,9 @@ func _finish_loading() -> void:
 	for _frame in READY_FRAMES:
 		await get_tree().process_frame
 	await get_tree().physics_frame
-	_status.text = "LA DOGANA È PRONTA"
 	await get_tree().process_frame
+	_status.text = "LA DOGANA È PRONTA"
+	await get_tree().create_timer(0.12, true, false, true).timeout
 	var tween := create_tween()
 	tween.tween_property(_overlay, "modulate:a", 0.0, OVERLAY_FADE_OUT).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 	await tween.finished

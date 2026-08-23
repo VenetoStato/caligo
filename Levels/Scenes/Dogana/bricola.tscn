@@ -3,16 +3,21 @@
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/bricola.svg" id="1_bricola"]
 
 [sub_resource type="RectangleShape2D" id="BricolaCollision"]
-size = Vector2(48, 278)
+size = Vector2(48, 460)
 
 [node name="Bricola" type="StaticBody2D" groups=["dogana_bricole", "dogana_geometry"]]
-collision_layer = 1
-collision_mask = 2
+z_index = -3
+collision_layer = 0
+collision_mask = 0
+metadata/seabed_anchored = true
+metadata/visual_top_y = -500.0
+metadata/visual_bottom_y = 0.0
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
-position = Vector2(0, -137)
+position = Vector2(0, -250)
+modulate = Color(0.88, 0.9, 0.87, 0.95)
 texture = ExtResource("1_bricola")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(0, -126)
+position = Vector2(0, -230)
 shape = SubResource("BricolaCollision")

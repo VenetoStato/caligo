@@ -105,8 +105,7 @@ pivot_offset = Vector2(500, 310)
 theme_override_styles/panel = SubResource("FrameStyle")
 
 [node name="Title" type="Label" parent="Overlay/Frame"]
-layout_mode = 0
-offset_left = 80.0
+offset_left = 270.0
 offset_top = 14.0
 offset_right = 920.0
 offset_bottom = 52.0
@@ -114,21 +113,29 @@ theme_override_colors/font_color = Color(0.9, 0.79, 0.52, 1)
 theme_override_font_sizes/font_size = 28
 text = "CARTA DELLA PUNTA DELLA DOGANA"
 horizontal_alignment = 1
-vertical_alignment = 0
 
 [node name="Subtitle" type="Label" parent="Overlay/Frame"]
-layout_mode = 0
 offset_left = 80.0
-offset_top = 38.0
+offset_top = 42.0
 offset_right = 920.0
 offset_bottom = 68.0
 theme_override_colors/font_color = Color(0.56, 0.75, 0.74, 0.8)
 theme_override_font_sizes/font_size = 14
-text = "LA CARTA SI COMPLETA MENTRE ESPLORI • I PASSAGGI SEGRETI APPAIONO SOLO DOPO LA SCOPERTA"
+text = "VISTA LATERALE - DALLA PUNTA ALLA BASILICA DELLA SALUTE"
 horizontal_alignment = 1
 
+[node name="DebugTravel" type="CheckButton" parent="Overlay/Frame"]
+offset_left = 34.0
+offset_top = 16.0
+offset_right = 265.0
+offset_bottom = 54.0
+theme_override_colors/font_color = Color(0.72, 0.95, 0.86, 0.94)
+theme_override_colors/font_pressed_color = Color(0.95, 0.8, 0.42, 1)
+theme_override_font_sizes/font_size = 13
+text = "DEBUG: VIAGGIO GRAZIE"
+tooltip_text = "Se attivo, rende cliccabili anche le Grazie non ancora scoperte."
+
 [node name="MapCanvas" type="Control" parent="Overlay/Frame"]
-layout_mode = 0
 offset_left = 26.0
 offset_top = 72.0
 offset_right = 974.0
@@ -138,10 +145,10 @@ script = ExtResource("2_canvas")
 
 [node name="Pontile" type="Button" parent="Overlay/Frame/MapCanvas"]
 layout_mode = 1
-anchor_left = 0.12
-anchor_top = 0.64
-anchor_right = 0.12
-anchor_bottom = 0.64
+anchor_left = 0.145
+anchor_top = 0.865
+anchor_right = 0.145
+anchor_bottom = 0.865
 offset_left = -57.0
 offset_top = -29.0
 offset_right = 57.0
@@ -153,15 +160,14 @@ theme_override_styles/normal = SubResource("SiteStyle")
 theme_override_styles/hover = SubResource("SiteHover")
 theme_override_styles/pressed = SubResource("SiteHover")
 theme_override_styles/disabled = SubResource("SiteDisabled")
-text = "✦
-PONTILE"
+text = "GRAZIA\nPONTILE"
 
 [node name="Dogana" type="Button" parent="Overlay/Frame/MapCanvas"]
 layout_mode = 1
-anchor_left = 0.54
-anchor_top = 0.5
-anchor_right = 0.54
-anchor_bottom = 0.5
+anchor_left = 0.365
+anchor_top = 0.865
+anchor_right = 0.365
+anchor_bottom = 0.865
 offset_left = -57.0
 offset_top = -29.0
 offset_right = 57.0
@@ -173,15 +179,14 @@ theme_override_styles/normal = SubResource("SiteStyle")
 theme_override_styles/hover = SubResource("SiteHover")
 theme_override_styles/pressed = SubResource("SiteHover")
 theme_override_styles/disabled = SubResource("SiteDisabled")
-text = "✦
-DOGANA"
+text = "GRAZIA\nDOGANA"
 
 [node name="Fortuna" type="Button" parent="Overlay/Frame/MapCanvas"]
 layout_mode = 1
-anchor_left = 0.87
-anchor_top = 0.32
-anchor_right = 0.87
-anchor_bottom = 0.32
+anchor_left = 0.74
+anchor_top = 0.865
+anchor_right = 0.74
+anchor_bottom = 0.865
 offset_left = -57.0
 offset_top = -29.0
 offset_right = 57.0
@@ -193,24 +198,21 @@ theme_override_styles/normal = SubResource("SiteStyle")
 theme_override_styles/hover = SubResource("SiteHover")
 theme_override_styles/pressed = SubResource("SiteHover")
 theme_override_styles/disabled = SubResource("SiteDisabled")
-text = "✦
-FORTUNA"
+text = "GRAZIA\nFORTUNA"
 
 [node name="Status" type="Label" parent="Overlay/Frame"]
-layout_mode = 0
 offset_left = 80.0
 offset_top = 568.0
 offset_right = 920.0
 offset_bottom = 602.0
 theme_override_colors/font_color = Color(0.65, 0.77, 0.73, 0.88)
 theme_override_font_sizes/font_size = 14
-text = "✦ Altare attivo  •  ● Posizione  •  Tratto turchese: passaggio segreto scoperto"
+text = "Grazia attiva - posizione - linea turchese: percorso sul waterfront"
 horizontal_alignment = 1
 
 [node name="Close" type="Button" parent="Overlay/Frame"]
-layout_mode = 0
 offset_left = 940.0
 offset_top = 14.0
 offset_right = 980.0
 offset_bottom = 54.0
-text = "×"
+text = "X"

@@ -14,7 +14,6 @@
   <rect width="1280" height="720" fill="url(#sky)"/>
   <path d="M0 268 C190 214 302 318 488 263 S831 222 1025 286 S1190 242 1280 254 V420 H0Z" fill="#718090" opacity=".16"/>
   <path d="M0 350 C230 307 348 388 590 340 S1020 315 1280 368 V476 H0Z" fill="url(#mist)"/>
-  <circle cx="1010" cy="154" r="50" fill="#e9d9b8" opacity=".35"/>
   <g fill="#17212a" opacity=".88">
     <path d="M0 474h132v-42h18v42h100v-21h20v21h144v-64h18v64h182v-30h18v30h160v-52h22v52h170v-28h17v28h129v246H0Z"/>
     <path d="M70 474v-92h12v-31h12v31h12v92M315 474v-106h12v-42h14v42h12v106M905 474v-84h12v-50h13v50h12v84"/>

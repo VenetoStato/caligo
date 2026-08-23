@@ -2,6 +2,62 @@
   "_readme": "Drop PNG files with these exact names into ArtistDrop/, then run: python tools/sync_artist_drop.py",
   "slots": [
     {
+      "file": "00a_torre_fortuna.png",
+      "dest": "Landscape/Dogana/Generated/module_torre_fortuna.png",
+      "profile": "torre_fortuna",
+      "size": [1374, 1145],
+      "kind": "architecture",
+      "notes": "Modulo Punta/Torre. PNG trasparente, piede sul bordo inferiore, vista laterale."
+    },
+    {
+      "file": "00b_dogana_ovest.png",
+      "dest": "Landscape/Dogana/Generated/module_dogana_ovest.png",
+      "profile": "dogana_ovest",
+      "size": [1983, 793],
+      "kind": "architecture",
+      "notes": "Ala ovest Dogana. PNG trasparente; giunti verticali puliti ai bordi."
+    },
+    {
+      "file": "00c_dogana_est.png",
+      "dest": "Landscape/Dogana/Generated/module_dogana_est.png",
+      "profile": "dogana_est",
+      "size": [1983, 793],
+      "kind": "architecture",
+      "notes": "Ala est Dogana. Slot indipendente dall'ala ovest."
+    },
+    {
+      "file": "00d_seminario.png",
+      "dest": "Landscape/Dogana/Generated/module_seminario.png",
+      "profile": "seminario",
+      "size": [1536, 1024],
+      "kind": "architecture",
+      "notes": "Blocco Seminario. PNG trasparente e accessi appoggiati alla baseline."
+    },
+    {
+      "file": "00e_collegamento_salute.png",
+      "dest": "Landscape/Dogana/Generated/module_collegamento_salute.png",
+      "profile": "collegamento_salute",
+      "size": [1774, 887],
+      "kind": "architecture",
+      "notes": "Passaggio basso tra Seminario e Salute. Arco attraversabile visivamente."
+    },
+    {
+      "file": "00f_salute.png",
+      "dest": "Landscape/Dogana/Generated/module_salute.png",
+      "profile": "salute",
+      "size": [1983, 793],
+      "kind": "architecture",
+      "notes": "Santa Maria della Salute / arena boss. Cupola completa, PNG trasparente."
+    },
+    {
+      "file": "00g_salute_interior.png",
+      "dest": "Landscape/Dogana/Generated/salute_interior_v2.png",
+      "profile": "salute_interior",
+      "size": [1774, 887],
+      "kind": "interior",
+      "notes": "Navata laterale della Salute. Mantieni il pavimento continuo sulla baseline; collisioni e boss separati."
+    },
+    {
       "file": "01_arrival.png",
       "dest": "Landscape/Dogana/Illustrated/arrival.png",
       "profile": "arrival_background",
@@ -32,14 +88,6 @@
       "size": [1536, 1024],
       "kind": "background",
       "notes": "Torre Atlante / Fortuna."
-    },
-    {
-      "file": "05_archive.png",
-      "dest": "Landscape/Dogana/Illustrated/archive.png",
-      "profile": "archive_background",
-      "size": [1536, 1024],
-      "kind": "background",
-      "notes": "Archivio segreto / ossario."
     },
     {
       "file": "10_quay_platform.png",

@@ -72,6 +72,11 @@ func _ready():
 	body_entered.connect(_on_body_entered)
 
 func _on_body_entered(body: Node2D) -> void:
+	# L'amo da trascino morde la pietra dove tocca. Prima restava sospeso a
+	# mezz'aria finche' non premevi G, e l'appiglio sembrava finto.
+	if hook_type == "grab" and not is_anchored and _is_grabbable(body):
+		_bite_surface()
+		return
 	# Hook (grab) fa danno ai nemici e spinge il dead gamberetto
 	if body.is_in_group("enemy"):
 		if body.has_method("take_damage") and player_ref != null:
@@ -90,6 +95,23 @@ func _on_body_entered(body: Node2D) -> void:
 			dir = dir.normalized()
 			body.apply_central_impulse(dir * 520.0)
 			body.apply_torque_impulse(sign(dir.x) * 220.0)
+
+func _is_grabbable(body: Node2D) -> bool:
+	if body.is_in_group("dogana_grapple_point"):
+		return true
+	if body.is_in_group("enemy") or body.is_in_group("dead_enemy"):
+		return false
+	return body is StaticBody2D or body is TileMap
+
+
+func _bite_surface() -> void:
+	is_anchored = true
+	freeze = true
+	linear_velocity = Vector2.ZERO
+	angular_velocity = 0.0
+	if player_ref != null and player_ref.has_method("on_grab_hook_anchored"):
+		player_ref.call("on_grab_hook_anchored", self)
+
 
 func _find_sprite():
 	if sprite_node_name != "":

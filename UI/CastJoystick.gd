@@ -111,16 +111,16 @@ func _draw() -> void:
 	var cen := _center
 	# Base circolare
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.025, 0.1, 0.15, 0.5)
-	style.border_color = Color(0.88, 0.74, 0.32, 0.68)
-	style.set_border_width_all(3)
+	style.bg_color = Color(0.025, 0.09, 0.105, 0.2 if not _tracking else 0.5)
+	style.border_color = Color(0.72, 0.88, 0.8, 0.34 if not _tracking else 0.82)
+	style.set_border_width_all(1 if not _tracking else 2)
 	style.set_corner_radius_all(int(minf(r.x, r.y) / 2.0))
-	style.shadow_color = Color(0, 0, 0, 0.16)
-	style.shadow_size = 2
+	style.shadow_color = Color(0, 0, 0, 0.08)
+	style.shadow_size = 1
 	draw_style_box(style, Rect2(Vector2.ZERO, r))
 	# Icona lancio esca: canna + lenza + pallino (bobber)
 	var s := minf(r.x, r.y) * 0.22
-	var col := Color(1.0, 0.98, 0.88, 0.78)
+	var col := Color(0.84, 0.92, 0.88, 0.52 if not _tracking else 0.9)
 	# Canna: da manico a punta
 	var p0 := cen + Vector2(-s * 0.8, s * 0.6)
 	var p1 := cen + Vector2(s * 0.5, -s * 0.9)
@@ -134,5 +134,5 @@ func _draw() -> void:
 	if dir.length_squared() > 0.01:
 		var stick_len := (_center.length() - 4) * 0.9
 		var stick_end := cen + dir * stick_len
-		draw_line(cen, stick_end, Color(0.95, 0.85, 0.4, 0.78))
-		draw_circle(stick_end, 8, Color(0.95, 0.85, 0.5, 0.82))
+		draw_line(cen, stick_end, Color(0.84, 0.91, 0.72, 0.86), 2.0, true)
+		draw_circle(stick_end, maxf(5.0, minf(r.x, r.y) * 0.09), Color(0.88, 0.92, 0.72, 0.9))

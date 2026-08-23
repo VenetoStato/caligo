@@ -24,15 +24,20 @@ float hash(vec2 p) {
 	return fract(p.x * p.y);
 }
 
+vec2 gradient_dir(vec2 cell) {
+	float angle = hash(cell) * 6.28318530718;
+	return vec2(cos(angle), sin(angle));
+}
+
 float value_noise(vec2 uv) {
 	vec2 i = floor(uv);
 	vec2 f = fract(uv);
-	float a = hash(i);
-	float b = hash(i + vec2(1.0, 0.0));
-	float c = hash(i + vec2(0.0, 1.0));
-	float d = hash(i + vec2(1.0, 1.0));
-	vec2 u = f * f * (3.0 - 2.0 * f);
-	return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+	vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+	float a = dot(gradient_dir(i), f);
+	float b = dot(gradient_dir(i + vec2(1.0, 0.0)), f - vec2(1.0, 0.0));
+	float c = dot(gradient_dir(i + vec2(0.0, 1.0)), f - vec2(0.0, 1.0));
+	float d = dot(gradient_dir(i + vec2(1.0, 1.0)), f - vec2(1.0, 1.0));
+	return mix(mix(a, b, u.x), mix(c, d, u.x), u.y) * 0.72 + 0.5;
 }
 
 float fbm(vec2 coord) {
@@ -55,9 +60,11 @@ void vertex() {
 
 void fragment() {
 	vec2 wind = u_wind * (0.55 + u_layer * 0.9);
-	vec2 coord = v_world * u_scale + wind * TIME;
+	// Celle molto allungate in orizzontale: veli lagunari, non blocchi quadrati.
+	vec2 coord = vec2(v_world.x * u_scale * 0.44, v_world.y * u_scale * 1.35) + wind * TIME;
 	vec2 warp = vec2(fbm(coord + vec2(0.0, TIME * 0.02)), fbm(coord + vec2(3.1, -TIME * 0.015)));
-	float n = fbm(coord + warp * 1.35);
+	vec2 detail_coord = vec2(coord.x * 0.82 + coord.y * 0.57, -coord.x * 0.57 + coord.y * 0.82);
+	float n = fbm(coord + warp * 0.82) * 0.72 + fbm(detail_coord * 1.7 - warp * 0.35) * 0.28;
 
 	// Più densa verso il suolo / acqua, rarefatta in alto.
 	float height_t = clamp((u_ground_y - v_world.y) / max(u_ground_y - u_ceiling_y, 1.0), 0.0, 1.0);
@@ -70,15 +77,15 @@ void fragment() {
 	float wake_r = u_disturb_radius * (1.0 + clamp(speed / 280.0, 0.0, 0.6));
 	float hole = 1.0 - smoothstep(wake_r * 0.4, wake_r, dist);
 
-	float density = smoothstep(0.28, 0.78, n) * u_density * height_mask;
+	float density = smoothstep(0.36, 0.72, n) * u_density * height_mask;
 	density *= 1.0 - hole * u_disturb_strength * (0.45 + u_layer * 0.35);
 
-	// Bordo soft del volume: evita taglio netto ai limiti del poligono.
+	// Bordo molto largo: un fade corto lasciava vedere il quad come un rettangolo.
 	float edge = min(
 		min(UV.x, 1.0 - UV.x),
 		min(UV.y, 1.0 - UV.y)
 	);
-	density *= smoothstep(0.0, 0.08, edge);
+	density *= smoothstep(0.0, 0.18, edge);
 
 	COLOR = vec4(u_color.rgb, clamp(density * u_color.a, 0.0, 1.0));
 }

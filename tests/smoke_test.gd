@@ -7,7 +7,7 @@ const REQUIRED_RESOURCES: PackedStringArray = [
 	"res://Levels/Scenes/test_area.tscn",
 	"res://Levels/Scenes/punta_della_dogana.tscn",
 	"res://Levels/Scenes/Dogana/dogana_environment.tscn",
-	"res://Levels/Scenes/Dogana/vertical_palace.tscn",
+	"res://Levels/Scenes/Dogana/salute_interior.tscn",
 	"res://Water/water_mobile.gdshader",
 ]
 

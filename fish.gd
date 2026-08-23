@@ -556,7 +556,7 @@ func _process_hooked_out_of_water(delta: float):
 		var dist := to_rod.length()
 		if dist > 0.01:
 			var radial := to_rod / dist
-			var hang_speed := clampf(_reel_force_smoothed.length() * 0.1, 60.0, 140.0)
+			var hang_speed := clampf(_reel_force_smoothed.length() * 0.045, 28.0, 70.0)
 			var radial_v := velocity.dot(radial)
 			velocity += radial * maxf(0.0, hang_speed - radial_v) * delta * 4.0
 	else:
@@ -958,9 +958,9 @@ func pull_along_line(rod_pos: Vector2, amount: float, allow_exit: bool = false) 
 	var target_speed := clampf(amount * 18.0, 22.0, 70.0)
 	var step := clampf(amount * 0.7, 1.5, 10.0)
 	if exiting and not _hanging:
-		target_speed = clampf(amount * 34.0, 70.0, 190.0)
-		step = clampf(amount * 1.2, 4.0, 18.0)
-	velocity = velocity.lerp(dir * target_speed, 0.12 if not exiting else 0.32)
+		target_speed = clampf(amount * 14.0, 22.0, 72.0)
+		step = clampf(amount * 0.45, 1.2, 5.5)
+	velocity = velocity.lerp(dir * target_speed, 0.12 if not exiting else 0.16)
 	if _hanging and _has_tether:
 		var to_anchor := global_position - _tether_anchor
 		var d := to_anchor.length()
