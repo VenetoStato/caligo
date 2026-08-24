@@ -52,6 +52,7 @@ func _ready() -> void:
 	var training_cache := level.get_node("Gameplay/Breakables/ArrivalCache")
 	training_cache.call("_break")
 	tutorial.call("_on_training_cache_broken")
+	tutorial.call("_on_player_tutorial_action", &"pogo")
 	tutorial.call("_on_player_tutorial_action", &"cast")
 	tutorial.call("_on_player_tutorial_action", &"reel")
 	if bool((tutorial.get("_completed") as Dictionary).get(7, false)):

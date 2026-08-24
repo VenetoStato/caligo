@@ -16,7 +16,7 @@ enum QualityPreset { AUTO, ANDROID, PC }
 
 @export_category("Simulation")
 @export_enum("Auto", "Android", "PC") var quality_preset: int = QualityPreset.AUTO
-@export_range(32, 48, 1) var android_samples: int = 48
+@export_range(32, 48, 1) var android_samples: int = 32
 @export_range(48, 96, 1) var pc_samples: int = 96
 @export_range(4, 8, 1) var android_passes: int = 4
 @export_range(4, 8, 1) var pc_passes: int = 8
@@ -169,8 +169,9 @@ func _create_visuals() -> void:
 	_water_material.set_shader_parameter("shallow_color", shallow_color)
 	_water_material.set_shader_parameter("deep_color", deep_color)
 	_water_material.set_shader_parameter("foam_color", foam_color)
-	_water_material.set_shader_parameter("reflection_strength", reflection_strength)
-	_water_material.set_shader_parameter("refraction_strength", refraction_strength)
+	var mobile_water := OS.has_feature("mobile") or OS.get_name() == "Android"
+	_water_material.set_shader_parameter("reflection_strength", 0.12 if mobile_water else reflection_strength)
+	_water_material.set_shader_parameter("refraction_strength", 0.0 if mobile_water else refraction_strength)
 	# Lo shader ragiona in pixel sotto il pelo dell'acqua: senza queste misure
 	# schiuma e riflesso diventano percentuali della profondita' del bacino.
 	_water_material.set_shader_parameter("water_depth", maxf(bottom - target_height, 1.0))

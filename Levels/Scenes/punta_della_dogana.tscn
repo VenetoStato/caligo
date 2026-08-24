@@ -1,4 +1,4 @@
-[gd_scene load_steps=40 format=3]
+[gd_scene load_steps=42 format=3]
 
 [ext_resource type="Script" path="res://Levels/Scenes/Dogana/dogana_level.gd" id="1_level"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/dogana_environment.tscn" id="2_environment"]
@@ -28,6 +28,8 @@
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/simplified_waterfront.tscn" id="31_waterfront"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/lore_lectern.tscn" id="32_lore_lectern"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/lore_reader.tscn" id="33_lore_reader"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/pogo_thorn.tscn" id="34_thorn"]
+[ext_resource type="PackedScene" path="res://UI/feel_debug_panel.tscn" id="35_feel"]
 
 [sub_resource type="RectangleShape2D" id="GroundArrivalWest"]
 size = Vector2(700, 96)
@@ -108,6 +110,8 @@ script = ExtResource("1_level")
 [node name="MetroidvaniaHUD" parent="." instance=ExtResource("14_hud")]
 
 [node name="TutorialHints" parent="." instance=ExtResource("20_tutorial")]
+
+[node name="FeelDebugPanel" parent="." instance=ExtResource("35_feel")]
 
 [node name="ArrivalCutscene" parent="." instance=ExtResource("28_arrival")]
 
@@ -258,6 +262,59 @@ scale = Vector2(0.64, 0.86)
 [node name="BricolaSalute" parent="Gameplay/Bricole" instance=ExtResource("3_bricola")]
 position = Vector2(5920, 900)
 scale = Vector2(0.68, 0.9)
+
+[node name="PogoSchool" type="Node2D" parent="Gameplay"]
+
+[node name="WestBed" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+position = Vector2(188, 460)
+kind = 1
+bed_width = 108.0
+
+[node name="GapClusterA" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+position = Vector2(286, 502)
+snap_to_ground = false
+
+[node name="GapClusterB" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+position = Vector2(332, 496)
+snap_to_ground = false
+
+[node name="GapClusterC" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+position = Vector2(378, 502)
+snap_to_ground = false
+
+[node name="EastBed" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+position = Vector2(930, 460)
+kind = 1
+bed_width = 168.0
+
+[node name="CustomsGapBed" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+position = Vector2(2120, 485)
+kind = 1
+bed_width = 210.0
+
+[node name="CustomsGapCluster" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+position = Vector2(2038, 485)
+
+[node name="QuayWedgeBed" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+position = Vector2(2510, 485)
+kind = 1
+bed_width = 190.0
+
+[node name="WedgeCanalClusterA" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+position = Vector2(3088, 485)
+
+[node name="WedgeCanalBed" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+position = Vector2(3188, 485)
+kind = 1
+bed_width = 200.0
+
+[node name="WedgeCanalClusterB" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+position = Vector2(3290, 485)
+
+[node name="CanalFortunaBed" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+position = Vector2(4010, 485)
+kind = 1
+bed_width = 200.0
 
 [node name="Checkpoints" type="Node2D" parent="Gameplay" groups=["dogana_checkpoints"]]
 visible = false

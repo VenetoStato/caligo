@@ -13,7 +13,7 @@ func _ready() -> void:
 	):
 		_fail("Enemy art kits are missing from the Dogana profile.")
 		return
-	for texture in [profile.tide_altar, profile.cracked_urn, profile.net_bundle]:
+	for texture in [profile.tide_altar, profile.cracked_urn, profile.net_bundle, profile.thorn_cluster, profile.thorn_bed]:
 		if texture == null:
 			_fail("An illustrator-facing prop slot is empty.")
 			return

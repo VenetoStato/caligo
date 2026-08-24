@@ -12,6 +12,7 @@ enum Step {
 	CAST,
 	REEL,
 	MAP,
+	POGO,
 	COMPLETE,
 }
 
@@ -22,6 +23,7 @@ const STEP_ORDER: Array[Step] = [
 	Step.DOUBLE_JUMP,
 	Step.DASH,
 	Step.ATTACK,
+	Step.POGO,
 	Step.CAST,
 	Step.REEL,
 	Step.MAP,
@@ -34,6 +36,8 @@ const HINT_DELAY := 4.2
 var _player: CharacterBody2D
 var _panel: PanelContainer
 var _fishing_panel: PanelContainer
+var _cast_nudge: PanelContainer
+var _cast_nudge_mark: HintMark
 var _mark: HintMark
 var _hint_wait := 0.0
 var _hint_shown := false
@@ -56,6 +60,7 @@ func _ready() -> void:
 		_completed[step] = false
 		_observed[step] = false
 	_build_panel()
+	_build_cast_nudge()
 	get_viewport().size_changed.connect(_apply_responsive_layout)
 	_apply_responsive_layout()
 	_fishing_panel = _panel
@@ -92,11 +97,8 @@ func arm_tutorial() -> void:
 		return
 	_armed = true
 	_ensure_player_hooks()
-	# Dopo la cutscene riparti da QUI: lo spostamento in barca non deve chiudere MOVE.
-	if _player:
+	if _player and _start_position == Vector2.INF:
 		_start_position = _player.global_position
-		_observed[Step.MOVE] = false
-		_completed[Step.MOVE] = false
 	_refresh_step()
 
 
@@ -121,15 +123,19 @@ func _process(_delta: float) -> void:
 	if _player == null:
 		return
 	if _start_position != Vector2.INF:
-		var moved := absf(_player.global_position.x - _start_position.x) >= 72.0
+		var moved := absf(_player.global_position.x - _start_position.x) >= 24.0
 		if moved:
 			_observe_step(Step.MOVE)
+	if Input.is_action_pressed("ui_left") or Input.is_action_pressed("ui_right"):
+		_observe_step(Step.MOVE)
 	var map_overlay := get_tree().current_scene.get_node_or_null("DoganaMap/Overlay") as Control if get_tree().current_scene else null
 	if map_overlay and map_overlay.visible:
 		_observe_step(Step.MAP)
 	if not _armed:
+		_update_fish_cast_nudge(_delta)
 		return
 	_update_hint_fade(_delta)
+	_update_fish_cast_nudge(_delta)
 
 
 ## Il glifo emerge dal nero solo dopo l'attesa e pulsa appena, come un riflesso.
@@ -137,6 +143,9 @@ func _update_hint_fade(delta: float) -> void:
 	if _panel == null or _completion_started:
 		return
 	if _current_step == Step.COMPLETE:
+		return
+	if _current_step == Step.CAST or _current_step == Step.REEL:
+		_panel.visible = false
 		return
 	_hint_wait += delta
 	if _hint_wait < HINT_DELAY:
@@ -166,6 +175,8 @@ func _on_player_tutorial_action(action: StringName) -> void:
 			_observe_step(Step.DASH)
 		&"attack":
 			_observe_step(Step.ATTACK)
+		&"pogo":
+			_observe_step(Step.POGO)
 		&"cast":
 			_observe_step(Step.CAST)
 		# REEL si completa solo con una cattura reale (vedi _on_fish_caught).
@@ -258,6 +269,14 @@ func _apply_step_copy(step: Step) -> void:
 	var touch := OS.get_name() == "Android"
 	if _step_transition and _step_transition.is_valid():
 		_step_transition.kill()
+	# Pesca: niente cartelli. La canna e la lenza insegnano da sole.
+	if step == Step.CAST or step == Step.REEL:
+		_panel.visible = false
+		_panel.modulate.a = 0.0
+		_hint_wait = 0.0
+		_hint_shown = false
+		_mark.clear_mark()
+		return
 	_panel.visible = true
 	_panel.modulate.a = 0.0
 	_hint_wait = 0.0
@@ -280,6 +299,8 @@ func _step_mark(step: Step) -> HintMark.Mark:
 			return HintMark.Mark.DASH
 		Step.ATTACK:
 			return HintMark.Mark.ATTACK
+		Step.POGO:
+			return HintMark.Mark.POGO
 		Step.CAST:
 			return HintMark.Mark.CAST
 		Step.REEL:
@@ -304,6 +325,8 @@ func _step_key(step: Step, touch: bool) -> String:
 			return "SHIFT"
 		Step.ATTACK:
 			return "CLICK"
+		Step.POGO:
+			return "S + CLICK"
 		Step.CAST:
 			return "F"
 		Step.REEL:
@@ -340,6 +363,53 @@ func _fade_completed_tutorial() -> void:
 	var tween := create_tween()
 	tween.tween_property(_panel, "modulate:a", 0.0, 0.8)
 	tween.tween_callback(func() -> void: _panel.visible = false)
+
+
+func _update_fish_cast_nudge(delta: float) -> void:
+	if _cast_nudge == null or _player == null:
+		return
+	if bool(_player.get("line_extended")) or bool(_player.get("is_charging")):
+		_cast_nudge.modulate.a = move_toward(_cast_nudge.modulate.a, 0.0, delta * 3.0)
+		if _cast_nudge.modulate.a <= 0.02:
+			_cast_nudge.visible = false
+		return
+	var well := get_tree().get_first_node_in_group("dogana_fishing_well") as Node2D
+	var in_zone := false
+	if well:
+		var delta_pos := _player.global_position - well.global_position
+		in_zone = absf(delta_pos.x) < 190.0 and absf(delta_pos.y) < 140.0
+	if not in_zone:
+		_cast_nudge.modulate.a = move_toward(_cast_nudge.modulate.a, 0.0, delta * 2.4)
+		if _cast_nudge.modulate.a <= 0.02:
+			_cast_nudge.visible = false
+		return
+	_cast_nudge.visible = true
+	_place_cast_nudge(well)
+	var breathe := 0.28 + 0.08 * sin(Time.get_ticks_msec() * 0.0024)
+	_cast_nudge.modulate.a = move_toward(_cast_nudge.modulate.a, breathe, delta * 1.1)
+
+
+func _place_cast_nudge(well: Node2D) -> void:
+	if _cast_nudge == null or well == null:
+		return
+	var screen := well.get_global_transform_with_canvas().origin + Vector2(-36.0, -58.0)
+	_cast_nudge.position = screen
+
+
+func _build_cast_nudge() -> void:
+	_cast_nudge = PanelContainer.new()
+	_cast_nudge.name = "FishCastNudge"
+	_cast_nudge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cast_nudge.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	_cast_nudge.modulate.a = 0.0
+	_cast_nudge.visible = false
+	_cast_nudge.size = Vector2(72, 40)
+	add_child(_cast_nudge)
+	_cast_nudge_mark = HintMark.new()
+	_cast_nudge_mark.name = "CastNudgeMark"
+	_cast_nudge_mark.set_scale_compact(true)
+	_cast_nudge_mark.show_mark(HintMark.Mark.CAST, "F")
+	_cast_nudge.add_child(_cast_nudge_mark)
 
 
 func _build_panel() -> void:

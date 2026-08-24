@@ -35,6 +35,8 @@ extends RigidBody2D
 @export var swim_response: float = 3.0
 @export var water_damping: float = 0.98
 @export var boundary_push: float = 80.0
+## Fuori acqua: stessa gravita' del mondo, niente tetto sulla caduta.
+const AIR_GRAVITY := 980.0
 
 @export_category("Struggle")
 @export var struggle_strength: float = 320.0
@@ -134,8 +136,8 @@ func _ready():
 	add_to_group("fish")
 	if bool(get_meta("tutorial_fish", false)):
 		_configure_tutorial_fish()
-	# z_index > water (10): pesci visibili sopra l'acqua
-	z_index = 15
+	# Sopra l'acqua (10), sotto le briccole di primissimo piano (15/17).
+	z_index = 12
 	# Configurazione RigidBody2D per pesci
 	lock_rotation = true
 	rotation = 0.0
@@ -546,9 +548,8 @@ func _process_hooked_out_of_water(delta: float):
 
 	var reeling_hang := reel_force.length_squared() > 0.01 and _has_tether
 
-	velocity.y += (820.0 if reeling_hang else 980.0) * delta
-	velocity.y = minf(velocity.y, 480.0)
-	velocity.x *= 0.995
+	velocity.y += AIR_GRAVITY * delta
+	velocity.x *= 0.999
 
 	if reeling_hang:
 		_reel_force_smoothed = _reel_force_smoothed.lerp(reel_force, delta * 2.2)
@@ -711,8 +712,8 @@ func _apply_soft_line_tether(_delta: float) -> void:
 
 ## Fuori acqua (non agganciato): ricade / rientra nel bacino.
 func _process_falling(delta: float):
-	velocity.y += 980.0 * delta
-	velocity.x *= 0.98
+	velocity.y += AIR_GRAVITY * delta
+	velocity.x *= 0.999
 	if _try_reenter_water():
 		velocity.y = minf(velocity.y, 40.0)
 		_clamp_to_water_bounds()
@@ -1069,11 +1070,11 @@ func _spawn_water_exit_effect(surf_y: float) -> void:
 		return
 	var burst := CPUParticles2D.new()
 	burst.name = "FishExitSplash"
-	burst.z_index = 18
+	burst.z_index = 13
 	burst.emitting = false
 	burst.one_shot = true
 	burst.explosiveness = 0.92
-	burst.amount = 22
+	burst.amount = 8 if OS.get_name() == "Android" or OS.has_feature("mobile") else 22
 	burst.lifetime = 0.45
 	burst.preprocess = 0.0
 	burst.direction = Vector2(0, -1)

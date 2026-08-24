@@ -48,6 +48,8 @@ sostituito da solo; conserva il piede sul bordo inferiore del canvas.
 | `20_fishing_cache.png` | Cassa tutorial | 384×288 |
 | `21_urn.png` / `22_net_bundle.png` | Props rompibili | 1024×1024 |
 | `23_fishbone_wall.png` | Muro | 320×427 |
+| `24_thorn_cluster.png` | Ciuffo spine (pogo) | 757×849 |
+| `25_thorn_bed.png` | Striscia spine | 1482×486 |
 | `30_tide_bloater.png` | Nemico (ritratto) | 512×436 |
 | `31_lagoon_oracle.png` | Nemico (ritratto) | 431×512 |
 | `32_drowned_warden.png` | Boss (ritratto) | 512×512 |
@@ -80,7 +82,7 @@ Clip obbligatorie, da sinistra a destra sulla riga:
 - **Moduli laterali:** camera ortogonale, PNG trasparenti, piede sul bordo inferiore; niente vista aerea o isometrica.
 - **Fondali:** tieni l’orizzonte allineato agli altri.
 - **Platform:** il bordo calpestabile deve stare **in alto** nell’immagine.
-- **Props / nemici / altare:** PNG trasparente, poco padding vuoto.
+- **Props / nemici / altare / spine:** PNG **trasparente** (niente sfondo nero o bianco), poco padding vuoto, piede sul bordo basso.
 - **Non** disegnare collisioni: restano nel livello.
 - Player sheet separato: `Player/Sprites/player-Sheet.png` (griglia 5×8).
 

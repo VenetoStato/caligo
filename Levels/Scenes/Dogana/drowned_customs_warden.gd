@@ -326,9 +326,10 @@ func _animate(delta: float) -> void:
 			lean = (1.0 - settle) * -0.08
 
 	if _hurt_anim > 0.0:
-		offset.x -= _hurt_anim * 9.0
-		lean += _hurt_anim * 0.12
-		squash *= Vector2(1.0 + _hurt_anim * 0.05, 1.0 - _hurt_anim * 0.06)
+		offset.x -= _hurt_anim * 6.0
+		offset.y -= _hurt_anim * 16.0
+		lean += _hurt_anim * 0.08
+		squash *= Vector2(1.0 + _hurt_anim * 0.04, 1.0 - _hurt_anim * 0.07)
 
 	var blend := clampf(delta * 20.0, 0.0, 1.0)
 	_sprite.position = _base_sprite_position + Vector2(offset.x * facing, offset.y)
@@ -977,11 +978,14 @@ func take_damage(amount: int = 1, source_position: Vector2 = Vector2.ZERO) -> vo
 		_phase = next_phase
 		_begin_phase_transition()
 	var away := signf(global_position.x - source_position.x)
-	velocity.x = away * 130.0
+	if is_zero_approx(away):
+		away = 1.0
+	velocity.x = away * 90.0
+	velocity.y = minf(velocity.y, -160.0)
 	var tween := create_tween()
-	tween.tween_property(_sprite, "modulate", Color(1.6, 0.34, 0.28, 1.0), 0.05)
-	tween.tween_property(_sprite, "modulate", Color.WHITE, 0.15)
-	_shake_camera(0.16)
+	tween.tween_property(_sprite, "modulate", Color(2.1, 2.15, 2.2, 1.0), 0.04)
+	tween.tween_property(_sprite, "modulate", Color.WHITE, 0.12)
+	_shake_camera(0.12)
 
 
 func _begin_phase_transition() -> void:

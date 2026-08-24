@@ -166,7 +166,8 @@ func play_rest_fx() -> void:
 
 
 func get_respawn_position() -> Vector2:
-	return global_position + Vector2(0.0, -58.0)
+	# Origine del player: i piedi stanno ~13px sotto. -14 li appoggia sul piano dell'altare.
+	return global_position + Vector2(0.0, -14.0)
 
 
 func _on_body_entered(body: Node2D) -> void:
@@ -223,8 +224,8 @@ func _update_prompt() -> void:
 func _draw() -> void:
 	var center := Vector2(0, -34)
 	var radius := 15.0
-	if _player_near and _charge_progress <= 0.01:
-		_draw_ready_mark(center, radius)
+	# Niente rombo sopra l'altare: il prompt e' solo il tasto E del tutorial,
+	# e anche quello senza icona. L'altare si legge dalla luce della conca.
 	if _charge_progress <= 0.01:
 		return
 	draw_arc(center, radius, -PI * 0.5, TAU - PI * 0.5, 30, Color(0.05, 0.08, 0.08, 0.35), 2.0, true)
@@ -238,26 +239,6 @@ func _draw() -> void:
 		2.4,
 		true
 	)
-
-
-## Rombo di luce che ondeggia sopra la conca: dice "qui si tiene premuto" senza
-## scrivere niente. Respira, cosi' l'occhio lo trova anche in scena carica.
-func _draw_ready_mark(center: Vector2, radius: float) -> void:
-	var breath := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.0026)
-	var lift := center + Vector2(0.0, -radius - 12.0 - breath * 3.0)
-	var half := 5.4 + breath * 1.1
-	var tint := Color(COL_CHARGE, 0.3 + breath * 0.34)
-	draw_polyline(
-		PackedVector2Array([
-			lift + Vector2(0, -half), lift + Vector2(half * 0.66, 0),
-			lift + Vector2(0, half), lift + Vector2(-half * 0.66, 0),
-			lift + Vector2(0, -half),
-		]),
-		tint,
-		1.8,
-		true
-	)
-	draw_circle(lift, 1.5, Color(COL_CHARGE, 0.25 + breath * 0.4))
 
 
 ## Il nome inciso si legge solo quando gli sei accanto, e sfuma da solo.

@@ -1,11 +1,11 @@
 extends Control
 
-## HUD della vita: una fila di fiale. Ogni fiala e' un colpo.
-## L'acqua sta in piedi e scende dal basso, come in un'ampolla vera.
+## HUD della vita: maschere discrete, una per colpo, come in Hollow Knight.
+## Niente fiala/misuratore: se e' piena sei vivo, se e' vuota hai preso danno.
 
-const VIAL_W := 14.0
-const VIAL_H := 28.0
-const VIAL_GAP := 7.0
+const MASK_W := 20.0
+const MASK_H := 24.0
+const MASK_GAP := 6.0
 const LOSS_TRAIL_SPEED := 0.85
 const LEVEL_SPEED := 8.0
 
@@ -78,8 +78,8 @@ func _apply_responsive_layout() -> void:
 	var margin := clampf(viewport_size.x * 0.028, 10.0, 36.0)
 	_hud_origin = Vector2(margin, clampf(viewport_size.y * 0.038, 12.0, 28.0))
 	var max_health := maxi(int(_player.get("max_health")) if is_instance_valid(_player) else 5, 1)
-	var row_w := float(max_health) * (VIAL_W + VIAL_GAP) - VIAL_GAP
-	_grace_label.position = _hud_origin + Vector2(0, VIAL_H + 10.0) * _hud_scale
+	var row_w := float(max_health) * (MASK_W + MASK_GAP) - MASK_GAP
+	_grace_label.position = _hud_origin + Vector2(0, MASK_H + 10.0) * _hud_scale
 	_grace_label.size = Vector2(maxf(row_w + 40.0, 220.0), 22.0) * _hud_scale
 	_grace_label.add_theme_font_size_override("font_size", int(11 * _hud_scale))
 	queue_redraw()
@@ -91,92 +91,35 @@ func _draw() -> void:
 	var units := float(max_health)
 	var low := _level <= 0.34
 	for index in max_health:
-		var origin := Vector2(float(index) * (VIAL_W + VIAL_GAP), 0.0)
+		var origin := Vector2(float(index) * (MASK_W + MASK_GAP), 0.0)
 		var fill := clampf(_level * units - float(index), 0.0, 1.0)
 		var trail := clampf(_loss_trail * units - float(index), 0.0, 1.0)
-		_draw_vial(origin, fill, trail, low)
+		_draw_mask(origin, fill, trail, low)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-func _draw_vial(origin: Vector2, fill: float, trail: float, low: bool) -> void:
-	var body := Rect2(origin.x, origin.y + 5.0, VIAL_W, VIAL_H - 5.0)
-	draw_colored_polygon(_vial_outline(body, -2.2), Color(0.012, 0.03, 0.034, 0.82))
-	draw_colored_polygon(_vial_outline(body, 0.0), Color(0.045, 0.1, 0.11, 0.78))
-	if trail > 0.04:
-		_draw_vial_water(body, trail, Color(0.7, 0.86, 0.8, 0.22))
-	if fill > 0.04:
-		var water := Color(0.34, 0.82, 0.76, 0.92)
-		if low:
-			water = water.lerp(Color(0.9, 0.58, 0.4, 0.94), 0.48 + 0.32 * sin(_time * 6.0))
-		_draw_vial_water(body, fill, water)
-	_draw_vial_glass_edge(body)
-	_draw_vial_neck(origin)
-
-
-func _vial_outline(body: Rect2, inset: float) -> PackedVector2Array:
-	var radius := body.size.x * 0.5 - inset
-	var cx := body.position.x + body.size.x * 0.5
-	var top := body.position.y + inset
-	var bottom := body.end.y - radius
+func _mask_points(center: Vector2, rx: float, ry: float) -> PackedVector2Array:
 	var points := PackedVector2Array()
-	for step in 11:
-		var angle := lerpf(PI, TAU, float(step) / 10.0)
-		points.append(Vector2(cx, bottom) + Vector2(cos(angle), sin(angle)) * radius)
-	points.append(Vector2(cx + radius, top))
-	points.append(Vector2(cx - radius, top))
+	for step in 16:
+		var angle := TAU * float(step) / 16.0 - PI * 0.5
+		var bulge := 1.12 if sin(angle) > 0.0 else 1.0
+		points.append(center + Vector2(cos(angle) * rx, sin(angle) * ry * bulge))
 	return points
 
 
-func _draw_vial_water(body: Rect2, ratio: float, tint: Color) -> void:
-	var radius := body.size.x * 0.5 - 1.15
-	var cx := body.position.x + body.size.x * 0.5
-	var bowl := body.end.y - body.size.x * 0.5
-	var min_y := body.position.y + 1.2
-	var max_y := body.end.y - 1.2
-	var water_top := clampf(max_y - (max_y - min_y) * clampf(ratio, 0.0, 1.0) + _slosh * 0.45, min_y, max_y)
-	var points := PackedVector2Array()
-	var half_at_top := radius
-	if water_top > bowl:
-		half_at_top = sqrt(maxf(radius * radius - pow(water_top - bowl, 2.0), 0.0))
-	points.append(Vector2(cx - half_at_top, water_top))
-	for step in 10:
-		var angle := lerpf(PI, TAU, float(step) / 9.0)
-		var point := Vector2(cx, bowl) + Vector2(cos(angle), sin(angle)) * radius
-		if point.y >= water_top - 0.01:
-			points.append(point)
-	points.append(Vector2(cx + half_at_top, water_top))
-	if points.size() < 3:
-		return
-	draw_colored_polygon(points, tint)
-	draw_line(
-		Vector2(cx - half_at_top, water_top),
-		Vector2(cx + half_at_top, water_top),
-		Color(0.9, 0.99, 0.94, 0.72),
-		1.1,
-		true
-	)
-
-
-func _draw_vial_glass_edge(body: Rect2) -> void:
-	var brass := Color(0.62, 0.52, 0.34, 0.92)
-	var outline := _vial_outline(body, -2.2)
-	outline.append(outline[0])
-	draw_polyline(outline, brass, 1.35, true)
-	var cx := body.position.x + body.size.x * 0.5
-	draw_line(
-		Vector2(cx - body.size.x * 0.22, body.position.y + 3.0),
-		Vector2(cx - body.size.x * 0.18, body.end.y - 8.0),
-		Color(0.86, 0.96, 0.94, 0.22),
-		1.4
-	)
-
-
-func _draw_vial_neck(origin: Vector2) -> void:
-	var cx := origin.x + VIAL_W * 0.5
-	var brass := Color(0.66, 0.55, 0.36, 0.95)
-	var neck := Rect2(cx - 3.2, origin.y + 1.4, 6.4, 5.2)
-	draw_rect(neck, Color(0.05, 0.08, 0.09, 0.92))
-	draw_rect(neck, brass, false, 1.15)
-	draw_rect(Rect2(cx - 4.1, origin.y - 0.4, 8.2, 2.6), Color(0.2, 0.16, 0.1, 0.95))
-	draw_rect(Rect2(cx - 4.1, origin.y - 0.4, 8.2, 2.6), brass, false, 1.1)
-	draw_line(Vector2(cx - 2.4, origin.y + 0.7), Vector2(cx + 2.4, origin.y + 0.7), Color(0.86, 0.76, 0.5, 0.55), 1.0)
+func _draw_mask(origin: Vector2, fill: float, trail: float, low: bool) -> void:
+	var center := origin + Vector2(MASK_W * 0.5, MASK_H * 0.52)
+	var shell := _mask_points(center, MASK_W * 0.42, MASK_H * 0.38)
+	draw_colored_polygon(_mask_points(center + Vector2(0, 1.2), MASK_W * 0.44, MASK_H * 0.4), Color(0.02, 0.04, 0.05, 0.55))
+	draw_colored_polygon(shell, Color(0.06, 0.1, 0.12, 0.88))
+	if trail > 0.35 and fill < 0.35:
+		draw_colored_polygon(_mask_points(center, MASK_W * 0.34, MASK_H * 0.3), Color(0.78, 0.88, 0.84, 0.18))
+	if fill > 0.35:
+		var life := Color(0.86, 0.96, 0.92, 0.96)
+		if low:
+			life = life.lerp(Color(0.95, 0.62, 0.48, 0.96), 0.42 + 0.28 * sin(_time * 6.0))
+		draw_colored_polygon(_mask_points(center, MASK_W * 0.34, MASK_H * 0.3), life)
+		draw_circle(center + Vector2(-3.2, -4.0), 2.2, Color(1.0, 1.0, 1.0, 0.28))
+	var rim := shell.duplicate()
+	rim.append(shell[0])
+	draw_polyline(rim, Color(0.72, 0.84, 0.8, 0.82), 1.35, true)

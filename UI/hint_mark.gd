@@ -20,6 +20,7 @@ enum Mark {
 	CAST,
 	REEL,
 	MAP,
+	POGO,
 }
 
 const KEY_FONT := preload("res://UI/Fonts/CormorantGaramond.ttf")
@@ -67,8 +68,8 @@ func _draw() -> void:
 			_draw_chevron(center + Vector2(-16, 0), Vector2.LEFT)
 			_draw_chevron(center + Vector2(16, 0), Vector2.RIGHT)
 		Mark.INTERACT:
-			_draw_diamond(center, 11.0)
-			_draw_dot(center, 2.2)
+			# Solo il tasto: il rombo sopra la E leggeva come icona di debug.
+			pass
 		Mark.JUMP:
 			_draw_chevron(center + Vector2(0, -3), Vector2.UP)
 			_draw_ground_tick(center + Vector2(0, 11))
@@ -84,7 +85,9 @@ func _draw() -> void:
 		Mark.REEL:
 			_draw_reel_loop(center)
 		Mark.MAP:
-			_draw_folded_sheet(center)
+			_draw_map_chart(center)
+		Mark.POGO:
+			_draw_pogo(center)
 		Mark.NONE:
 			return
 	if not key_text.is_empty():
@@ -138,6 +141,13 @@ func _draw_streaks(at: Vector2) -> void:
 	_draw_chevron(at + Vector2(16, 0), Vector2.RIGHT)
 
 
+## Pogo: fendente verso il basso e rimbalzo.
+func _draw_pogo(at: Vector2) -> void:
+	_draw_slash(at + Vector2(0, 2))
+	_draw_chevron(at + Vector2(0, 11), Vector2.DOWN)
+	_draw_ground_tick(at + Vector2(0, 14))
+
+
 ## Fendente: un arco che si apre, non una spada.
 func _draw_slash(at: Vector2) -> void:
 	var points := PackedVector2Array()
@@ -175,15 +185,31 @@ func _draw_reel_loop(at: Vector2) -> void:
 	]))
 
 
-## Mappa: un foglio piegato, visto di tre quarti.
-func _draw_folded_sheet(at: Vector2) -> void:
+## Carta aperta: costa, acqua e un punto. Si legge come mappa, non come foglio.
+func _draw_map_chart(at: Vector2) -> void:
+	var frame := PackedVector2Array([
+		at + Vector2(-13, -9), at + Vector2(13, -9),
+		at + Vector2(13, 9), at + Vector2(-13, 9),
+		at + Vector2(-13, -9),
+	])
+	_stroke(frame)
+	# Angolo ripiegato: e' carta, non un riquadro UI.
 	_stroke(PackedVector2Array([
-		at + Vector2(-14, -8), at + Vector2(-1, -10),
-		at + Vector2(13, -7), at + Vector2(13, 8),
-		at + Vector2(-1, 10), at + Vector2(-14, 7),
-		at + Vector2(-14, -8),
+		at + Vector2(6, -9), at + Vector2(13, -3), at + Vector2(6, -3), at + Vector2(6, -9),
+	]), STROKE_SOFT)
+	# Laguna in basso, terra sopra.
+	_stroke(PackedVector2Array([
+		at + Vector2(-11, 2),
+		at + Vector2(-6, 0),
+		at + Vector2(-1, 3),
+		at + Vector2(4, 1),
+		at + Vector2(11, 3),
 	]))
-	_stroke(PackedVector2Array([at + Vector2(-1, -10), at + Vector2(-1, 10)]), STROKE_SOFT)
+	# Percorso e posizione.
+	_stroke(PackedVector2Array([
+		at + Vector2(-8, 1), at + Vector2(-2, -2), at + Vector2(3, -4),
+	]), STROKE_SOFT)
+	_draw_dot(at + Vector2(3, -4), 2.0)
 
 
 ## Il tasto sta sotto il pittogramma, dentro un riquadro appena accennato: dice

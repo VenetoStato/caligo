@@ -39,6 +39,10 @@ extends Resource
 @export var net_bundle_scale := Vector2(0.15, 0.15)
 @export var net_bundle_offset := Vector2(0.0, -42.0)
 @export var fishbone_wall: Texture2D
+@export var thorn_cluster: Texture2D
+@export var thorn_cluster_scale := Vector2(0.08, 0.08)
+@export var thorn_bed: Texture2D
+@export var thorn_bed_height := 40.0
 
 @export_category("Characters")
 @export var tide_bloater: Texture2D

@@ -77,6 +77,19 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 	var home: Vector2 = bloater.get("_home_position")
+	player.set("_attack_dir", Vector2.RIGHT)
+	player.global_position = volley.global_position + Vector2(-48, 0)
+	volley.call("take_damage", 1, player.global_position)
+	if volley.velocity.x <= 20.0 or volley.velocity.y > -20.0 or volley.velocity.y < -160.0:
+		push_error("Side nail should shove away with a small hop, not launch the enemy.")
+		get_tree().quit(1)
+		return
+	player.set("_attack_dir", Vector2.UP)
+	volley.call("take_damage", 1, player.global_position)
+	if volley.velocity.y > -140.0:
+		push_error("Upslash should lift the enemy.")
+		get_tree().quit(1)
+		return
 	bloater.set("current_health", 1)
 	bloater.call("take_damage", 1, player.global_position)
 	await get_tree().process_frame

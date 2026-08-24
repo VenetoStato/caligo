@@ -32,6 +32,7 @@ la leggono a runtime.
 - **Environment secondario:** arrival, customs, canal, fortuna
 - **Architecture:** walkable platform, central wedge, tide altar
 - **Breakables:** fishing cache, cracked urn, net bundle, fishbone wall
+- **Hazards / pogo:** `thorn_cluster`, `thorn_bed` — PNG trasparenti; hitbox restano in `pogo_thorn.gd`
 - **Lore props:** `Generated/Lore/customs_ledger.png`; il piede viene allineato
   automaticamente dalla scena `lore_lectern.tscn`, mentre titolo e testo restano
   esportati sul nodo. Puoi sostituire il PNG senza toccare Area2D o lettore UI.
@@ -65,6 +66,7 @@ di contatto con il terreno. L'artwork deve avere il piede sul bordo inferiore de
 canvas, centrato in X, senza trasparenza inutile sotto. In questo modo il livello
 aggancia automaticamente il prop alla collisione, anche su rampe.
 
+- `dogana_thorn_cluster.png` / `dogana_thorn_bed.png`: piede in basso, **sfondo trasparente** (mai nero pieno).
 - `breakable_fishing_cache.png`: 384 x 288, piede in basso.
 - `breakable_urn.png` / `breakable_net_bundle.png`: soggetto appoggiato al bordo
   basso, nessuna ombra separata.

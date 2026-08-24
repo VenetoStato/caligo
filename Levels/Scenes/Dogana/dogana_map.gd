@@ -20,23 +20,33 @@ var _regions: Dictionary = {"arrival": true}
 var _player_world_position := Vector2(330, 425)
 
 
-## La carta si apre con M: a schermo resta solo un glifo appena visibile al
-## posto dell'etichetta "CARTA [M]", che spiegava un comando gia' noto.
+## La carta si apre con M. Il pulsante e' la stessa icona della carta, non un
+## rombo unicode che sembrava un misuratore.
 func _style_map_glyph() -> void:
-	_map_button.text = "\u25C8"
+	_map_button.text = ""
 	_map_button.flat = true
 	_map_button.focus_mode = Control.FOCUS_NONE
-	_map_button.custom_minimum_size = Vector2(30, 30)
-	_map_button.offset_left = -78.0
-	_map_button.offset_right = -48.0
-	_map_button.offset_top = 8.0
-	_map_button.offset_bottom = 38.0
-	_map_button.modulate = Color(1, 1, 1, 0.34)
-	_map_button.add_theme_font_size_override("font_size", 16)
-	_map_button.add_theme_color_override("font_color", Color(0.7, 0.79, 0.75, 1.0))
-	_map_button.add_theme_color_override("font_hover_color", Color(0.96, 0.86, 0.55, 1.0))
-	_map_button.mouse_entered.connect(func() -> void: _map_button.modulate.a = 0.9)
-	_map_button.mouse_exited.connect(func() -> void: _map_button.modulate.a = 0.34)
+	_map_button.custom_minimum_size = Vector2(44, 44)
+	_map_button.offset_left = -56.0
+	_map_button.offset_right = -12.0
+	_map_button.offset_top = 10.0
+	_map_button.offset_bottom = 54.0
+	_map_button.modulate = Color(1, 1, 1, 0.42)
+	_map_button.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+	_map_button.add_theme_stylebox_override("hover", StyleBoxEmpty.new())
+	_map_button.add_theme_stylebox_override("pressed", StyleBoxEmpty.new())
+	_map_button.mouse_entered.connect(func() -> void: _map_button.modulate.a = 0.95)
+	_map_button.mouse_exited.connect(func() -> void: _map_button.modulate.a = 0.42)
+	if _map_button.get_node_or_null("MapGlyph") == null:
+		var glyph := HintMark.new()
+		glyph.name = "MapGlyph"
+		glyph.set_anchors_preset(Control.PRESET_FULL_RECT)
+		glyph.offset_left = 0
+		glyph.offset_top = 0
+		glyph.offset_right = 0
+		glyph.offset_bottom = 0
+		glyph.show_mark(HintMark.Mark.MAP, "")
+		_map_button.add_child(glyph)
 
 
 func _ready() -> void:

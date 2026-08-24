@@ -142,12 +142,13 @@ func _apply_mobile_postfx_budget() -> void:
 	var mobile := OS.has_feature("mobile") or OS.get_name() == "Android"
 	if not mobile:
 		return
-	bloom = minf(bloom, 0.12)
-	chroma = minf(chroma, 0.25)
-	grain_amount = minf(grain_amount, 0.06)
-	haze = minf(haze, 0.04)
-	ink_strength = minf(ink_strength, 0.12)
-	grade_strength = minf(grade_strength, 0.18)
+	# Full-screen shader + screen texture: troppo per GLES su telefoni scarsi.
+	postfx_enabled = false
+	bloom = 0.0
+	chroma = 0.0
+	grain_amount = 0.0
+	haze = 0.0
+	ink_strength = 0.0
 	_postfx_dirty = true
 
 

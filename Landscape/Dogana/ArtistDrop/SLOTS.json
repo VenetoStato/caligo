@@ -146,6 +146,22 @@
       "notes": "Muro osseo rompibile."
     },
     {
+      "file": "24_thorn_cluster.png",
+      "dest": "Landscape/Dogana/Generated/dogana_thorn_cluster.png",
+      "profile": "thorn_cluster",
+      "size": [757, 849],
+      "kind": "prop",
+      "notes": "Ciuffo di spine pogoabili. PNG TRASPARENTE, piede sul bordo inferiore, niente sfondo nero/bianco. Hitbox restano in Godot."
+    },
+    {
+      "file": "25_thorn_bed.png",
+      "dest": "Landscape/Dogana/Generated/dogana_thorn_bed.png",
+      "profile": "thorn_bed",
+      "size": [1482, 486],
+      "kind": "prop",
+      "notes": "Striscia di spine a terra. PNG TRASPARENTE, base sul bordo inferiore. Si scala in larghezza; non disegnare collisioni."
+    },
+    {
       "file": "30_tide_bloater.png",
       "dest": "Landscape/Dogana/Generated/tide_bloater.png",
       "profile": "tide_bloater",

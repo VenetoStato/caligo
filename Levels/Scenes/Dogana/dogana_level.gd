@@ -358,31 +358,13 @@ func _set_interactable_aura(interactable: Area2D, on: bool) -> void:
 			7
 		)
 	aura.emitting = on
-	_set_interactable_mark(interactable, on)
+	_clear_interactable_mark(interactable)
 
 
-## Al posto della scritta "[E] ...": un rombo di luce che ondeggia sopra
-## l'oggetto. Dice "qui si puo' agire" senza spiegare niente.
-func _set_interactable_mark(interactable: Area2D, on: bool) -> void:
-	var mark := interactable.get_node_or_null("ReadyMark") as Line2D
-	if mark == null:
-		if not on:
-			return
-		mark = Line2D.new()
-		mark.name = "ReadyMark"
-		mark.width = 1.6
-		mark.z_index = 40
-		mark.default_color = Color(0.88, 0.8, 0.52, 0.0)
-		mark.points = PackedVector2Array([
-			Vector2(0, -6), Vector2(5, 0), Vector2(0, 6), Vector2(-5, 0), Vector2(0, -6)
-		])
-		mark.position = Vector2(0, -36)
-		interactable.add_child(mark)
-		var bob := mark.create_tween().set_loops()
-		bob.tween_property(mark, "position:y", -42.0, 1.3).set_trans(Tween.TRANS_SINE)
-		bob.tween_property(mark, "position:y", -36.0, 1.3).set_trans(Tween.TRANS_SINE)
-	var fade := mark.create_tween()
-	fade.tween_property(mark, "default_color:a", 0.7 if on else 0.0, 0.3)
+func _clear_interactable_mark(interactable: Area2D) -> void:
+	var mark := interactable.get_node_or_null("ReadyMark")
+	if mark:
+		mark.queue_free()
 
 
 func _use_salute_passage(interactable: Area2D) -> void:

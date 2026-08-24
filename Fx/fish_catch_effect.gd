@@ -4,14 +4,12 @@ var _particles: Array[Dictionary] = []
 var _age := 0.0
 var _lifetime := 1.05
 var _light: PointLight2D
-var _label: Label
 
 
 func _ready() -> void:
 	add_to_group("fish_catch_effect")
 	z_index = 90
 	_create_light()
-	_create_label()
 
 
 func setup(health_restored: int) -> void:
@@ -25,8 +23,6 @@ func setup(health_restored: int) -> void:
 			"radius": randf_range(1.8, 4.2),
 			"gold": index % 3 == 0,
 		})
-	_label.text = "+%d VITA" % health_restored if health_restored > 0 else "VITA PIENA"
-	_label.modulate = Color(1.0, 0.83, 0.42, 1.0) if health_restored > 0 else Color(0.55, 0.95, 0.87, 1.0)
 	queue_redraw()
 
 
@@ -42,8 +38,6 @@ func _process(delta: float) -> void:
 		particle["position"] = position
 	var fade := clampf(1.0 - _age / _lifetime, 0.0, 1.0)
 	_light.energy = fade * 1.35
-	_label.position.y = -54.0 - _age * 26.0
-	_label.modulate.a = fade
 	queue_redraw()
 	if _age >= _lifetime:
 		queue_free()
@@ -78,12 +72,3 @@ func _create_light() -> void:
 	_light.energy = 1.35
 	_light.texture_scale = 1.3
 	add_child(_light)
-
-
-func _create_label() -> void:
-	_label = Label.new()
-	_label.position = Vector2(-70.0, -54.0)
-	_label.size = Vector2(140.0, 32.0)
-	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label.add_theme_font_size_override("font_size", 18)
-	add_child(_label)

@@ -25,7 +25,9 @@ signal locked_skill_requested
 @export var ground_deceleration: float = 2200.0
 @export var air_acceleration: float = 900.0
 @export var air_deceleration: float = 450.0
-@export var gravity: float = 500.0
+@export var gravity: float = 1100.0
+@export var fall_gravity: float = 2300.0
+@export var max_fall_speed: float = 580.0
 
 @export_category("Dash")
 @export var dash_speed: float = 400.0
@@ -36,12 +38,19 @@ signal locked_skill_requested
 @export var dash_cancel_on_wall: bool = true
 
 @export_category("Jump")
-@export var jump_speed: float = 300.0
-@export var jump_acceleration: float = 380.0
+@export var jump_speed: float = 520.0
+@export var jump_acceleration: float = 640.0
+@export var pogo_speed_scale: float = 0.8
 @export var jump_amount: int = 2
 @export var coyote_time: float = 0.12
 @export var jump_buffer_time: float = 0.12
-@export var jump_cut_multiplier: float = 0.45
+@export var jump_cut_multiplier: float = 0.5
+## Celeste Player.cs / stessa scuola di Hollow Knight: NON 500ms.
+## VarJumpTime = 0.2s. HalfGrav all'apice ~80-120ms, poi caduta secca.
+@export var var_jump_time: float = 0.2
+@export var apex_hang_time: float = 0.1
+@export var apex_gravity_scale: float = 0.5
+@export var half_grav_threshold: float = 48.0
 @export var dash_invincibility: bool = true
 
 @export_category("Water")
@@ -185,8 +194,8 @@ const POWER_STRIKE_TINT := Color(1.0, 0.72, 0.3, 1.0)
 @export var spawn_point_group: String = "spawn_point"
 ## Se true, usa l'ultimo terreno toccato come respawn
 @export var use_last_ground_as_respawn: bool = true
-## Offset Y dal punto di respawn (per non spawnare nel terreno)
-@export var respawn_y_offset: float = -20.0
+## Offset Y dal punto di respawn. last_safe è già la posizione in piedi: 0.
+@export var respawn_y_offset: float = 0.0
 ## Frame preciso dello sprite da mostrare alla morte (indice del frame nello sprite sheet, es. 0-39 se 5x8)
 @export var death_frame: int = 0
 ## Se true, alla morte il mondo si resetta (reload scena) e riparti dall'inizio (character_beginning + player)
@@ -204,7 +213,18 @@ var _attack_hitbox: Area2D = null  # Area per colpire nemici (abilitata solo dur
 var _attack_hit_enemies: Array[Node] = []  # nemici già colpiti in questo attacco (evita doppio danno)
 var _current_attack_damage: int = 1  # 1 = attacco normale, 2 = attacco forte
 var _attack_slash_timer: float = 0.0
+var _attack_slash_span: float = 0.35
+var _attack_cooldown: float = 0.0
+var _attack_dir: Vector2 = Vector2.RIGHT
+var _hitstop_timer: float = 0.0
+var _pogo_grace_timer: float = 0.0
+var _var_jump_timer: float = 0.0
+var _var_jump_speed: float = 0.0
+var _apex_hang_left: float = 0.0
+var _was_rising: bool = false
 var _fishing_feedback_timer := 0.0
+const NAIL_DURATION := 0.35
+const NAIL_COOLDOWN := 0.41
 
 # Health UI
 var _health_states: Array[bool] = []
@@ -394,19 +414,53 @@ func _on_fish_area_body_entered(body: Node2D):
 		_fish_catch_jump_done = true
 		_sync_line_length_for_hang()
 
+func _resolve_nail_direction() -> Vector2:
+	var up := (
+		Input.is_action_pressed("ui_up")
+		or Input.is_action_pressed("aim_up")
+		or Input.is_physical_key_pressed(KEY_W)
+	)
+	var down := (
+		Input.is_action_pressed("aim_down")
+		or Input.is_physical_key_pressed(KEY_S)
+		or Input.is_physical_key_pressed(KEY_DOWN)
+	)
+	if InputMap.has_action("ui_down") and Input.is_action_pressed("ui_down"):
+		down = true
+	if down and not is_on_floor():
+		return Vector2.DOWN
+	if up:
+		return Vector2.UP
+	return Vector2.RIGHT if facing_right else Vector2.LEFT
+
 func _update_attack_hitbox_position():
 	if _attack_hitbox == null:
 		return
-	var offset_x = 32 if facing_right else -32
-	var col = _attack_hitbox.get_node_or_null("CollisionShape2D")
-	if col:
-		col.position = Vector2(offset_x, -30)
+	var col = _attack_hitbox.get_node_or_null("CollisionShape2D") as CollisionShape2D
+	if col == null:
+		return
+	var shape := col.shape as RectangleShape2D
+	if shape == null:
+		shape = RectangleShape2D.new()
+		col.shape = shape
+	if _attack_dir.y < -0.5:
+		shape.size = Vector2(54, 70)
+		col.position = Vector2(0, -56)
+	elif _attack_dir.y > 0.5:
+		shape.size = Vector2(64, 86)
+		col.position = Vector2(0, 40)
+	else:
+		shape.size = Vector2(72, 58)
+		col.position = Vector2(34 if facing_right else -34, -22)
 
 func _enable_attack_hitbox(damage: int = 1):
+	_attack_dir = _resolve_nail_direction()
 	_update_attack_hitbox_position()
 	_attack_hit_enemies.clear()
 	_current_attack_damage = damage
-	_attack_slash_timer = 0.22
+	_attack_slash_span = NAIL_DURATION
+	_attack_slash_timer = NAIL_DURATION
+	_attack_cooldown = NAIL_COOLDOWN
 	if damage >= enemy_power_damage:
 		_power_strike_left = 0.0
 		_request_shake(0.5)
@@ -426,6 +480,9 @@ func _disable_attack_hitbox():
 func _on_attack_hitbox_area_entered(area: Area2D) -> void:
 	if is_dead:
 		return
+	if _is_pogo_target(area):
+		_try_hit_enemy(area)
+		return
 	var parent: Node = area.get_parent()
 	_try_hit_enemy(parent)
 
@@ -433,9 +490,18 @@ func _on_attack_hitbox_area_entered(area: Area2D) -> void:
 func _try_hit_enemy(target: Node) -> void:
 	if target == null or not is_instance_valid(target):
 		return
+	if target == self or target.is_in_group("player"):
+		return
 	if not target.is_in_group("enemy"):
-		if target.has_method("_on_hit"):
-			_request_shake(0.35)
+		if _is_pogo_target(target):
+			if target in _attack_hit_enemies:
+				return
+			_attack_hit_enemies.append(target)
+			if target.has_method("on_pogo_hit"):
+				target.call("on_pogo_hit")
+			if target.has_method("_on_hit"):
+				target.call("_on_hit")
+			_on_nail_connect(target)
 		return
 	if target in _attack_hit_enemies:
 		return
@@ -444,7 +510,56 @@ func _try_hit_enemy(target: Node) -> void:
 	_attack_hit_enemies.append(target)
 	if target.has_method("take_damage"):
 		target.take_damage(_current_attack_damage, global_position)
-	_request_shake(0.38)
+	_on_nail_connect(target)
+
+
+func _is_pogo_target(target: Node) -> bool:
+	if target == null or not is_instance_valid(target):
+		return false
+	if target == self or target.is_in_group("player"):
+		return false
+	if target.is_in_group("enemy") or target.is_in_group("dead_enemy"):
+		return true
+	if target.is_in_group("pogoable") or target.is_in_group("dogana_thorn"):
+		return true
+	if target.is_in_group("dogana_breakable") or target.has_method("_on_hit"):
+		return true
+	if target.is_in_group("dogana_bricole"):
+		return true
+	return false
+
+
+func is_pogo_grace() -> bool:
+	return _pogo_grace_timer > 0.0
+
+
+func _probe_pogo_targets() -> void:
+	if _attack_dir.y <= 0.5:
+		return
+	var world := get_world_2d()
+	if world == null:
+		return
+	var space := world.direct_space_state
+	if space == null:
+		return
+	var shape := RectangleShape2D.new()
+	shape.size = Vector2(62.0, 80.0)
+	var query := PhysicsShapeQueryParameters2D.new()
+	query.shape = shape
+	query.transform = Transform2D(0.0, global_position + Vector2(0.0, 36.0))
+	query.collision_mask = 1 | 2
+	query.collide_with_areas = true
+	query.collide_with_bodies = true
+	query.exclude = [get_rid()]
+	for hit in space.intersect_shape(query, 14):
+		var collider: Variant = hit.get("collider")
+		if not (collider is Node):
+			continue
+		var node := collider as Node
+		if _is_pogo_target(node):
+			_try_hit_enemy(node)
+		elif node.get_parent() != null and _is_pogo_target(node.get_parent()):
+			_try_hit_enemy(node.get_parent())
 
 
 func _resolve_attack_overlaps() -> void:
@@ -455,8 +570,11 @@ func _resolve_attack_overlaps() -> void:
 	for body in _attack_hitbox.get_overlapping_bodies():
 		_try_hit_enemy(body)
 		_on_attack_hitbox_body_entered(body)
+	_probe_pogo_targets()
 
 func _on_attack_hitbox_body_entered(body: Node2D) -> void:
+	if _is_pogo_target(body) and not body.is_in_group("enemy"):
+		_try_hit_enemy(body)
 	if body.is_in_group("dead_enemy") and body is RigidBody2D:
 		_request_shake(0.28)
 		var dir: Vector2 = (body.global_position - global_position).normalized()
@@ -464,6 +582,7 @@ func _on_attack_hitbox_body_entered(body: Node2D) -> void:
 		dir = dir.normalized()
 		body.apply_central_impulse(dir * 520.0)
 		body.apply_torque_impulse(sign(dir.x) * 220.0)
+		_on_nail_connect(body)
 
 func _setup_health():
 	_health_states.clear()
@@ -516,7 +635,7 @@ func _simple_fade_in(rect: ColorRect):
 func _on_anim_finished(anim_name: String):
 	if anim_name == "Fishing":
 		fishing_anim_finished = true
-	if anim_name == "Attack_fast" or anim_name == "Attack_strong":
+	if anim_name in ["Attack_fast", "Attack_strong", "Attack_up", "Attack_down"]:
 		_disable_attack_hitbox()
 		_attack_hit_enemies.clear()
 
@@ -596,24 +715,101 @@ func _draw():
 			var highlight = Color(1, 1, 1, 0.3 * _health_alpha)
 			draw_circle(pos + Vector2(-rad * 0.25, -rad * 0.25), rad * 0.25, highlight)
 
+func _on_nail_connect(target: Node) -> void:
+	var heavy := _current_attack_damage >= 2
+	var freeze := 0.055 if heavy else 0.04
+	_hitstop_timer = maxf(_hitstop_timer, freeze)
+	if target.has_method("apply_hitstop"):
+		target.call("apply_hitstop", freeze)
+	if _attack_dir.y > 0.5:
+		_apply_pogo()
+		_request_shake(0.12)
+		return
+	if _attack_dir.y < -0.5:
+		if not is_on_floor():
+			velocity.y = maxf(velocity.y, 36.0)
+		_request_shake(0.1)
+		return
+	var away := 1.0
+	if target is Node2D:
+		away = signf(global_position.x - (target as Node2D).global_position.x)
+	if is_zero_approx(away):
+		away = -1.0 if facing_right else 1.0
+	velocity.x = away * (168.0 if heavy else 150.0)
+	_knockback_timer = maxf(_knockback_timer, 0.1)
+	_request_shake(0.12)
+
+
+func _apply_pogo() -> void:
+	velocity.y = -jump_speed * pogo_speed_scale
+	jump_amount = 2
+	dash_cooldown_timer = 0.0
+	is_dashing = false
+	_pogo_grace_timer = 0.22
+	_begin_variable_jump(velocity.y)
+	tutorial_action_performed.emit(&"pogo")
+
+
+func apply_thorn_bounce() -> void:
+	## Rimbalzo passivo sulle spine: ti solleva e ti fa ricadere finché non poghi.
+	velocity.y = -jump_speed * 0.72
+	velocity.x *= 0.4
+	is_dashing = false
+	_apex_hang_left = 0.0
+	_var_jump_timer = 0.0
+
+
 func _draw_attack_slash() -> void:
-	var t := clampf(_attack_slash_timer / 0.22, 0.0, 1.0)
+	var span := _attack_slash_span if _attack_slash_span > 0.001 else NAIL_DURATION
+	var t := clampf(_attack_slash_timer / span, 0.0, 1.0)
+	var fade := pow(t, 0.55)
 	var facing := 1.0 if facing_right else -1.0
 	var empowered := _current_attack_damage >= enemy_power_damage
-	var reach := lerpf(28.0, 74.0 if empowered else 58.0, 1.0 - t)
-	var col := Color(0.42, 0.96, 0.82, 0.12 + t * 0.62)
-	var hot := Color(0.9, 1.0, 0.84, 0.1 + t * 0.8)
+	var edge := Color(0.97, 0.98, 1.0, 0.1 + fade * 0.88)
+	var core := Color(1.0, 1.0, 1.0, 0.08 + fade * 0.96)
 	if empowered:
-		col = Color(0.99, 0.72, 0.32, 0.16 + t * 0.7)
-		hot = Color(1.0, 0.94, 0.72, 0.14 + t * 0.86)
-	var tip := Vector2(facing * reach, -10.0)
-	var a := Vector2(facing * 10.0, -26.0)
-	var b := Vector2(facing * 14.0, 8.0)
-	draw_line(a, tip, col, 3.2, true)
-	draw_line(b, tip, col, 2.5, true)
-	draw_arc(Vector2(facing * 18.0, -8.0), reach * 0.55, -0.9 if facing_right else PI - 0.2, 0.7 if facing_right else PI + 0.9, 18, col, 3.2, true)
-	draw_arc(Vector2(facing * 17.0, -8.0), reach * 0.42, -0.78 if facing_right else PI - 0.1, 0.58 if facing_right else PI + 0.78, 16, hot, 1.25, true)
-	draw_circle(tip, 3.0 + (1.0 - t) * 2.0, hot)
+		edge = Color(1.0, 0.96, 0.86, 0.12 + fade * 0.9)
+		core = Color(1.0, 0.99, 0.94, 0.1 + fade * 0.98)
+	var origin := Vector2(10.0, -14.0)
+	var reach := lerpf(24.0, 54.0, 1.0 - t)
+	var a0 := -1.05
+	var a1 := 0.68
+	if _attack_dir.y < -0.5:
+		origin = Vector2(2.0, -18.0)
+		reach = lerpf(20.0, 48.0, 1.0 - t)
+		a0 = -2.35
+		a1 = -0.75
+	elif _attack_dir.y > 0.5:
+		origin = Vector2(2.0, 6.0)
+		reach = lerpf(18.0, 44.0, 1.0 - t)
+		a0 = 0.75
+		a1 = 2.35
+	var width := 4.2 if empowered else 3.4
+	_draw_mirrored_arc(origin, reach, a0, a1, facing, edge, width)
+	_draw_mirrored_arc(origin, reach * 0.9, a0 + 0.05, a1 - 0.05, facing, core, 1.5)
+	var tip_local := Vector2(
+		origin.x + cos(lerpf(a0, a1, 0.82)) * reach,
+		origin.y + sin(lerpf(a0, a1, 0.82)) * reach
+	)
+	draw_circle(Vector2(tip_local.x * facing, tip_local.y), 1.5 + fade * 1.3, core)
+
+
+func _draw_mirrored_arc(
+	origin: Vector2,
+	reach: float,
+	a0: float,
+	a1: float,
+	facing: float,
+	color: Color,
+	width: float
+) -> void:
+	var pts := PackedVector2Array()
+	var steps := 18
+	for i in range(steps + 1):
+		var a := lerpf(a0, a1, float(i) / float(steps))
+		var local := Vector2(origin.x + cos(a) * reach, origin.y + sin(a) * reach)
+		pts.append(Vector2(local.x * facing, local.y))
+	draw_polyline(pts, color, width, true)
 
 # ===========================================
 # CAST UI (barra caricamento + direzione)
@@ -705,7 +901,9 @@ func _input(event):
 	if event.is_action_pressed("grab"):
 		if not line_extended and hook_instance == null:
 			if using_fishing_hook:
-				_cast_pastura()
+				# Pastura disattivata per ora: il lancio si fa con F.
+				# _cast_pastura()
+				return
 			else:
 				var a = find_nearest_grab_anchor(get_rod_tip_position(), grab_attach_radius)
 				if a:
@@ -744,6 +942,9 @@ func _physics_process(delta: float):
 	if get_meta("arrival_locked", false):
 		velocity = Vector2.ZERO
 		return
+	if _hitstop_timer > 0.0:
+		_hitstop_timer = maxf(0.0, _hitstop_timer - delta)
+		return
 	
 	_update_dash_timers(delta)
 	_check_dash_input()
@@ -752,6 +953,10 @@ func _physics_process(delta: float):
 	_update_health_visibility(delta)
 	_update_breathing(delta)
 	_update_jump_assist_timers(delta)
+	if _attack_cooldown > 0.0:
+		_attack_cooldown = maxf(0.0, _attack_cooldown - delta)
+	if _pogo_grace_timer > 0.0:
+		_pogo_grace_timer = maxf(0.0, _pogo_grace_timer - delta)
 	if _attack_slash_timer > 0.0:
 		_resolve_attack_overlaps()
 		_attack_slash_timer = maxf(0.0, _attack_slash_timer - delta)
@@ -805,6 +1010,8 @@ func _physics_process(delta: float):
 	if is_on_floor() and velocity.y >= 0.0:
 		_coyote_timer = coyote_time
 		jump_amount = 2
+		_var_jump_timer = 0.0
+		_apex_hang_left = 0.0
 		last_safe_ground_position = global_position
 	elif _was_on_floor and not is_on_floor():
 		_coyote_timer = coyote_time
@@ -911,6 +1118,8 @@ func _update_jump_assist_timers(delta: float) -> void:
 		and not is_dashing
 	):
 		velocity.y *= jump_cut_multiplier
+		_var_jump_timer = 0.0
+		_apex_hang_left = 0.0
 
 
 func _start_dash(direction: Vector2):
@@ -967,7 +1176,35 @@ func _end_dash():
 	_dash_was_invincible = false
 
 func _apply_gravity(delta: float):
-	velocity.y += gravity * water_gravity_multiplier * delta
+	var holding_jump := Input.is_action_pressed("ui_accept")
+	if _was_rising and velocity.y >= 0.0 and holding_jump:
+		_apex_hang_left = apex_hang_time
+	_was_rising = velocity.y < 0.0
+
+	var g := gravity
+	var near_apex := absf(velocity.y) < half_grav_threshold
+	if _apex_hang_left > 0.0 and holding_jump:
+		g = gravity * apex_gravity_scale
+		_apex_hang_left = maxf(0.0, _apex_hang_left - delta)
+	elif near_apex and holding_jump:
+		g = gravity * apex_gravity_scale
+	elif velocity.y > 0.0:
+		g = fall_gravity
+		_apex_hang_left = 0.0
+	else:
+		_apex_hang_left = 0.0
+
+	velocity.y += g * water_gravity_multiplier * delta
+	if _var_jump_timer > 0.0:
+		if holding_jump:
+			velocity.y = minf(velocity.y, _var_jump_speed)
+			_var_jump_timer = maxf(0.0, _var_jump_timer - delta)
+		else:
+			_var_jump_timer = 0.0
+	var cap := max_fall_speed
+	if water_gravity_multiplier < 0.95:
+		cap = max_fall_speed * 0.55
+	velocity.y = minf(velocity.y, cap)
 
 func horizontal_movement(delta: float):
 	if is_dashing:
@@ -1013,6 +1250,8 @@ func _update_footstep_fx(delta: float) -> void:
 
 
 func _setup_player_soft_light() -> void:
+	if OS.get_name() == "Android" or OS.has_feature("mobile"):
+		return
 	_player_soft_light = PointLight2D.new()
 	_player_soft_light.name = "PlayerSoftLight"
 	_player_soft_light.position = Vector2(0, -7)
@@ -1050,22 +1289,24 @@ func flip_logic():
 	_update_attack_hitbox_position()
 
 func set_animation():
-	if Input.is_action_just_pressed("ui_attack_strong") and not line_extended:
+	var can_nail := _attack_cooldown <= 0.0 and not line_extended
+	if Input.is_action_just_pressed("ui_attack_strong") and can_nail:
 		if anim.has_animation("Attack_strong"):
-			anim.play("Attack_strong")
+			anim.play("Attack_strong", -1.0, 2.05)
 			_enable_attack_hitbox(2)
 			tutorial_action_performed.emit(&"attack")
-			if particles_on_attack and black_particle_scene:
-				_spawn_particles(global_position, Vector2.RIGHT if facing_right else Vector2.LEFT, 0.25)
 		return
-	if Input.is_action_just_pressed("ui_attack") and not line_extended:
-		anim.play("Attack_fast")
+	if Input.is_action_just_pressed("ui_attack") and can_nail:
 		_enable_attack_hitbox(enemy_power_damage if _power_strike_left > 0.0 else 1)
+		if _attack_dir.y < -0.5 and anim.has_animation("Attack_up"):
+			anim.play("Attack_up")
+		elif _attack_dir.y > 0.5 and anim.has_animation("Attack_down"):
+			anim.play("Attack_down")
+		else:
+			anim.play("Attack_fast")
 		tutorial_action_performed.emit(&"attack")
-		if particles_on_attack and black_particle_scene:
-			_spawn_particles(global_position, Vector2.RIGHT if facing_right else Vector2.LEFT, 0.2)
 		return
-	if (anim.current_animation == "Attack_fast" or anim.current_animation == "Attack_strong") and anim.is_playing():
+	if anim.current_animation in ["Attack_fast", "Attack_strong", "Attack_up", "Attack_down"] and anim.is_playing():
 		return
 	if _attack_slash_timer > 0.0:
 		return
@@ -1112,6 +1353,13 @@ func _play_locomotion():
 	else:
 		anim.play("Idle")
 
+func _begin_variable_jump(upward_speed: float) -> void:
+	_var_jump_speed = upward_speed
+	_var_jump_timer = var_jump_time
+	_apex_hang_left = 0.0
+	_was_rising = true
+
+
 func jump_logic():
 	var wants_jump := _jump_buffer_timer > 0.0
 	var can_coyote := _coyote_timer > 0.0 and jump_amount > 0
@@ -1120,6 +1368,7 @@ func jump_logic():
 		_coyote_timer = 0.0
 		jump_amount = maxi(0, jump_amount - 1)
 		velocity.y = -lerp(jump_speed, jump_acceleration, 0.1)
+		_begin_variable_jump(velocity.y)
 		tutorial_action_performed.emit(&"jump")
 		if particles_on_jump and black_particle_scene:
 			_spawn_particles(global_position, Vector2.DOWN, 0.2)
@@ -1129,6 +1378,7 @@ func jump_logic():
 		_jump_buffer_timer = 0.0
 		jump_amount -= 1
 		velocity.y = -lerp(jump_speed, jump_acceleration, 1.0)
+		_begin_variable_jump(velocity.y)
 		tutorial_action_performed.emit(&"double_jump" if jump_amount == 0 else &"jump")
 		if particles_on_jump and black_particle_scene:
 			_spawn_particles(global_position, Vector2.DOWN, 0.2)
@@ -1361,12 +1611,36 @@ func _on_respawn():
 	
 	_show_health_ui()
 	respawned.emit()
-	
-	# Stessa animazione di risveglio di character_beginning (altare / respawn).
-	if not bool(get_meta("skip_wake_animation", false)):
-		call_deferred("play_altar_wake_animation")
-	else:
-		set_meta("skip_wake_animation", false)
+	call_deferred("_snap_respawn_to_floor")
+	# Niente sprite barca/risveglio in morte: sembrava un mezzo cerchio sospeso.
+
+
+func _snap_respawn_to_floor() -> void:
+	if not is_inside_tree() or is_dead:
+		return
+	var space := get_world_2d().direct_space_state
+	if space == null:
+		return
+	var query := PhysicsRayQueryParameters2D.create(
+		global_position + Vector2(0.0, -12.0),
+		global_position + Vector2(0.0, 80.0)
+	)
+	query.collision_mask = 1
+	query.exclude = [get_rid()]
+	var hit := space.intersect_ray(query)
+	if hit.is_empty():
+		return
+	var collider := hit.get("collider") as Node
+	while collider:
+		if collider.is_in_group("dogana_bricole"):
+			return
+		collider = collider.get_parent()
+	var col := get_node_or_null("CollisionShape2D") as CollisionShape2D
+	var feet := 13.0
+	if col and col.shape is RectangleShape2D:
+		feet = col.position.y + (col.shape as RectangleShape2D).size.y * 0.5
+	global_position.y = (hit.position as Vector2).y - feet + 1.0
+	velocity = Vector2.ZERO
 
 
 func play_altar_wake_animation() -> void:
@@ -1684,21 +1958,24 @@ func cast_hook_charged():
 	if line_mode == LineMode.GRAB:
 		register_grab_anchor(hook_instance)
 
+# Pastura disattivata per ora. Tenere il codice, non cancellare.
+# func _cast_pastura():
+# 	if pastura_scene == null:
+# 		return
+# 	var p = pastura_scene.instantiate() as Node2D
+# 	if p == null:
+# 		return
+# 	get_tree().current_scene.add_child(p)
+# 	var start = get_rod_tip_position()
+# 	var dir = get_cast_direction()
+# 	p.global_position = start + dir * spawn_forward_push
+# 	if p.has_method("set_velocity"):
+# 		p.call("set_velocity", dir * cast_speed * 0.8)
+# 	if p.has_method("set_player_reference"):
+# 		p.call("set_player_reference", self)
+# 	active_pastura = p
 func _cast_pastura():
-	if pastura_scene == null:
-		return
-	var p = pastura_scene.instantiate() as Node2D
-	if p == null:
-		return
-	get_tree().current_scene.add_child(p)
-	var start = get_rod_tip_position()
-	var dir = get_cast_direction()
-	p.global_position = start + dir * spawn_forward_push
-	if p.has_method("set_velocity"):
-		p.call("set_velocity", dir * cast_speed * 0.8)
-	if p.has_method("set_player_reference"):
-		p.call("set_player_reference", self)
-	active_pastura = p
+	return
 
 # ===========================================
 # ROPE
@@ -2074,7 +2351,6 @@ func on_fish_hooked(fish: Node2D):
 			hide = using_fishing_hook and line_mode == LineMode.FISHING
 		if hide and hook_instance.has_method("hide_for_fish"):
 			hook_instance.call("hide_for_fish")
-	_notify_gameplay("PESCE AGGANCIATO  •  TIENI R — RILASCIA SE LA LENZA È ROSSA")
 
 func on_fish_spawned(fish: Node2D):
 	on_fish_hooked(fish)
@@ -2119,8 +2395,6 @@ func _update_fish_struggle(delta: float):
 		fish_struggle_phase_timer = 0.0
 		if current_fish.has_method("start_struggle"):
 			current_fish.call("start_struggle")
-		if _fish_hooked_time < 8.0:
-			_notify_gameplay("ASPETTA  •  LA LENZA È IN TENSIONE")
 	if fish_struggle_active:
 		if is_reeling:
 			# Tirare durante la lotta = sbagliato: stress e rischio fuga.
@@ -2157,7 +2431,6 @@ func _stop_fish_struggle():
 		current_fish.call("stop_struggle")
 
 func _on_fish_escaped():
-	_notify_gameplay("IL PESCE È SCAPPATO")
 	# L'amo resta dove il pesce si è staccato (non torna al punto del morso)
 	if current_fish and is_instance_valid(current_fish) and hook_instance and is_instance_valid(hook_instance):
 		var fish_pos: Vector2 = get_fish_center_position(current_fish)
@@ -2367,7 +2640,6 @@ func _tether_fish_to_line(rod: Vector2, max_len: float) -> void:
 func _complete_fish_catch(fish: Node2D) -> void:
 	if fish == null or not is_instance_valid(fish):
 		return
-	_notify_gameplay("CATTURA  •  NUTRIMENTO RECUPERATO")
 	var health_before := current_health
 	heal(fish_health_reward)
 	var health_restored := current_health - health_before

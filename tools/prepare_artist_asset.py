@@ -18,7 +18,10 @@ from PIL import Image
 
 def is_preview_background(pixel: tuple[int, int, int, int]) -> bool:
     red, green, blue, _alpha = pixel
-    return min(red, green, blue) >= 202 and max(red, green, blue) - min(red, green, blue) <= 24
+    if min(red, green, blue) >= 202 and max(red, green, blue) - min(red, green, blue) <= 24:
+        return True
+    # Placeholder AI / solid studio backdrop: near-black and almost neutral.
+    return max(red, green, blue) <= 16 and max(red, green, blue) - min(red, green, blue) <= 8
 
 
 def remove_connected_background(path: Path) -> None:

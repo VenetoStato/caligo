@@ -46,12 +46,15 @@ func _ready() -> void:
 	_near = _build_empty_layer("NearAtmosphericFrames", 12, "dogana_parallax_near")
 	_fore = _build_foreground_veils()
 	_fore_close = _build_foreground_close()
-	_fore_motes = _build_foreground_motes()
-	_bokeh_far = _build_bokeh_layer("FarBokeh", -16, 18, Color(0.42, 0.72, 0.75, 0.18), 0.65)
-	_bokeh_near = _build_bokeh_layer("NearBokeh", 11, 11, Color(0.72, 0.78, 0.62, 0.12), 1.25)
-	_atmospheric_dust = _build_atmospheric_dust()
-	_light_motes = _build_light_motes()
 	_world_lights = _build_world_lights()
+	if OS.has_feature("mobile") or OS.get_name() == "Android":
+		pass
+	else:
+		_fore_motes = _build_foreground_motes()
+		_bokeh_far = _build_bokeh_layer("FarBokeh", -16, 18, Color(0.42, 0.72, 0.75, 0.18), 0.65)
+		_bokeh_near = _build_bokeh_layer("NearBokeh", 11, 11, Color(0.72, 0.78, 0.62, 0.12), 1.25)
+		_atmospheric_dust = _build_atmospheric_dust()
+		_light_motes = _build_light_motes()
 	_interior_overlay = _build_interior_depth()
 	set_process(true)
 
@@ -172,6 +175,7 @@ func _build_mid_reflections() -> Node2D:
 func _build_foreground_veils() -> Node2D:
 	var layer := Node2D.new()
 	layer.name = "ForegroundPoles"
+	layer.z_as_relative = false
 	layer.z_index = 15
 	layer.add_to_group("dogana_parallax_foreground")
 	add_child(layer)
@@ -190,13 +194,14 @@ func _build_foreground_veils() -> Node2D:
 func _build_foreground_close() -> Node2D:
 	var layer := Node2D.new()
 	layer.name = "ForegroundClose"
+	layer.z_as_relative = false
 	layer.z_index = 17
 	layer.add_to_group("dogana_parallax_foreground_close")
 	add_child(layer)
 	if OS.has_feature("mobile"):
 		return layer
-	for index in 2:
-		var x := 1850.0 + index * 3450.0
+	for index in 3:
+		var x := 1200.0 + index * 2050.0
 		layer.add_child(_make_foreground_pole(x, 760.0, 1.5, 2.1, FORE_CLOSE))
 	return layer
 

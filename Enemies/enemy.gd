@@ -34,8 +34,9 @@ const MAX_TRANSIENT_ATTACKS := 64
 @export var attack_range: float = 58.0   # distanza per considerare "vicino" al player
 @export var attack_damage: int = 1
 @export var attack_cooldown: float = 1.35
-@export var knockback_speed: float = 1020.0  # rinculo quando colpito (metà di 2040)
-@export var knockback_duration: float = 0.35
+@export var knockback_speed: float = 168.0
+@export var knockback_lift: float = 86.0
+@export var knockback_duration: float = 0.18
 
 @export_category("Archetype")
 enum AttackPattern {
@@ -84,8 +85,8 @@ enum AttackPattern {
 ## Kit art sostituibile: still e/o sheet a clip (idle/walk/wake/windup/attack/hurt/death/jump).
 @export var art_kit: EnemyArtKit
 ## Colore dello sprite quando viene colpito (flash molto visibile)
-@export var hit_flash_color: Color = Color(2.6, 0.55, 0.22, 1.0)
-@export var hit_flash_duration: float = 0.28
+@export var hit_flash_color: Color = Color(2.15, 2.2, 2.25, 1.0)
+@export var hit_flash_duration: float = 0.12
 ## Scena particelle quando colpito (es. BlackParticle); vuoto = nessuna
 @export var hit_particle_scene: PackedScene = null
 
@@ -98,6 +99,7 @@ var attack_timer: float = 0.0
 var facing_right: bool = true
 var _attack_hitbox_disable_timer: float = 0.0
 var _knockback_timer: float = 0.0
+var _hitstop_timer: float = 0.0
 var _hit_flash_timer: float = 0.0
 var _flip_cooldown: float = 0.0
 var _attack_has_hit := false
@@ -339,6 +341,10 @@ func _normalize_collision_to_feet() -> void:
 func _physics_process(delta: float) -> void:
 	if state == State.DEAD:
 		return
+	if _hitstop_timer > 0.0:
+		_hitstop_timer = maxf(0.0, _hitstop_timer - delta)
+		queue_redraw()
+		return
 	_patrol_turn_cooldown = maxf(0.0, _patrol_turn_cooldown - delta)
 	_chase_switch_cooldown = maxf(0.0, _chase_switch_cooldown - delta)
 	# La lenza prende temporaneamente il controllo del moto. I pesanti si piantano
@@ -423,12 +429,13 @@ func _physics_process(delta: float) -> void:
 		queue_redraw()
 		return
 
-	# Rinculo: per un breve tempo non inseguire, solo fisica del rinculo
+	# Rinculo: arco breve, poi ricade. Niente inseguimento finché è in aria.
 	if _knockback_timer > 0.0:
 		_knockback_timer -= delta
-		velocity.y += gravity * delta
-		velocity.x = move_toward(velocity.x, 0.0, knockback_speed * 5.0 * delta)
+		velocity.y += gravity * 1.55 * delta
+		velocity.x = move_toward(velocity.x, 0.0, 640.0 * delta)
 		move_and_slide()
+		queue_redraw()
 		return
 
 	# AGGRO: insegui il player
@@ -1081,29 +1088,47 @@ func take_damage(amount: int = 1, source_position: Vector2 = Vector2.ZERO) -> vo
 	_attack_kick = 0.55
 	if sprite_node:
 		sprite_node.modulate = hit_flash_color
-		sprite_node.scale = _original_sprite_scale * Vector2(1.18, 0.82)
+		sprite_node.scale = _original_sprite_scale * Vector2(1.12, 0.88)
 	_spawn_hit_particles(source_position)
 	_alert_nearby_enemies()
 	queue_redraw()
 
+	var pop := _nail_pop_velocity(source_position)
 	if current_health <= 0:
-		_die()
+		_die(pop)
 		return
 
-	# Rinculo: prevalentemente orizzontale (sinistra/destra), al massimo un lieve stacco
-	if source_position != Vector2.ZERO:
-		var dir: Vector2 = (global_position - source_position).normalized()
-		dir.x = sign(dir.x)
-		dir.y = -0.2
-		dir = dir.normalized()
-		velocity = dir * knockback_speed
-		_knockback_timer = knockback_duration
+	velocity = pop
+	_knockback_timer = knockback_duration
+	apply_hitstop(0.05)
 
 	_play_clip("hurt", true)
 	if state == State.IDLE:
 		state = State.AGGRO
 		player = get_tree().get_first_node_in_group("player") as Node2D
 		jump_timer = 0.0
+
+
+func _nail_pop_velocity(source_position: Vector2) -> Vector2:
+	var away := 1.0
+	if source_position != Vector2.ZERO:
+		away = signf(global_position.x - source_position.x)
+		if is_zero_approx(away):
+			away = 1.0
+	var nail := Vector2(away, 0.0)
+	if source_position != Vector2.ZERO:
+		var attacker := get_tree().get_first_node_in_group("player")
+		if attacker and attacker.get("_attack_dir") != null:
+			nail = attacker.get("_attack_dir")
+	if nail.y < -0.5:
+		return Vector2(away * knockback_speed * 0.35, -knockback_lift * 2.6)
+	if nail.y > 0.5:
+		return Vector2(away * knockback_speed * 0.5, 70.0)
+	return Vector2(away * knockback_speed, -knockback_lift)
+
+
+func apply_hitstop(duration: float) -> void:
+	_hitstop_timer = maxf(_hitstop_timer, duration)
 
 
 func can_be_combat_hooked() -> bool:
@@ -1234,8 +1259,8 @@ func _draw_hurtbox_silhouette() -> void:
 	var fill := Color(0.95, 0.28, 0.22, 0.12)
 	var edge := Color(1.0, 0.45, 0.32, 0.55)
 	if _hit_flash_timer > 0.0:
-		fill = Color(1.0, 0.85, 0.35, 0.28)
-		edge = Color(1.0, 0.95, 0.55, 0.9)
+		fill = Color(1.0, 1.0, 1.0, 0.22)
+		edge = Color(0.96, 0.98, 1.0, 0.85)
 	draw_rect(Rect2(center - half, half * 2.0), fill, true)
 	draw_rect(Rect2(center - half, half * 2.0), edge, false, 1.6 / scale_safe)
 	draw_circle(center, 2.6 / scale_safe, Color(edge.r, edge.g, edge.b, edge.a * 0.75))
@@ -1265,13 +1290,13 @@ func _spawn_hit_particles(source_position: Vector2) -> void:
 	if p.has_method("set_direction"):
 		p.call("set_direction", dir)
 	if p.has_method("set_color"):
-		p.call("set_color", Color(0.9, 0.35, 0.2, 0.9))
+		p.call("set_color", Color(0.94, 0.96, 1.0, 0.92))
 	if p.has_method("set_amount"):
-		p.call("set_amount", 14)
+		p.call("set_amount", 8)
 	if p.has_method("play"):
 		p.call("play")
 
-func _die() -> void:
+func _die(launch_velocity: Vector2 = Vector2.ZERO) -> void:
 	if state == State.DEAD:
 		return
 	state = State.DEAD
@@ -1323,6 +1348,14 @@ func _die() -> void:
 	# Posizione in coordinate locali del parent, così quando viene aggiunto è già al posto giusto
 	rb.position = parent_node.to_local(pos_global)
 	parent_node.call_deferred("add_child", rb)
+	if launch_velocity.length_squared() > 1.0:
+		rb.tree_entered.connect(
+			func() -> void:
+				if is_instance_valid(rb):
+					rb.apply_central_impulse(launch_velocity * rb.mass)
+					rb.apply_torque_impulse(signf(launch_velocity.x) * 90.0),
+			CONNECT_ONE_SHOT
+		)
 	var cleanup_timer := Timer.new()
 	cleanup_timer.one_shot = true
 	cleanup_timer.wait_time = 12.0
@@ -1351,6 +1384,7 @@ func reset_to_home() -> void:
 	_leap_slam_timer = 0.0
 	_charge_timer = 0.0
 	_knockback_timer = 0.0
+	_hitstop_timer = 0.0
 	_hit_flash_timer = 0.0
 	_attack_has_hit = false
 	_combat_hooked = false

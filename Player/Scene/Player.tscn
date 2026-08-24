@@ -1,4 +1,4 @@
-[gd_scene load_steps=19 format=3 uid="uid://c064mwp5bwak4"]
+[gd_scene load_steps=21 format=3 uid="uid://c064mwp5bwak4"]
 
 [ext_resource type="Texture2D" uid="uid://d3oicsx8lp473" path="res://Player/Sprites/sprite_sheet.png" id="1_gqxai"]
 [ext_resource type="Script" uid="uid://c14so0210pd47" path="res://Player/Scene/player_controller.gd" id="1_qfdc6"]
@@ -26,6 +26,40 @@ tracks/0/keys = {
 "transitions": PackedFloat32Array(1, 1, 1),
 "update": 1,
 "values": [16, 17, 18]
+}
+
+[sub_resource type="Animation" id="Animation_attack_up"]
+resource_name = "Attack_up"
+length = 0.3
+step = 0.1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:frame")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.2),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 1,
+"values": [0, 1, 2]
+}
+
+[sub_resource type="Animation" id="Animation_attack_down"]
+resource_name = "Attack_down"
+length = 0.3
+step = 0.1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:frame")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.2),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 1,
+"values": [31, 32, 35]
 }
 
 [sub_resource type="Animation" id="Animation_lhvu3"]
@@ -151,6 +185,8 @@ tracks/0/keys = {
 _data = {
 &"Attack_fast": SubResource("Animation_f50pn"),
 &"Attack_strong": SubResource("Animation_lhvu3"),
+&"Attack_up": SubResource("Animation_attack_up"),
+&"Attack_down": SubResource("Animation_attack_down"),
 &"Falling": SubResource("Animation_qp52p"),
 &"Fishing": SubResource("Animation_dd465"),
 &"Idle": SubResource("Animation_ij6vw"),
