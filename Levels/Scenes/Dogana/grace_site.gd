@@ -166,8 +166,9 @@ func play_rest_fx() -> void:
 
 
 func get_respawn_position() -> Vector2:
-	# Origine del player: i piedi stanno ~13px sotto. -14 li appoggia sul piano dell'altare.
-	return global_position + Vector2(0.0, -14.0)
+	# Parte un po' sopra il piano: lo snap ai piedi evita di spawnare dentro il dock.
+	var lift := -28.0 if site_id == "fortuna" else -22.0
+	return global_position + Vector2(0.0, lift)
 
 
 func _on_body_entered(body: Node2D) -> void:

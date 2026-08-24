@@ -450,7 +450,7 @@ func _on_boss_defeated() -> void:
 		if finish_collision:
 			finish_collision.set_deferred("disabled", false)
 		finish.set_deferred("monitoring", true)
-	_show_message("CUSTODE SCONFITTO  •  OTTENUTO AMO DEL TRASCINAMENTO [C]")
+	_show_message("CUSTODE SCONFITTO  •  VITA IN PIU'  •  AMO DEL TRASCINAMENTO [C]")
 
 
 func _mark_access_open(access_id: String) -> void:
@@ -547,6 +547,8 @@ func _on_fast_travel_requested(site_id: String, debug_unlock := false) -> void:
 		_current_grace = site_id
 		_player.global_position = grace.call("get_respawn_position")
 		_player.velocity = Vector2.ZERO
+		if _player.has_method("_snap_respawn_to_floor"):
+			_player.call("_snap_respawn_to_floor")
 		_activate_grace(grace, false)
 		_sync_map()
 		_show_message("DEBUG - VIAGGIO ALLA GRAZIA - %s" % str(grace.get("display_name")).to_upper())

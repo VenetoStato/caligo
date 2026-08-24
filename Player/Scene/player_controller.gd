@@ -23,8 +23,8 @@ signal locked_skill_requested
 @export var deceleration: float = 0.1
 @export var ground_acceleration: float = 1800.0
 @export var ground_deceleration: float = 2200.0
-@export var air_acceleration: float = 900.0
-@export var air_deceleration: float = 450.0
+@export var air_acceleration: float = 1380.0
+@export var air_deceleration: float = 780.0
 @export var gravity: float = 1100.0
 @export var fall_gravity: float = 2300.0
 @export var max_fall_speed: float = 580.0
@@ -54,7 +54,7 @@ signal locked_skill_requested
 @export var dash_invincibility: bool = true
 
 @export_category("Water")
-@export var water_bounce_speed: float = 190.0
+@export var water_bounce_speed: float = 390.0
 
 @export_category("Fishing")
 @export var hook_scene: PackedScene
@@ -93,7 +93,7 @@ signal locked_skill_requested
 @export var reel_pull_force: float = 680.0
 @export var min_line_length_start: float = 40.0
 @export var spawn_forward_push: float = 18.0
-@export var min_forward_aim_dot: float = 0.15
+@export var min_forward_aim_dot: float = -0.05
 
 @export_category("Grab")
 @export var grab_pull_speed: float = 520.0
@@ -171,7 +171,7 @@ const POWER_STRIKE_TINT := Color(1.0, 0.72, 0.3, 1.0)
 ## Angolo di mira durante caricamento (radianti). Positivo = su, negativo = giù. Usato quando non c'è mouse.
 @export var cast_aim_angle_speed: float = 2.5
 ## Limite massimo angolo in su (gradi)
-@export var cast_aim_max_up: float = 75.0
+@export var cast_aim_max_up: float = 88.0
 ## Limite massimo angolo in giù (gradi)
 @export var cast_aim_max_down: float = 45.0
 ## Barra di caricamento del lancio (visibile mentre tieni premuto F)
@@ -218,6 +218,8 @@ var _attack_cooldown: float = 0.0
 var _attack_dir: Vector2 = Vector2.RIGHT
 var _hitstop_timer: float = 0.0
 var _pogo_grace_timer: float = 0.0
+var _thorn_grace_timer: float = 0.0
+var _water_hop_timer: float = 0.0
 var _var_jump_timer: float = 0.0
 var _var_jump_speed: float = 0.0
 var _apex_hang_left: float = 0.0
@@ -533,6 +535,10 @@ func is_pogo_grace() -> bool:
 	return _pogo_grace_timer > 0.0
 
 
+func is_thorn_grace() -> bool:
+	return _thorn_grace_timer > 0.0
+
+
 func _probe_pogo_targets() -> void:
 	if _attack_dir.y <= 0.5:
 		return
@@ -735,7 +741,7 @@ func _on_nail_connect(target: Node) -> void:
 		away = signf(global_position.x - (target as Node2D).global_position.x)
 	if is_zero_approx(away):
 		away = -1.0 if facing_right else 1.0
-	velocity.x = away * (168.0 if heavy else 150.0)
+	velocity.x = away * (192.0 if heavy else 174.0)
 	_knockback_timer = maxf(_knockback_timer, 0.1)
 	_request_shake(0.12)
 
@@ -750,13 +756,29 @@ func _apply_pogo() -> void:
 	tutorial_action_performed.emit(&"pogo")
 
 
-func apply_thorn_bounce() -> void:
-	## Rimbalzo passivo sulle spine: ti solleva e ti fa ricadere finché non poghi.
-	velocity.y = -jump_speed * 0.72
-	velocity.x *= 0.4
+func apply_thorn_bounce(from: Vector2 = Vector2.ZERO) -> void:
+	## Di lato respinge in orizzontale; da sopra (o in loop di salto) spacca verso l'alto.
+	if _thorn_grace_timer > 0.0:
+		return
+	var away := global_position - from
+	if away.length_squared() < 4.0:
+		away = Vector2(-1.0 if facing_right else 1.0, -0.7)
+	var side_hit := absf(away.x) > absf(away.y) * 0.52 or absf(velocity.x) > 64.0
+	if side_hit:
+		var hx := signf(away.x)
+		if is_zero_approx(hx):
+			hx = -signf(velocity.x) if absf(velocity.x) > 6.0 else (-1.0 if facing_right else 1.0)
+		velocity.x = hx * jump_speed * 0.84
+		velocity.y = -jump_speed * 0.78
+	else:
+		velocity.x *= 0.22
+		velocity.y = -jump_speed * 1.14
 	is_dashing = false
-	_apex_hang_left = 0.0
-	_var_jump_timer = 0.0
+	jump_amount = 2
+	_knockback_timer = maxf(_knockback_timer, 0.14)
+	_thorn_grace_timer = 0.36
+	_pogo_grace_timer = maxf(_pogo_grace_timer, 0.2)
+	_begin_variable_jump(velocity.y)
 
 
 func _draw_attack_slash() -> void:
@@ -957,6 +979,10 @@ func _physics_process(delta: float):
 		_attack_cooldown = maxf(0.0, _attack_cooldown - delta)
 	if _pogo_grace_timer > 0.0:
 		_pogo_grace_timer = maxf(0.0, _pogo_grace_timer - delta)
+	if _thorn_grace_timer > 0.0:
+		_thorn_grace_timer = maxf(0.0, _thorn_grace_timer - delta)
+	if _water_hop_timer > 0.0:
+		_water_hop_timer = maxf(0.0, _water_hop_timer - delta)
 	if _attack_slash_timer > 0.0:
 		_resolve_attack_overlaps()
 		_attack_slash_timer = maxf(0.0, _attack_slash_timer - delta)
@@ -1362,6 +1388,20 @@ func _begin_variable_jump(upward_speed: float) -> void:
 
 func jump_logic():
 	var wants_jump := _jump_buffer_timer > 0.0
+	if wants_jump and _water_hop_timer > 0.0:
+		_jump_buffer_timer = 0.0
+		_water_hop_timer = 0.0
+		jump_amount = maxi(0, jump_amount - 1)
+		velocity.y = -lerp(jump_speed, jump_acceleration, 0.1)
+		_begin_variable_jump(velocity.y)
+		tutorial_action_performed.emit(&"jump")
+		if particles_on_jump and black_particle_scene:
+			_spawn_particles(global_position, Vector2.DOWN, 0.2)
+		if particles_on_jump and ambient_trail_scene:
+			_spawn_trail(global_position, Vector2.DOWN)
+		return
+	if _thorn_grace_timer > 0.0 and is_on_floor():
+		return
 	var can_coyote := _coyote_timer > 0.0 and jump_amount > 0
 	if wants_jump and (is_on_floor() or can_coyote):
 		_jump_buffer_timer = 0.0
@@ -1426,6 +1466,15 @@ func take_damage(
 	
 	if current_health <= 0:
 		_on_death()
+
+func add_life_vessel() -> void:
+	max_health += 1
+	current_health += 1
+	_health_states.append(true)
+	_health_scales.append(1.0)
+	_health_pulse.append(0.0)
+	_show_health_ui()
+
 
 func heal(amount: int = 1):
 	var old = current_health
@@ -1622,8 +1671,8 @@ func _snap_respawn_to_floor() -> void:
 	if space == null:
 		return
 	var query := PhysicsRayQueryParameters2D.create(
-		global_position + Vector2(0.0, -12.0),
-		global_position + Vector2(0.0, 80.0)
+		global_position + Vector2(0.0, -48.0),
+		global_position + Vector2(0.0, 96.0)
 	)
 	query.collision_mask = 1
 	query.exclude = [get_rid()]
@@ -1631,15 +1680,17 @@ func _snap_respawn_to_floor() -> void:
 	if hit.is_empty():
 		return
 	var collider := hit.get("collider") as Node
-	while collider:
-		if collider.is_in_group("dogana_bricole"):
+	var walk: Node = collider
+	while walk:
+		if walk.is_in_group("dogana_bricole"):
 			return
-		collider = collider.get_parent()
+		walk = walk.get_parent()
+	var floor_y := (hit.position as Vector2).y
 	var col := get_node_or_null("CollisionShape2D") as CollisionShape2D
 	var feet := 13.0
 	if col and col.shape is RectangleShape2D:
 		feet = col.position.y + (col.shape as RectangleShape2D).size.y * 0.5
-	global_position.y = (hit.position as Vector2).y - feet + 1.0
+	global_position.y = floor_y - feet + 1.0
 	velocity = Vector2.ZERO
 
 
@@ -1701,64 +1752,59 @@ func get_rod_tip_position() -> Vector2:
 func get_facing_vector() -> Vector2:
 	return Vector2.RIGHT if facing_right else Vector2.LEFT
 
+func _aim_angle_from_vector(diff: Vector2) -> float:
+	var facing := get_facing_vector()
+	var forward := maxf(absf(diff.x * facing.x), 0.04)
+	var angle := atan2(-diff.y, forward)
+	return clampf(angle, -deg_to_rad(cast_aim_max_down), deg_to_rad(cast_aim_max_up))
+
+
+func _direction_from_aim_angle() -> Vector2:
+	var facing := get_facing_vector()
+	return Vector2(cos(_cast_aim_angle) * facing.x, -sin(_cast_aim_angle)).normalized()
+
+
 func _reset_cast_aim_from_mouse():
 	## Inizializza _cast_aim_angle dalla posizione mouse (o default se non disponibile)
 	var start = get_rod_tip_position()
 	var aim = get_global_mouse_position()
 	var diff = aim - start
 	if diff.length_squared() > 400.0:  # min 20px di distanza per considerare il mouse valido
-		diff = diff.normalized()
-		var facing = get_facing_vector()
-		if diff.dot(facing) >= min_forward_aim_dot:
-			_cast_aim_angle = atan2(-diff.y, diff.x * facing.x)
-		else:
-			_cast_aim_angle = atan2(-diff.y, 0.01) * sign(facing.x)
+		_cast_aim_angle = _aim_angle_from_vector(diff)
 	else:
-		_cast_aim_angle = -deg_to_rad(25.0) * sign(get_facing_vector().x)  # default leggermente verso l'alto
+		_cast_aim_angle = deg_to_rad(35.0)
 	var d := get_cast_direction()
 	_display_cast_direction = d
 	_target_cast_direction = d
 
 func _update_cast_aim(delta: float):
-	## Durante il caricamento: mouse ha priorità, altrimenti aim_up/aim_down
+	## Durante il caricamento: il cursore punta la traiettoria, anche verso l'alto.
 	var start = get_rod_tip_position()
 	var aim = get_global_mouse_position()
 	var diff = aim - start
 	if diff.length_squared() > 400.0:
-		diff = diff.normalized()
-		var facing = get_facing_vector()
-		if diff.dot(facing) >= min_forward_aim_dot:
-			_cast_aim_angle = atan2(-diff.y, diff.x * facing.x)
+		_cast_aim_angle = _aim_angle_from_vector(diff)
 	else:
-		var max_up_rad = deg_to_rad(cast_aim_max_up)
-		var max_down_rad = deg_to_rad(cast_aim_max_down)
 		if Input.is_action_pressed("aim_up"):
 			_cast_aim_angle += cast_aim_angle_speed * delta
 		if Input.is_action_pressed("aim_down"):
 			_cast_aim_angle -= cast_aim_angle_speed * delta
-		_cast_aim_angle = clampf(_cast_aim_angle, -max_down_rad, max_up_rad)
+		_cast_aim_angle = clampf(_cast_aim_angle, -deg_to_rad(cast_aim_max_down), deg_to_rad(cast_aim_max_up))
 
 func get_cast_direction() -> Vector2:
-	var facing = get_facing_vector()
 	# Joystick mobile: usa direzione se valida (anche al release, quando active=false ma direction non ancora azzerata)
 	if MobileControlsManager.cast_joystick_direction.length_squared() > 0.01:
 		var j := MobileControlsManager.cast_joystick_direction
-		var dir := j.normalized()
-		if dir.dot(facing) < min_forward_aim_dot:
-			dir = Vector2(facing.x, dir.y).normalized()
-		return dir
+		_cast_aim_angle = _aim_angle_from_vector(j)
+		return _direction_from_aim_angle()
 	var start = get_rod_tip_position()
 	var aim = get_global_mouse_position()
 	var diff = aim - start
-	# Mouse valido (distanza > 20px)? Usalo
+	# Mouse valido (distanza > 20px)? Usalo, anche se è quasi verticale.
 	if diff.length_squared() > 400.0:
-		var dir = diff.normalized()
-		if dir.dot(facing) < min_forward_aim_dot:
-			dir = Vector2(facing.x, dir.y).normalized()
-		return dir
-	# Altrimenti usa _cast_aim_angle (su = -y in world space)
-	var dir = Vector2(cos(_cast_aim_angle), -sin(_cast_aim_angle)) * facing.x
-	return dir.normalized()
+		_cast_aim_angle = _aim_angle_from_vector(diff)
+		return _direction_from_aim_angle()
+	return _direction_from_aim_angle()
 
 func get_hook_center_position(hook: Node) -> Vector2:
 	if hook == null:
@@ -1789,6 +1835,17 @@ func get_fish_center_position(fish: Node2D) -> Vector2:
 ## L'amo che morde una superficie mette il personaggio in sospensione: da li'
 ## si dondola con i tasti di movimento, si risale con R e si stacca saltando.
 ## E' il modo per uscire dal raggio degli attacchi che spazzano il pavimento.
+func on_grapple_latched(hook: Node) -> void:
+	## L'amo da pesca ha morso una lampada: si dondola come con l'amo da trascino.
+	if hook == null or hook != hook_instance:
+		return
+	line_mode = LineMode.GRAB
+	on_grab_hook_anchored(hook)
+	# Tirati su appena morsi: restare con la lenza lunga ti lascia nella marea.
+	current_line_length = clampf(minf(current_line_length, 52.0), swing_min_length, 70.0)
+	target_line_length = current_line_length
+
+
 func on_grab_hook_anchored(hook: Node) -> void:
 	if hook == null or hook != hook_instance:
 		return
@@ -2775,9 +2832,12 @@ func set_in_water(in_w: bool, grav_red: float = 0.3, water_owner: Node = null):
 
 
 func _bounce_off_water() -> void:
-	## Come toccare il suolo: rimbalzo + salto e doppio salto di nuovo disponibili.
-	velocity.y = -water_bounce_speed
+	## Colpo d'acqua: slancio dedicato verso l'alto, poi Space conferma il salto.
+	var hop := maxf(water_bounce_speed, jump_speed * 1.12)
+	velocity.y = -hop
 	jump_amount = 2
+	_water_hop_timer = 0.42
+	_begin_variable_jump(velocity.y)
 	if particles_on_jump and black_particle_scene:
 		_spawn_particles(global_position, Vector2.UP, 0.22, 3)
 	if particles_on_land and ambient_trail_scene:
@@ -2787,6 +2847,8 @@ func _bounce_off_water() -> void:
 func refresh_jumps_from_water_surface() -> void:
 	## Chiamato dall'acqua se si ribatte sulla superficie restando in overlap.
 	if is_dead or get_meta("arrival_locked", false):
+		return
+	if _water_hop_timer > 0.0:
 		return
 	_bounce_off_water()
 

@@ -39,7 +39,7 @@ func _snap_to_ground() -> void:
 	query.exclude = [self]
 	var hit := space.intersect_ray(query)
 	if not hit.is_empty():
-		global_position.y = (hit.position as Vector2).y
+		global_position.y = (hit.position as Vector2).y + 8.0
 
 
 func _apply_visual_variant() -> void:

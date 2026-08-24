@@ -5,6 +5,7 @@ enum Kind { CLUSTER, BED }
 
 @export var kind := Kind.CLUSTER
 @export var bed_width := 96.0
+@export var vertical := false
 @export var damage := 1
 @export var snap_to_ground := true
 @export var art_profile: DoganaArtProfile = preload("res://Levels/Scenes/Dogana/dogana_art_profile.tres")
@@ -27,7 +28,8 @@ var _bounce_cd := 0.0
 func _ready() -> void:
 	add_to_group("pogoable")
 	add_to_group("dogana_thorn")
-	z_index = 6
+	z_as_relative = false
+	z_index = 12
 	_build_visual()
 	_build_hurtboxes()
 	call_deferred("_snap_to_ground")
@@ -97,40 +99,44 @@ func _try_hurt(body: Node) -> void:
 		return
 	if body.has_method("is_pogo_grace") and bool(body.call("is_pogo_grace")):
 		return
+	if body.has_method("is_thorn_grace") and bool(body.call("is_thorn_grace")):
+		return
 	if "is_dashing" in body and bool(body.get("is_dashing")):
 		return
-	_launch_player(body)
-	if _hurt_cd > 0.0:
-		return
-	if body.has_method("take_damage"):
-		# Niente rinculo laterale: le spine devono lanciare su, non scaraventare via.
+	if _hurt_cd <= 0.0 and body.has_method("take_damage"):
 		body.call("take_damage", damage, Vector2.ZERO)
 		_hurt_cd = 0.55
+	_launch_player(body)
 
 
 func _launch_player(body: Node) -> void:
 	if _bounce_cd > 0.0:
 		return
 	if body.has_method("apply_thorn_bounce"):
-		body.call("apply_thorn_bounce")
-	elif "velocity" in body:
-		var vel: Vector2 = body.get("velocity")
-		vel.y = -260.0
-		vel.x *= 0.4
-		body.set("velocity", vel)
-	_bounce_cd = 0.16
+		body.call("apply_thorn_bounce", global_position)
+	elif "velocity" in body and body is Node2D:
+		var away: Vector2 = (body as Node2D).global_position - global_position
+		if away.length_squared() < 4.0:
+			away = Vector2.UP
+		away.y = minf(away.y, -0.35)
+		body.set("velocity", away.normalized() * 280.0)
+	_bounce_cd = 0.32
 
 
 func _pogo_size() -> Vector2:
+	if vertical:
+		return Vector2(32.0, 88.0)
 	if kind == Kind.BED:
-		return Vector2(bed_width * 0.68, 18.0)
-	return Vector2(26.0, 36.0)
+		return Vector2(bed_width * 0.78, 24.0)
+	return Vector2(34.0, 48.0)
 
 
 func _hazard_size() -> Vector2:
+	if vertical:
+		return Vector2(36.0, 80.0)
 	if kind == Kind.BED:
-		return Vector2(bed_width * 0.58, 12.0)
-	return Vector2(18.0, 24.0)
+		return Vector2(bed_width * 0.88, 26.0)
+	return Vector2(38.0, 42.0)
 
 
 func _build_visual() -> void:
@@ -152,7 +158,8 @@ func _build_visual() -> void:
 		var s: Vector2 = art_profile.thorn_cluster_scale if art_profile else Vector2(0.08, 0.08)
 		# Se lo scale del profilo è relativo al placeholder: adatta all'altezza ~68px.
 		if texture.get_height() > 0:
-			var fitted := 68.0 / float(texture.get_height())
+			var target_h := 96.0 if vertical else 68.0
+			var fitted := target_h / float(texture.get_height())
 			_sprite.scale = Vector2(fitted, fitted)
 		else:
 			_sprite.scale = s
@@ -214,10 +221,11 @@ func _snap_to_ground() -> void:
 		global_position + Vector2(0.0, 300.0)
 	)
 	query.collision_mask = 1
+	for node in get_tree().get_nodes_in_group("dogana_bricole"):
+		if node is CollisionObject2D:
+			query.exclude.append((node as CollisionObject2D).get_rid())
 	var hit := space.intersect_ray(query)
-	if hit.is_empty():
-		return
-	if _is_bricola(hit.get("collider")):
+	if hit.is_empty() or _is_bricola(hit.get("collider")):
 		return
 	global_position.y = (hit.position as Vector2).y
 

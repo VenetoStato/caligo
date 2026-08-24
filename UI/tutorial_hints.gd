@@ -134,6 +134,8 @@ func _process(_delta: float) -> void:
 	if not _armed:
 		_update_fish_cast_nudge(_delta)
 		return
+	if _current_step == Step.INTERACT and _player_near_interactable() and _panel and not _panel.visible:
+		_apply_step_copy(Step.INTERACT)
 	_update_hint_fade(_delta)
 	_update_fish_cast_nudge(_delta)
 
@@ -146,6 +148,10 @@ func _update_hint_fade(delta: float) -> void:
 		return
 	if _current_step == Step.CAST or _current_step == Step.REEL:
 		_panel.visible = false
+		return
+	if _current_step == Step.INTERACT and not _player_near_interactable():
+		_panel.visible = false
+		_panel.modulate.a = 0.0
 		return
 	_hint_wait += delta
 	if _hint_wait < HINT_DELAY:
@@ -251,6 +257,21 @@ func _is_altar_already_used() -> bool:
 	return bool(_observed.get(Step.INTERACT, false))
 
 
+func _player_near_interactable() -> bool:
+	if _player == null or not is_instance_valid(_player):
+		return false
+	var tree := get_tree()
+	if tree == null:
+		return false
+	for node in tree.get_nodes_in_group("dogana_grace"):
+		if node is Node2D and (node as Node2D).global_position.distance_to(_player.global_position) <= 78.0:
+			return true
+	for node in tree.get_nodes_in_group("dogana_interactable"):
+		if node is Node2D and (node as Node2D).global_position.distance_to(_player.global_position) <= 78.0:
+			return true
+	return false
+
+
 func _is_training_cache_already_broken() -> bool:
 	var level := get_tree().current_scene
 	if level == null:
@@ -271,6 +292,14 @@ func _apply_step_copy(step: Step) -> void:
 		_step_transition.kill()
 	# Pesca: niente cartelli. La canna e la lenza insegnano da sole.
 	if step == Step.CAST or step == Step.REEL:
+		_panel.visible = false
+		_panel.modulate.a = 0.0
+		_hint_wait = 0.0
+		_hint_shown = false
+		_mark.clear_mark()
+		return
+	# E solo quando c'è davvero qualcosa da usare. All'inizio del pontile no.
+	if step == Step.INTERACT and not _player_near_interactable():
 		_panel.visible = false
 		_panel.modulate.a = 0.0
 		_hint_wait = 0.0

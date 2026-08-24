@@ -491,6 +491,12 @@ func _begin_windup(to_player: Vector2) -> void:
 func _pick_attack(to_player: Vector2) -> AttackKind:
 	var dist := absf(to_player.x)
 	var options: Array[AttackKind] = []
+	_attack_chain_step += 1
+	# Mega-attacco raro: non ogni combo, ma quando arriva dura diversi secondi.
+	if _attack_chain_step >= 8:
+		_attack_chain_step = 0
+		_last_attack_kind = int(AttackKind.FLOOD)
+		return AttackKind.FLOOD
 	# Pool per fase: pochi pattern coerenti e imparabili. Le varianti dense
 	# entrano solo dopo che il player ha letto il moveset base.
 	if dist <= 120.0:
@@ -508,7 +514,6 @@ func _pick_attack(to_player: Vector2) -> AttackKind:
 		options.append(AttackKind.STREAM)
 		options.append(AttackKind.RING)
 		options.append(AttackKind.PILLARS)
-		options.append(AttackKind.FLOOD)
 	if _is_desperate():
 		options.append(AttackKind.SPIRAL)
 		options.append(AttackKind.CROSS)
@@ -520,7 +525,6 @@ func _pick_attack(to_player: Vector2) -> AttackKind:
 		filtered = options
 	var chosen := filtered[randi() % filtered.size()]
 	_last_attack_kind = int(chosen)
-	_attack_chain_step += 1
 	return chosen
 
 
@@ -719,12 +723,12 @@ func _fire_ring_burst() -> void:
 ## parete a parete. Il pavimento smette di essere un posto sicuro.
 func _begin_flood() -> void:
 	state = State.FLOOD
-	_state_timer = 2.3
+	_state_timer = 5.2
 	_disable_melee_hitbox()
 	var floor_y := global_position.y
 	var surge := FLOOD_SURGE_SCRIPT.new() as Area2D
-	var span := Vector2(ARENA_RIGHT - ARENA_LEFT + 260.0, 104.0)
-	surge.call("setup", span, heavy_attack_damage, 0.92 if _is_desperate() else 1.2, 1.1)
+	var span := Vector2(ARENA_RIGHT - ARENA_LEFT + 260.0, 168.0)
+	surge.call("setup", span, 2, 1.05, 4.15)
 	get_tree().current_scene.add_child(surge)
 	surge.global_position = Vector2(
 		(ARENA_LEFT + ARENA_RIGHT) * 0.5, floor_y - span.y * 0.5 + 26.0
@@ -1039,6 +1043,7 @@ func _die() -> void:
 	if _telegraph:
 		_telegraph.visible = false
 	_spawn_death_motes()
+	_spawn_extra_life_orb()
 	boss_defeated.emit()
 	if _wound_light:
 		var glow_tween := create_tween()
@@ -1049,6 +1054,20 @@ func _die() -> void:
 	tween.tween_property(_sprite, "scale", _base_scale * 1.22, 1.0)
 	tween.tween_property(_sprite, "rotation", -0.12, 1.0)
 	tween.chain().tween_callback(queue_free)
+
+
+func _spawn_extra_life_orb() -> void:
+	var orb_script := load("res://Levels/Scenes/Dogana/extra_life_orb.gd") as Script
+	if orb_script == null:
+		return
+	var host := get_tree().current_scene
+	if host == null:
+		return
+	var orb := Area2D.new()
+	orb.set_script(orb_script)
+	host.add_child(orb)
+	orb.global_position = global_position + Vector2(0.0, -92.0)
+	orb.set("_home", orb.global_position)
 
 
 func restore_defeated() -> void:

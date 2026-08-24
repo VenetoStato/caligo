@@ -26,11 +26,12 @@ func _style_map_glyph() -> void:
 	_map_button.text = ""
 	_map_button.flat = true
 	_map_button.focus_mode = Control.FOCUS_NONE
-	_map_button.custom_minimum_size = Vector2(44, 44)
-	_map_button.offset_left = -56.0
-	_map_button.offset_right = -12.0
-	_map_button.offset_top = 10.0
-	_map_button.offset_bottom = 54.0
+	_map_button.custom_minimum_size = Vector2(52, 52)
+	_map_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_map_button.offset_left = -72.0
+	_map_button.offset_right = -20.0
+	_map_button.offset_top = -72.0
+	_map_button.offset_bottom = -20.0
 	_map_button.modulate = Color(1, 1, 1, 0.42)
 	_map_button.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
 	_map_button.add_theme_stylebox_override("hover", StyleBoxEmpty.new())

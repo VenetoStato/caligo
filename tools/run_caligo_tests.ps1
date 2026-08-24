@@ -41,6 +41,7 @@ $tests = @(
     @{ kind = "script"; path = "res://tests/fishing_attract_swim_test.gd"; token = "FISHING_ATTRACT_SWIM_TEST_OK"; timeout = 30000 },
     @{ kind = "scene"; path = "res://tests/player_jump_test.tscn"; token = "CALIGO_JUMP_TEST"; timeout = 30000 },
     @{ kind = "scene"; path = "res://tests/pogo_bounce_test.tscn"; token = "CALIGO_POGO_BOUNCE_OK"; timeout = 30000 },
+    @{ kind = "scene"; path = "res://tests/boss_lamp_aim_test.tscn"; token = "CALIGO_BOSS_LAMP_AIM_OK"; timeout = 30000 },
     @{ kind = "scene"; path = "res://tests/guided_tutorial_geometry_test.tscn"; token = "CALIGO_GUIDED_TUTORIAL"; timeout = 90000 },
     @{ kind = "scene"; path = "res://tests/dogana_section_tour_test.tscn"; token = "CALIGO_SECTION_TOUR_OK"; timeout = 120000 },
     @{ kind = "scene"; path = "res://tests/dogana_zone_coherence_test.tscn"; token = "CALIGO_ZONE_COHERENCE_OK"; timeout = 120000 },

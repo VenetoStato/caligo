@@ -1,6 +1,7 @@
 extends Node2D
 
 const ART := preload("res://Landscape/Dogana/Generated/salute_interior_v2.png")
+const LAMP_SCENE := preload("res://Levels/Scenes/Dogana/gothic_hanging_lamp.tscn")
 
 const FLOOR_Y := -500.0
 const ROOM_LEFT := 4100.0
@@ -57,51 +58,16 @@ func _build_room_collision() -> void:
 	_add_rect(body, "EastWall", Vector2(ROOM_RIGHT, -950), Vector2(60, 1100))
 
 
-## Anelli da carena appesi alla volta: l'amo ci morde e si resta sospesi.
-## Sono la via d'uscita dagli attacchi che spazzano il pavimento della navata.
+## Lampade gotiche a pendolo: l'amo della canna ci si appende per uscire
+## dagli attacchi che spazzano tutto il pavimento della navata.
 func _build_ceiling_rings() -> void:
 	var heights := [-268.0, -318.0, -292.0, -330.0, -276.0]
 	for index in heights.size():
-		var x := 4560.0 + index * 290.0
-		var ring := StaticBody2D.new()
-		ring.name = "CeilingRing_%d" % index
-		ring.position = Vector2(x, FLOOR_Y + float(heights[index]))
-		ring.collision_layer = 1
-		ring.collision_mask = 0
-		ring.add_to_group("dogana_grapple_point")
-		var shape := CircleShape2D.new()
-		shape.radius = 16.0
-		var collision := CollisionShape2D.new()
-		collision.shape = shape
-		ring.add_child(collision)
-		ring.add_child(_make_ring_visual())
-		add_child(ring)
-
-
-func _make_ring_visual() -> Node2D:
-	var visual := Node2D.new()
-	visual.name = "Visual"
-	visual.z_index = 3
-	var chain := Line2D.new()
-	chain.points = PackedVector2Array([Vector2(0, -120), Vector2(0, -6)])
-	chain.width = 3.0
-	chain.default_color = Color(0.29, 0.26, 0.19, 0.92)
-	chain.antialiased = true
-	visual.add_child(chain)
-	for radius in [13.0, 9.5]:
-		var ring_line := Line2D.new()
-		var points := PackedVector2Array()
-		for step in 17:
-			var angle := TAU * float(step) / 16.0
-			points.append(Vector2(cos(angle), sin(angle)) * radius)
-		ring_line.points = points
-		ring_line.width = 3.4 if radius > 11.0 else 1.4
-		ring_line.default_color = (
-			Color(0.42, 0.36, 0.22, 0.95) if radius > 11.0 else Color(0.68, 0.6, 0.38, 0.5)
-		)
-		ring_line.antialiased = true
-		visual.add_child(ring_line)
-	return visual
+		var lamp := LAMP_SCENE.instantiate() as Node2D
+		lamp.name = "CeilingLamp_%d" % index
+		lamp.position = Vector2(4560.0 + index * 290.0, FLOOR_Y + float(heights[index]))
+		lamp.set("chain_length", 64.0 + float(index % 3) * 8.0)
+		add_child(lamp)
 
 
 func _add_rect(parent: Node, node_name: String, center: Vector2, size: Vector2) -> void:

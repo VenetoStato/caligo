@@ -1,4 +1,4 @@
-[gd_scene load_steps=42 format=3]
+[gd_scene load_steps=43 format=3]
 
 [ext_resource type="Script" path="res://Levels/Scenes/Dogana/dogana_level.gd" id="1_level"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/dogana_environment.tscn" id="2_environment"]
@@ -30,6 +30,7 @@
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/lore_reader.tscn" id="33_lore_reader"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/pogo_thorn.tscn" id="34_thorn"]
 [ext_resource type="PackedScene" path="res://UI/feel_debug_panel.tscn" id="35_feel"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/wooden_ledge.tscn" id="36_ledge"]
 
 [sub_resource type="RectangleShape2D" id="GroundArrivalWest"]
 size = Vector2(700, 96)
@@ -270,22 +271,49 @@ position = Vector2(188, 460)
 kind = 1
 bed_width = 108.0
 
-[node name="GapClusterA" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
-position = Vector2(286, 502)
-snap_to_ground = false
-
-[node name="GapClusterB" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
-position = Vector2(332, 496)
-snap_to_ground = false
-
-[node name="GapClusterC" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
-position = Vector2(378, 502)
-snap_to_ground = false
-
 [node name="EastBed" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
 position = Vector2(930, 460)
 kind = 1
 bed_width = 168.0
+
+[node name="WoodenLedges" type="Node2D" parent="Gameplay"]
+
+[node name="DockToQuayPlank" parent="Gameplay/WoodenLedges" instance=ExtResource("36_ledge")]
+position = Vector2(1252, 460)
+ledge_width = 132.0
+pile_depth = 92.0
+
+[node name="EastBedSkip" parent="Gameplay/WoodenLedges" instance=ExtResource("36_ledge")]
+position = Vector2(930, 382)
+ledge_width = 96.0
+pile_depth = 72.0
+
+[node name="CanalPierA" parent="Gameplay/WoodenLedges" instance=ExtResource("36_ledge")]
+position = Vector2(2288, 418)
+ledge_width = 108.0
+pile_depth = 80.0
+
+[node name="CanalPierB" parent="Gameplay/WoodenLedges" instance=ExtResource("36_ledge")]
+position = Vector2(2476, 352)
+ledge_width = 94.0
+pile_depth = 74.0
+unstable = true
+
+[node name="CanalPierC" parent="Gameplay/WoodenLedges" instance=ExtResource("36_ledge")]
+position = Vector2(2664, 418)
+ledge_width = 108.0
+pile_depth = 80.0
+
+[node name="CanalPierD" parent="Gameplay/WoodenLedges" instance=ExtResource("36_ledge")]
+position = Vector2(2860, 378)
+ledge_width = 92.0
+pile_depth = 72.0
+unstable = true
+
+[node name="CanalPierE" parent="Gameplay/WoodenLedges" instance=ExtResource("36_ledge")]
+position = Vector2(3048, 428)
+ledge_width = 100.0
+pile_depth = 76.0
 
 [node name="CustomsGapBed" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
 position = Vector2(2120, 485)
@@ -293,7 +321,7 @@ kind = 1
 bed_width = 210.0
 
 [node name="CustomsGapCluster" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
-position = Vector2(2038, 485)
+position = Vector2(2160, 485)
 
 [node name="QuayWedgeBed" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
 position = Vector2(2510, 485)
@@ -312,7 +340,7 @@ bed_width = 200.0
 position = Vector2(3290, 485)
 
 [node name="CanalFortunaBed" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
-position = Vector2(4010, 485)
+position = Vector2(4240, 485)
 kind = 1
 bed_width = 200.0
 
@@ -419,7 +447,7 @@ shape = SubResource("InteractionShape")
 [node name="Encounters" type="Node2D" parent="Gameplay" groups=["dogana_encounters"]]
 
 [node name="GamberoArrival" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
-position = Vector2(1720, 473)
+position = Vector2(1580, 473)
 scale = Vector2(0.05, 0.05)
 wake_delay = 0.6
 patrol_range = 160.0
@@ -457,7 +485,7 @@ projectile_count = 6
 projectile_speed = 152.0
 
 [node name="GamberoCanal" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
-position = Vector2(3600, 485)
+position = Vector2(3460, 485)
 scale = Vector2(0.05, 0.05)
 wake_delay = 0.6
 patrol_range = 120.0

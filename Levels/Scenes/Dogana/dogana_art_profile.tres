@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="DoganaArtProfile" load_steps=28 format=3]
+[gd_resource type="Resource" script_class="DoganaArtProfile" load_steps=30 format=3]
 
 [ext_resource type="Script" path="res://Levels/Scenes/Dogana/dogana_art_profile.gd" id="1_profile"]
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/Illustrated/arrival.png" id="2_arrival"]
@@ -27,6 +27,8 @@
 [ext_resource type="Resource" path="res://Enemies/Art/drowned_warden_kit.tres" id="27_warden_kit"]
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/dogana_thorn_cluster.png" id="28_thorn_cluster"]
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/dogana_thorn_bed.png" id="29_thorn_bed"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/dogana_pier_plank.png" id="30_pier"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/dogana_pier_plank_cracked.png" id="31_pier_cracked"]
 
 [resource]
 script = ExtResource("1_profile")
@@ -50,6 +52,8 @@ net_bundle = ExtResource("16_net")
 fishbone_wall = ExtResource("11_wall")
 thorn_cluster = ExtResource("28_thorn_cluster")
 thorn_bed = ExtResource("29_thorn_bed")
+pier_plank = ExtResource("30_pier")
+pier_plank_cracked = ExtResource("31_pier_cracked")
 tide_bloater = ExtResource("12_bloater")
 lagoon_oracle = ExtResource("13_oracle")
 drowned_warden = ExtResource("14_boss")

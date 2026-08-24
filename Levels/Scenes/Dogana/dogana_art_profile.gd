@@ -43,6 +43,8 @@ extends Resource
 @export var thorn_cluster_scale := Vector2(0.08, 0.08)
 @export var thorn_bed: Texture2D
 @export var thorn_bed_height := 40.0
+@export var pier_plank: Texture2D
+@export var pier_plank_cracked: Texture2D
 
 @export_category("Characters")
 @export var tide_bloater: Texture2D

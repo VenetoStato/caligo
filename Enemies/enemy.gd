@@ -103,7 +103,7 @@ var _hitstop_timer: float = 0.0
 var _hit_flash_timer: float = 0.0
 var _flip_cooldown: float = 0.0
 var _attack_has_hit := false
-const FLIP_MIN_INTERVAL: float = 0.45  # cooldown tra un cambio direzione e l'altro (evita glitch avanti/indietro)
+const FLIP_MIN_INTERVAL: float = 0.2  # cooldown tra un cambio direzione e l'altro (evita glitch avanti/indietro)
 
 var _hurtbox: Area2D = null
 var _attack_hitbox: Area2D = null
@@ -319,7 +319,7 @@ func _normalize_collision_to_feet() -> void:
 		var hcol := _hurtbox.get_node_or_null("CollisionShape2D") as CollisionShape2D
 		if hcol:
 			var hshape := RectangleShape2D.new()
-			var hurt := body_world_size * (Vector2(1.7, 2.35) if hovering else Vector2(1.45, 1.35))
+			var hurt := body_world_size * (Vector2(2.05, 2.35) if hovering else Vector2(1.85, 1.4))
 			hshape.size = Vector2(hurt.x / sx, hurt.y / sy)
 			hcol.shape = hshape
 			hcol.position = Vector2(0.0, -hurt.y * (0.62 if hovering else 0.5) / sy)
@@ -626,6 +626,13 @@ func _update_melee_attack(delta: float, dist: float) -> void:
 		and _charge_timer <= 0.0
 	):
 		attack_timer = attack_cooldown
+		if player and is_instance_valid(player):
+			var face_x := player.global_position.x - global_position.x
+			if absf(face_x) > 4.0:
+				facing_right = face_x > 0.0
+				if sprite_node:
+					sprite_node.flip_h = not facing_right
+				_sync_attack_hitbox_facing()
 		var heavy := attack_pattern == AttackPattern.MELEE and randf() < heavy_melee_chance
 		_pending_melee_damage = heavy_melee_damage if heavy else attack_damage
 		_melee_windup_remaining = melee_windup * (1.25 if heavy else 1.0)
@@ -944,7 +951,7 @@ func _sync_attack_hitbox_facing() -> void:
 
 func _is_player_sanctuary_safe(p: Node2D) -> bool:
 	# Zona sicura intorno agli Altari: niente aggro / niente chase.
-	const SANCTUARY_RADIUS := 168.0
+	const SANCTUARY_RADIUS := 118.0
 	for node in get_tree().get_nodes_in_group("dogana_grace"):
 		if not is_instance_valid(node) or not (node is Node2D):
 			continue

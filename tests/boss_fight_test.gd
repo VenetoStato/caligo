@@ -9,7 +9,7 @@ const STATE_WINDUP := 2
 const STATE_RECOVER := 11
 const STATE_DEAD := 12
 
-const ATTACK_STATES := [3, 4, 5, 6, 7, 8, 9, 10, 13, 14]
+const ATTACK_STATES := [3, 4, 5, 6, 7, 8, 9, 10, 13, 14, 15]
 
 var _level: Node
 var _player: CharacterBody2D

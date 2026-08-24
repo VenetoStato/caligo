@@ -7,7 +7,7 @@ extends Area2D
 const PARTICLE_BURST := preload("res://Fx/particle_burst.gd")
 
 var span := Vector2(1060.0, 96.0)
-var damage := 1
+var damage := 2
 var windup := 1.15
 var active_time := 1.05
 var tint := Color(0.32, 0.78, 0.82, 1.0)
@@ -72,9 +72,11 @@ func _physics_process(delta: float) -> void:
 func _damage_overlaps() -> void:
 	for body in get_overlapping_bodies():
 		if body is Node2D and body.is_in_group("player") and body not in _damaged:
+			if bool(body.get("is_swinging")):
+				continue
 			_damaged.append(body)
 			if damage > 0 and body.has_method("take_damage"):
-				body.call_deferred("take_damage", damage, global_position)
+				body.call_deferred("take_damage", damage, Vector2.ZERO)
 
 
 func _draw() -> void:

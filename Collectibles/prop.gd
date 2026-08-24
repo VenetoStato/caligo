@@ -34,7 +34,7 @@ func _snap_visual_to_ground() -> void:
 	var hit := space.intersect_ray(query)
 	if not hit.is_empty():
 		var floor_y := (hit.position as Vector2).y
-		global_position.y = floor_y
+		global_position.y = floor_y + 9.0
 		if _sprite is Sprite2D:
 			var sprite := _sprite as Sprite2D
 			var image := sprite.texture.get_image() if sprite.texture else null

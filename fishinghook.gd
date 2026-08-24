@@ -159,6 +159,8 @@ func _physics_process(delta: float):
 	if is_instance_valid(hooked_enemy):
 		global_position = hooked_enemy.global_position + Vector2(0.0, -14.0)
 		linear_velocity = Vector2.ZERO
+	if not is_anchored and hooked_fish == null and hooked_enemy == null:
+		_scan_grapples()
 	if in_water and not is_anchored:
 		# In acqua: gravità 0, quindi smorza la velocità verticale verso target
 		var target_vy = sink_speed if sink_slowly_in_water else 0.0
@@ -253,7 +255,37 @@ func get_hooked_enemy() -> CharacterBody2D:
 # ===========================================
 # FISH DETECTION
 # ===========================================
+func _scan_grapples() -> void:
+	if player_ref == null or not player_ref.has_method("on_grapple_latched"):
+		return
+	for node in get_tree().get_nodes_in_group("dogana_grapple_point"):
+		if not (node is Node2D):
+			continue
+		var target := node as Node2D
+		if target.global_position.distance_squared_to(global_position) <= 900.0:
+			_latch_grapple(target)
+			return
+
+
+func _latch_grapple(target: Node2D) -> void:
+	if is_anchored:
+		return
+	is_anchored = true
+	freeze = true
+	linear_velocity = Vector2.ZERO
+	angular_velocity = 0.0
+	if target.has_method("get_grapple_point"):
+		global_position = target.call("get_grapple_point")
+	else:
+		global_position = target.global_position
+	if player_ref:
+		player_ref.call("on_grapple_latched", self)
+
+
 func _on_fish_body_entered(body: Node2D):
+	if body != null and body.is_in_group("dogana_grapple_point"):
+		_latch_grapple(body)
+		return
 	_check_if_fish(body)
 
 func _on_fish_area_entered(area: Area2D):
