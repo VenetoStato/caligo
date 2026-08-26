@@ -116,6 +116,9 @@ signal locked_skill_requested
 @export var enemy_power_window := 0.34
 @export var enemy_power_min_speed := 190.0
 @export var enemy_power_damage := 3
+@export var enemy_power_fail_distance := 68.0
+@export var enemy_power_fail_damage := 1
+@export var enemy_power_fail_knockback := 360.0
 @export var power_strike_window := 1.05
 @export var idle_hook_pull_ratio := 0.44
 @export var heavy_reel_player_speed := 610.0
@@ -299,6 +302,9 @@ var fish_hooked: bool = false
 var current_hooked_enemy: CharacterBody2D = null
 var enemy_hooked := false
 var _enemy_power_window_left := 0.0
+var _power_strike_target: CharacterBody2D = null
+var _power_strike_hit := false
+var _power_strike_fail_applied := false
 var _enemy_hook_feedback_timer := 0.0
 var _power_strike_left := 0.0
 var _power_tint_active := false
@@ -460,8 +466,10 @@ func _update_attack_hitbox_position():
 		shape.size = Vector2(64, 86)
 		col.position = Vector2(0, 40)
 	else:
-		shape.size = Vector2(72, 58)
-		col.position = Vector2(34 if facing_right else -34, -22)
+		# Il colpo orizzontale copre anche il bordo superiore del nemico:
+		# stare un poco sopra non deve far passare la lenza a vuoto.
+		shape.size = Vector2(78, 76)
+		col.position = Vector2(34 if facing_right else -34, -30)
 
 func _enable_attack_hitbox(damage: int = 1):
 	_attack_dir = _resolve_nail_direction()
@@ -527,6 +535,9 @@ func _try_hit_enemy(target: Node) -> void:
 	_attack_hit_enemies.append(target)
 	if target.has_method("take_damage"):
 		target.take_damage(_current_attack_damage, global_position)
+	if _power_strike_left > 0.0 and target == _power_strike_target:
+		_power_strike_hit = true
+		_spawn_power_strike_impact(target)
 	_on_nail_connect(target)
 
 
@@ -2124,6 +2135,7 @@ func _process_fishing(delta: float):
 		if current_hooked_enemy.has_method("set_combat_hook_reeling"):
 			current_hooked_enemy.call("set_combat_hook_reeling", is_reeling)
 		_apply_enemy_hook_resistance(delta)
+	_check_power_strike_miss()
 	if line_extended and hook_instance:
 		_update_line_length(delta)
 		_sync_hook_to_rope(delta)
@@ -2454,12 +2466,41 @@ func _open_enemy_power_window(enemy: CharacterBody2D) -> void:
 	if enemy.has_method("stagger"):
 		enemy.call("stagger", power_strike_window)
 	_power_strike_left = power_strike_window
+	_power_strike_target = enemy
+	_power_strike_hit = false
+	_power_strike_fail_applied = false
 	PARTICLE_BURST.spawn(
 		get_tree().current_scene, impact_position,
 		Color(1.0, 0.72, 0.3, 0.84), 9, Vector2.UP, 24.0, 74.0, 0.52
 	)
 	_release_hooked_enemy(false)
 	_request_shake(0.28)
+
+
+func _spawn_power_strike_impact(target: Node) -> void:
+	if target == null or not is_instance_valid(target):
+		return
+	var at := (target as Node2D).global_position + Vector2(0.0, -18.0) if target is Node2D else global_position
+	# Effetto dedicato della finestra riuscita: ambra + scintille chiare,
+	# distinto dal normale colpo della canna.
+	PARTICLE_BURST.spawn(get_tree().current_scene, at, Color(1.0, 0.78, 0.32, 0.95), 16, Vector2.UP, 34.0, 118.0, 0.46)
+
+
+func _check_power_strike_miss() -> void:
+	if _power_strike_left <= 0.0 or _power_strike_hit or _power_strike_fail_applied:
+		return
+	if _power_strike_target == null or not is_instance_valid(_power_strike_target):
+		return
+	if global_position.distance_to(_power_strike_target.global_position) > enemy_power_fail_distance:
+		return
+	_power_strike_fail_applied = true
+	var away := (global_position - _power_strike_target.global_position).normalized()
+	if away.length_squared() < 0.01:
+		away = Vector2(-1.0 if facing_right else 1.0, -0.35)
+	take_damage(enemy_power_fail_damage, _power_strike_target.global_position)
+	velocity = away * enemy_power_fail_knockback
+	velocity.y = minf(velocity.y, -enemy_power_fail_knockback * 0.34)
+	_release_hooked_enemy(false)
 
 
 func _release_hooked_enemy(powered: bool) -> void:

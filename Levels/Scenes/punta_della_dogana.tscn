@@ -669,12 +669,12 @@ disabled = true
 [node name="Interactions" type="Node2D" parent="Gameplay" groups=["dogana_interactions"]]
 
 [node name="RegistroMerci" parent="Gameplay/Interactions" instance=ExtResource("32_lore_lectern")]
-position = Vector2(2430, 427)
+position = Vector2(2430, 485)
 entry_title = "Registro delle merci sommerse"
 entry_text = "Anno 1631. Le navi in quarantena scaricarono sale, spezie e una cassa senza sigillo. Il doganiere che la aprì annotò soltanto: 'il mare era già dentro'. La riga successiva è stata cancellata con cera turchese."
 
 [node name="LibroLonghena" parent="Gameplay/Interactions" instance=ExtResource("32_lore_lectern")]
-position = Vector2(4050, 435)
+position = Vector2(4050, 485)
 scale = Vector2(0.92, 0.92)
 entry_title = "Taccuino di Baldassare"
 entry_text = "La Salute non guarda la Punta: la trattiene. Otto lati, otto spinte contro l'acqua. Fra i conti della fabbrica compare ogni mese una voce impossibile: 'una campana restituita dalla laguna'."
