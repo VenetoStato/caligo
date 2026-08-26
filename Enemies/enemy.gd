@@ -1249,6 +1249,17 @@ func release_combat_hook(launch_direction := Vector2.ZERO, powered := false) -> 
 		player = get_tree().get_first_node_in_group("player") as Node2D
 	elif state == State.IDLE:
 		player = null
+	# Riparti dal ciclo AI normale: il trascinamento può aver lasciato windup,
+	# strafe o salto a metà. Non cambiamo lo stato precedente, ma eliminiamo
+	# solo i residui temporanei dell'aggancio.
+	jump_timer = 0.0
+	attack_timer = 0.0
+	_strafe_timer = 0.0
+	_melee_windup_remaining = 0.0
+	_special_windup_remaining = 0.0
+	_charge_timer = 0.0
+	if state == State.IDLE:
+		play_idle()
 	facing_right = _combat_hook_previous_facing
 	if powered and not combat_hook_heavy and launch_direction.length_squared() > 0.01:
 		var direction := launch_direction.normalized()

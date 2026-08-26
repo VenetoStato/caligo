@@ -1798,8 +1798,11 @@ func _direction_from_aim_angle() -> Vector2:
 
 func _reset_cast_aim_from_mouse():
 	## Inizializza _cast_aim_angle dalla posizione mouse (o default se non disponibile)
-	var start = get_rod_tip_position()
 	var aim = get_global_mouse_position()
+	# La direzione di mira deve anche girare il personaggio: altrimenti il
+	# calcolo usa ancora il lato precedente e la canna resta bloccata lì.
+	_face_toward_aim(aim.x - global_position.x)
+	var start = get_rod_tip_position()
 	var diff = aim - start
 	if diff.length_squared() > 400.0:  # min 20px di distanza per considerare il mouse valido
 		_cast_aim_angle = _aim_angle_from_vector(diff)
@@ -1811,8 +1814,9 @@ func _reset_cast_aim_from_mouse():
 
 func _update_cast_aim(delta: float):
 	## Durante il caricamento: il cursore punta la traiettoria, anche verso l'alto.
-	var start = get_rod_tip_position()
 	var aim = get_global_mouse_position()
+	_face_toward_aim(aim.x - global_position.x)
+	var start = get_rod_tip_position()
 	var diff = aim - start
 	if diff.length_squared() > 400.0:
 		_cast_aim_angle = _aim_angle_from_vector(diff)
@@ -1823,10 +1827,23 @@ func _update_cast_aim(delta: float):
 			_cast_aim_angle -= cast_aim_angle_speed * delta
 		_cast_aim_angle = clampf(_cast_aim_angle, -deg_to_rad(cast_aim_max_down), deg_to_rad(cast_aim_max_up))
 
+
+func _face_toward_aim(horizontal_delta: float) -> void:
+	if absf(horizontal_delta) < 18.0:
+		return
+	var wanted_right := horizontal_delta > 0.0
+	if wanted_right == facing_right:
+		return
+	facing_right = wanted_right
+	if sprite_node:
+		sprite_node.flip_h = not facing_right
+	_update_attack_hitbox_position()
+
 func get_cast_direction() -> Vector2:
 	# Joystick mobile: usa direzione se valida (anche al release, quando active=false ma direction non ancora azzerata)
 	if MobileControlsManager.cast_joystick_direction.length_squared() > 0.01:
 		var j := MobileControlsManager.cast_joystick_direction
+		_face_toward_aim(j.x)
 		_cast_aim_angle = _aim_angle_from_vector(j)
 		return _direction_from_aim_angle()
 	var start = get_rod_tip_position()
