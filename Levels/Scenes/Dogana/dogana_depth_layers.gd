@@ -30,7 +30,7 @@ const CITY_RAIN_SHADER := preload("res://Levels/Scenes/Dogana/city_rain.gdshader
 @export_range(0.0, 1.0, 0.01) var rain_intensity := 0.62
 @export_range(0.1, 3.0, 0.05) var rain_speed := 1.0
 @export_range(-1.0, 1.0, 0.01) var rain_wind := 0.16
-@export_range(2.0, 72.0, 1.0) var rain_collision_rate := 36.0
+@export_range(2.0, 72.0, 1.0) var rain_collision_rate := 42.0
 
 var _camera: Camera2D
 var _origin := Vector2.ZERO
@@ -319,14 +319,14 @@ func _build_distant_fog() -> Node2D:
 	return layer
 
 
-## Velo vicino alla scena giocabile: stessa nebbia raster specchiata, tra la
-## Dogana e le briccole (z=-4 contro z=-3 delle briccole). Il moto è opposto a
-## quello del piano lontano per creare una separazione di profondità leggibile.
+## Velo vicino alla scena giocabile: stessa nebbia raster specchiata, davanti a
+## Dogana/player (z=9) ma dietro alle briccole del primissimo piano (z=15). Il
+## moto è opposto a quello del piano lontano per separare la profondità.
 func _build_foreground_fog() -> Node2D:
 	var layer := Node2D.new()
 	layer.name = "ForegroundMirroredFog"
 	layer.z_as_relative = false
-	layer.z_index = -4
+	layer.z_index = 9
 	layer.modulate = Color(0.68, 0.82, 0.96, fog_opacity * foreground_fog_opacity)
 	layer.add_to_group("dogana_parallax_foreground_fog")
 	for index in 5:
