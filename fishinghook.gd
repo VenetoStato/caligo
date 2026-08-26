@@ -49,6 +49,7 @@ var is_visible: bool = true
 var fish_detection_area: Area2D = null
 var _fish_scan_timer := 0.0
 var _enemy_scan_timer := 0.0
+var _enemy_contact_grace := 0.0
 
 func _ready():
 	original_gravity_scale = gravity_scale
@@ -157,6 +158,7 @@ func _setup_fish_detection():
 	fish_detection_area.area_exited.connect(_on_area_exited)
 
 func _physics_process(delta: float):
+	_enemy_contact_grace = maxf(0.0, _enemy_contact_grace - delta)
 	if is_instance_valid(hooked_enemy):
 		global_position = hooked_enemy.global_position + Vector2(0.0, -14.0)
 		linear_velocity = Vector2.ZERO
@@ -188,7 +190,9 @@ func _scan_nearby_fish() -> void:
 func _scan_nearby_enemies() -> void:
 	# Polling leggero di riserva: alcune varianti hanno hurtbox piccole o molto
 	# scalate e il solo segnale area_entered poteva mancare un lancio veloce.
-	var radius_squared := pow(fish_detection_radius * 1.85, 2)
+	if _enemy_contact_grace > 0.0:
+		return
+	var radius_squared := pow(fish_detection_radius * 1.15, 2)
 	for candidate in get_tree().get_nodes_in_group("enemy"):
 		if candidate is Node2D and (candidate as Node2D).global_position.distance_squared_to(global_position) <= radius_squared:
 			_check_if_enemy(candidate)
@@ -238,6 +242,9 @@ func get_hook_type() -> String:
 
 func set_player_reference(player: Node):
 	player_ref = player
+	# Dopo un nuovo lancio la scansione di riserva non può agganciare un enemy
+	# solo perché il player è già vicino: il contatto deve arrivare con la canna.
+	_enemy_contact_grace = 0.12
 
 func get_player_reference() -> Node:
 	return player_ref
@@ -308,6 +315,8 @@ func _on_fish_area_entered(area: Area2D):
 	var parent = area.get_parent()
 	if parent != null:
 		if parent.is_in_group("enemy"):
+			if _enemy_contact_grace > 0.0:
+				return
 			_check_if_enemy(parent)
 		else:
 			_check_if_fish(parent)

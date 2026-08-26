@@ -469,8 +469,8 @@ func _update_attack_hitbox_position():
 	else:
 		# Il colpo orizzontale copre anche il bordo superiore del nemico:
 		# stare un poco sopra non deve far passare la lenza a vuoto.
-		shape.size = Vector2(78, 76)
-		col.position = Vector2(34 if facing_right else -34, -30)
+		shape.size = Vector2(94, 76)
+		col.position = Vector2(38 if facing_right else -38, -30)
 
 func _enable_attack_hitbox(damage: int = 1):
 	_attack_dir = _resolve_nail_direction()

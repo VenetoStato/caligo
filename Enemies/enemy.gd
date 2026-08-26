@@ -1243,12 +1243,11 @@ func release_combat_hook(launch_direction := Vector2.ZERO, powered := false) -> 
 	_combat_hook_reel_active = false
 	if state == State.DEAD:
 		return
-	state = _combat_hook_previous_state
-	player = _combat_hook_previous_player if is_instance_valid(_combat_hook_previous_player) else null
-	if state == State.AGGRO and player == null:
-		player = get_tree().get_first_node_in_group("player") as Node2D
-	elif state == State.IDLE:
-		player = null
+	# Un rilascio manuale chiude il duello e restituisce il nemico al suo
+	# pattugliamento, invece di lasciare l'AGGRO congelato dal trascinamento.
+	state = State.IDLE
+	player = null
+	_wake_timer = maxf(_wake_timer, 0.75)
 	# Riparti dal ciclo AI normale: il trascinamento può aver lasciato windup,
 	# strafe o salto a metà. Non cambiamo lo stato precedente, ma eliminiamo
 	# solo i residui temporanei dell'aggancio.
