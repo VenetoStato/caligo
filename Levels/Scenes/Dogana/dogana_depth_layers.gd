@@ -24,6 +24,8 @@ const CITY_RAIN_SHADER := preload("res://Levels/Scenes/Dogana/city_rain.gdshader
 @export_range(0.0, 1.0, 0.01) var fog_opacity := 1.0
 @export_range(0.0, 0.5, 0.01) var fog_opacity_pulse := 0.07
 @export_range(0.0, 30.0, 0.5) var fog_vertical_drift := 9.0
+@export_range(0.0, 1.0, 0.01) var foreground_fog_opacity := 0.28
+@export_range(0.0, 30.0, 0.5) var foreground_fog_drift := 11.0
 @export var rain_enabled := false
 @export_range(0.0, 1.0, 0.01) var rain_intensity := 0.62
 @export_range(0.1, 3.0, 0.05) var rain_speed := 1.0
@@ -44,6 +46,7 @@ var _fore_close: Node2D
 var _distant_dogana: Node2D
 var _distant_ships: Node2D
 var _distant_fog: Node2D
+var _foreground_fog: Node2D
 var _rain_overlay: ColorRect
 var _rain_surface_fx: Node2D
 var _rain_collision_accumulator := 0.0
@@ -70,6 +73,7 @@ func _ready() -> void:
 	_distant_dogana = _build_distant_dogana()
 	_distant_ships = _build_distant_ships()
 	_distant_fog = _build_distant_fog()
+	_foreground_fog = _build_foreground_fog()
 	_rain_overlay = _build_rain_effect()
 	_rain_surface_fx = _build_rain_surface_fx()
 	apply_atmosphere_tuning()
@@ -106,6 +110,7 @@ func _process(delta: float) -> void:
 	_distant_dogana.position += delta_cam * 0.08
 	_distant_ships.position += delta_cam * 0.10
 	_distant_fog.position += delta_cam * 0.09
+	_foreground_fog.position += delta_cam * 0.18
 	_mid.position += delta_cam * 0.26
 	_mid_near.position += delta_cam * 0.42
 	_near.position += delta_cam * 0.58
@@ -132,6 +137,16 @@ func _process(delta: float) -> void:
 		_distant_fog.position.x += sin(t * 0.11) * delta * 5.0
 		_distant_fog.position.y = sin(t * 0.17 + 0.8) * fog_vertical_drift
 		_distant_fog.modulate.a = clampf(fog_opacity + sin(t * 0.13) * fog_opacity_pulse, 0.0, 1.0)
+	if _foreground_fog:
+		# Opposite drift and phase to the distant veil: the two planes separate
+		# perceptually instead of sliding as one painted background.
+		_foreground_fog.position.x -= sin(t * 0.11) * delta * 8.0
+		_foreground_fog.position.y = sin(t * 0.17 + 2.35) * foreground_fog_drift
+		_foreground_fog.modulate.a = clampf(
+			fog_opacity * foreground_fog_opacity - sin(t * 0.13) * fog_opacity_pulse * 0.35,
+			0.0,
+			1.0
+		)
 	if rain_enabled:
 		_update_rain_water_clip()
 		_update_rain_collision_fx(delta)
@@ -304,6 +319,29 @@ func _build_distant_fog() -> Node2D:
 	return layer
 
 
+## Velo vicino alla scena giocabile: stessa nebbia raster specchiata, tra la
+## Dogana e le briccole (z=-4 contro z=-3 delle briccole). Il moto è opposto a
+## quello del piano lontano per creare una separazione di profondità leggibile.
+func _build_foreground_fog() -> Node2D:
+	var layer := Node2D.new()
+	layer.name = "ForegroundMirroredFog"
+	layer.z_as_relative = false
+	layer.z_index = -4
+	layer.modulate = Color(0.68, 0.82, 0.96, fog_opacity * foreground_fog_opacity)
+	layer.add_to_group("dogana_parallax_foreground_fog")
+	for index in 5:
+		var sprite := Sprite2D.new()
+		sprite.texture = DISTANT_LAGOON_FOG
+		sprite.flip_h = true
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		sprite.material = _make_distant_soft_focus(maxf(12.0, distant_fog_blur * 0.72), 0.13)
+		sprite.position = Vector2(360.0 + index * 1420.0, 438.0)
+		sprite.scale = Vector2(0.86, 0.86)
+		layer.add_child(sprite)
+	add_child(layer)
+	return layer
+
+
 ## Sfocatura applicata alle texture raster lontane: non genera forme, filtra
 ## soltanto gli asset già esistenti con il materiale di background del progetto.
 func _make_distant_soft_focus(blur_radius: float, tint_strength: float) -> ShaderMaterial:
@@ -320,6 +358,7 @@ func apply_atmosphere_tuning() -> void:
 	_set_layer_blur(_distant_dogana, distant_dogana_blur)
 	_set_layer_blur(_distant_ships, distant_ships_blur)
 	_set_layer_blur(_distant_fog, distant_fog_blur)
+	_set_layer_blur(_foreground_fog, maxf(12.0, distant_fog_blur * 0.72))
 	if _distant_fog:
 		_distant_fog.modulate.a = fog_opacity
 	if _rain_overlay:
