@@ -19,14 +19,28 @@ const TUNING := [
 	{"key": "pogo_speed_scale", "label": "Forza pogo", "min": 0.45, "max": 1.1, "step": 0.05},
 ]
 
+const GRAPHICS_TUNING := [
+	{"key": "contrast", "label": "Contrasto", "min": 0.8, "max": 1.2, "step": 0.01},
+	{"key": "exposure", "label": "Esposizione", "min": 0.7, "max": 1.2, "step": 0.01},
+	{"key": "grade_strength", "label": "Filtro colore", "min": 0.0, "max": 0.8, "step": 0.02},
+	{"key": "palette_unify", "label": "Uniforma palette", "min": 0.0, "max": 1.0, "step": 0.02},
+	{"key": "bloom", "label": "Bagliore (bloom)", "min": 0.0, "max": 0.4, "step": 0.01},
+	{"key": "chroma", "label": "Frange cromatiche", "min": 0.0, "max": 1.0, "step": 0.02},
+	{"key": "ink_strength", "label": "Contorni scuri", "min": 0.0, "max": 0.4, "step": 0.01},
+	{"key": "sharpen", "label": "Nitidezza contorni", "min": 0.0, "max": 0.3, "step": 0.01},
+]
+
 var _player: CharacterBody2D
+var _camera: Camera2D
 var _window: Window
 var _open_btn: Button
 var _status: Label
 var _labels: Dictionary = {}
 var _sliders: Dictionary = {}
 var _defaults: Dictionary = {}
+var _graphics_defaults: Dictionary = {}
 var _dirty := false
+var _bind_retry_left := 0.0
 
 
 func _ready() -> void:
@@ -34,7 +48,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build_open_button()
 	_build_window()
-	call_deferred("_bind_player")
+	call_deferred("_bind_targets")
 	_show_window(true)
 
 
@@ -44,17 +58,34 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-func _bind_player() -> void:
-	_player = get_tree().get_first_node_in_group("player") as CharacterBody2D
+func _bind_targets() -> void:
 	if _player == null:
+		_player = get_tree().get_first_node_in_group("player") as CharacterBody2D
+		if _player:
+			for setting in TUNING:
+				var key: String = setting["key"]
+				if key in _player:
+					_defaults[key] = _player.get(key)
+	if _camera == null:
+		_camera = get_tree().get_first_node_in_group("camera") as Camera2D
+		if _camera:
+			for setting in GRAPHICS_TUNING:
+				var key: String = setting["key"]
+				if key in _camera:
+					_graphics_defaults[key] = _camera.get(key)
+	if _player or _camera:
+		_load_tuning()
+		_sync_sliders()
+		_set_status("Regola movimento e grafica in tempo reale. Premi Salva per conservarli.")
+
+
+func _process(delta: float) -> void:
+	if _player != null and _camera != null:
 		return
-	for setting in TUNING:
-		var key: String = setting["key"]
-		if key in _player:
-			_defaults[key] = _player.get(key)
-	_load_tuning()
-	_sync_sliders_from_player()
-	_set_status("Parametri della versione precedente. Premi Salva per tenerli.")
+	_bind_retry_left -= delta
+	if _bind_retry_left <= 0.0:
+		_bind_retry_left = 0.5
+		_bind_targets()
 
 
 func _build_open_button() -> void:
@@ -64,7 +95,7 @@ func _build_open_button() -> void:
 	add_child(host)
 	_open_btn = Button.new()
 	_open_btn.text = "Feel"
-	_open_btn.tooltip_text = "Apri i parametri di salto (F3)"
+	_open_btn.tooltip_text = "Apri parametri di movimento e grafica (F3)"
 	_open_btn.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_open_btn.position = Vector2(12, 12)
 	_open_btn.size = Vector2(72, 28)
@@ -74,9 +105,9 @@ func _build_open_button() -> void:
 
 func _build_window() -> void:
 	_window = Window.new()
-	_window.title = "Parametri salto"
+	_window.title = "Movimento e grafica"
 	_window.size = Vector2i(340, 560)
-	_window.min_size = Vector2i(280, 360)
+	_window.min_size = Vector2i(280, 420)
 	_window.unresizable = false
 	_window.always_on_top = true
 	_window.initial_position = Window.WINDOW_INITIAL_POSITION_ABSOLUTE
@@ -113,20 +144,15 @@ func _build_window() -> void:
 	scroll.add_child(box)
 
 	for setting in TUNING:
-		var key: String = setting["key"]
-		var label := Label.new()
-		label.text = "%s: —" % setting["label"]
-		label.add_theme_font_size_override("font_size", 12)
-		box.add_child(label)
-		_labels[key] = label
-		var slider := HSlider.new()
-		slider.min_value = setting["min"]
-		slider.max_value = setting["max"]
-		slider.step = setting["step"]
-		slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		slider.value_changed.connect(_on_slider.bind(key, setting["label"]))
-		box.add_child(slider)
-		_sliders[key] = slider
+		_add_slider(box, setting, false)
+
+	var graphics_title := Label.new()
+	graphics_title.text = "GRAFICA — riduci contorni bianchi qui"
+	graphics_title.add_theme_font_size_override("font_size", 13)
+	graphics_title.add_theme_color_override("font_color", Color(0.55, 0.9, 0.85, 1.0))
+	box.add_child(graphics_title)
+	for setting in GRAPHICS_TUNING:
+		_add_slider(box, setting, true)
 
 	_status = Label.new()
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -153,6 +179,23 @@ func _build_window() -> void:
 	buttons.add_child(close_btn)
 
 
+func _add_slider(box: VBoxContainer, setting: Dictionary, graphics: bool) -> void:
+	var key: String = setting["key"]
+	var label := Label.new()
+	label.text = "%s: —" % setting["label"]
+	label.add_theme_font_size_override("font_size", 12)
+	box.add_child(label)
+	_labels[key] = label
+	var slider := HSlider.new()
+	slider.min_value = setting["min"]
+	slider.max_value = setting["max"]
+	slider.step = setting["step"]
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.value_changed.connect(_on_slider.bind(key, setting["label"], graphics))
+	box.add_child(slider)
+	_sliders[key] = slider
+
+
 func _show_window(open: bool) -> void:
 	if _window == null:
 		return
@@ -161,9 +204,10 @@ func _show_window(open: bool) -> void:
 		_open_btn.visible = not open
 
 
-func _on_slider(value: float, key: String, label_text: String) -> void:
-	if _player and key in _player:
-		_player.set(key, value)
+func _on_slider(value: float, key: String, label_text: String, graphics: bool) -> void:
+	var target: Object = _camera if graphics else _player
+	if target and key in target:
+		target.set(key, value)
 	var label := _labels.get(key) as Label
 	if label:
 		label.text = "%s: %s" % [label_text, _fmt(value)]
@@ -171,14 +215,19 @@ func _on_slider(value: float, key: String, label_text: String) -> void:
 	_set_status("Modificato, non salvato. Premi Salva per tenerlo.")
 
 
-func _sync_sliders_from_player() -> void:
-	if _player == null:
+func _sync_sliders() -> void:
+	_sync_slider_group(TUNING, _player)
+	_sync_slider_group(GRAPHICS_TUNING, _camera)
+
+
+func _sync_slider_group(settings: Array, target: Object) -> void:
+	if target == null:
 		return
-	for setting in TUNING:
+	for setting in settings:
 		var key: String = setting["key"]
-		if not (key in _player):
+		if not (key in target):
 			continue
-		var value := float(_player.get(key))
+		var value := float(target.get(key))
 		var slider := _sliders.get(key) as HSlider
 		if slider:
 			slider.set_value_no_signal(value)
@@ -192,7 +241,9 @@ func _reset_defaults() -> void:
 		return
 	for key in _defaults.keys():
 		_player.set(key, _defaults[key])
-	_sync_sliders_from_player()
+	for key in _graphics_defaults.keys():
+		_camera.set(key, _graphics_defaults[key])
+	_sync_sliders()
 	_dirty = true
 	_set_status("Ripristinati i parametri precedenti. Premi Salva per tenerli.")
 
@@ -205,6 +256,10 @@ func _save_tuning() -> void:
 		var key: String = setting["key"]
 		if key in _player:
 			cfg.set_value("feel", key, _player.get(key))
+	for setting in GRAPHICS_TUNING:
+		var key: String = setting["key"]
+		if _camera and key in _camera:
+			cfg.set_value("graphics", key, _camera.get(key))
 	cfg.save(USER_SAVE)
 	cfg.save(PROJECT_SAVE)
 	_dirty = false
@@ -224,6 +279,10 @@ func _load_tuning() -> void:
 		var key: String = setting["key"]
 		if key in _player and cfg.has_section_key("feel", key):
 			_player.set(key, cfg.get_value("feel", key))
+	for setting in GRAPHICS_TUNING:
+		var key: String = setting["key"]
+		if _camera and key in _camera and cfg.has_section_key("graphics", key):
+			_camera.set(key, cfg.get_value("graphics", key))
 
 
 func _set_status(text: String) -> void:

@@ -36,12 +36,12 @@ extends Camera2D
 # Post-produzione estesa
 @export var contrast: float = 1.06
 @export var saturation: float = 0.92
-@export var grade_strength: float = 0.28
-@export var chroma: float = 0.55
-@export var bloom: float = 0.22
+@export var grade_strength: float = 0.18
+@export var chroma: float = 0.18
+@export var bloom: float = 0.06
 @export var bloom_threshold: float = 0.62
 @export var haze: float = 0.08
-@export var ink_strength: float = 0.18
+@export var ink_strength: float = 0.0
 @export var ink_threshold: float = 0.075
 @export var motion_breath: float = 0.16
 @export var shadow_tint: Color = Color(0.2, 0.19, 0.38, 1.0)
@@ -51,10 +51,11 @@ extends Camera2D
 
 # Palette: quanto le tinte vengono attratte verso acqua/verde/viola e quanto
 # l'immagine viene resa pastello.
-@export var palette_unify: float = 0.5
-@export var palette_pastel: float = 0.55
+@export var palette_unify: float = 0.18
+@export var palette_pastel: float = 0.12
 @export var palette_sat_cap: float = 0.52
-@export var exposure: float = 1.1
+@export var exposure: float = 1.0
+@export var sharpen: float = 0.0
 
 var _target: Node2D
 var _look_vec: Vector2 = Vector2.ZERO
@@ -155,14 +156,14 @@ func _apply_mobile_postfx_budget() -> void:
 func _apply_postfx_params() -> void:
 	if _post_mat == null:
 		return
-	var key := "%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%s|%s|%s|%s" % [
+	var key := str([
 		str(postfx_enabled),
 		vignette_strength, vignette_softness, vignette_radius,
 		grain_amount, grain_size, grain_speed, desaturate,
 		contrast, saturation, grade_strength, chroma, bloom, bloom_threshold, haze, ink_strength, ink_threshold, motion_breath,
-		palette_unify, palette_pastel, palette_sat_cap, exposure,
-		str(shadow_tint), str(mid_tint), str(highlight_tint), str(haze_color)
-	]
+		palette_unify, palette_pastel, palette_sat_cap, exposure, sharpen,
+		shadow_tint, mid_tint, highlight_tint, haze_color
+	])
 	if key == _last_postfx_key and not _postfx_dirty:
 		return
 	_last_postfx_key = key
@@ -197,6 +198,7 @@ func _apply_postfx_params() -> void:
 	_post_mat.set_shader_parameter("u_palette_pastel", palette_pastel)
 	_post_mat.set_shader_parameter("u_palette_sat_cap", palette_sat_cap)
 	_post_mat.set_shader_parameter("u_exposure", exposure)
+	_post_mat.set_shader_parameter("u_sharpen", sharpen)
 
 func _process(delta: float) -> void:
 	if _target == null:

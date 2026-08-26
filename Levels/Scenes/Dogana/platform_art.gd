@@ -1,6 +1,14 @@
+@tool
 extends Node2D
 
 @export var art_profile: DoganaArtProfile = preload("res://Levels/Scenes/Dogana/dogana_art_profile.tres")
+## Mantiene il fronte dei pontili visibile nella viewport dell'editor, così gli
+## oggetti di scena possono essere posizionati rispetto alla grafica reale.
+@export var preview_in_editor := true:
+	set(value):
+		preview_in_editor = value
+		if is_inside_tree():
+			_rebuild_platform_art()
 
 const SEA_LEVEL_Y := 565.0
 
@@ -41,6 +49,16 @@ func _texture_top_padding() -> float:
 func _ready() -> void:
 	add_to_group("dogana_generated_platform_art")
 	z_index = -1
+	if Engine.is_editor_hint() and not preview_in_editor:
+		return
+	_rebuild_platform_art()
+
+
+func _rebuild_platform_art() -> void:
+	_clear_generated_platform_art()
+	if art_profile == null or art_profile.walkable_platform == null:
+		push_warning("Dogana platform preview: missing walkable_platform texture.")
+		return
 
 	# Atto I: pontile lungo con varco di pesca (acqua visibile sotto, amo può passare).
 	_add_ledge(Rect2(-435, 460, 700, 96), 0.78, 0.0)
@@ -55,9 +73,17 @@ func _ready() -> void:
 	_add_ledge(Rect2(4620, 485, 1120, 110), 0.8, 0.01)
 
 
+func _clear_generated_platform_art() -> void:
+	for child in get_children():
+		if child.get_meta("generated_platform_preview", false):
+			remove_child(child)
+			child.queue_free()
+
+
 func _add_ledge(rect: Rect2, depth_scale: float, wear: float) -> void:
 	# AO sotto: dà peso e contatto a terra.
 	var ao := Polygon2D.new()
+	ao.set_meta("generated_platform_preview", true)
 	ao.z_index = -1
 	ao.polygon = PackedVector2Array([
 		Vector2(rect.position.x + 6, rect.end.y - 2),
@@ -69,6 +95,7 @@ func _add_ledge(rect: Rect2, depth_scale: float, wear: float) -> void:
 	add_child(ao)
 
 	var sprite := Sprite2D.new()
+	sprite.set_meta("generated_platform_preview", true)
 	sprite.texture = art_profile.walkable_platform
 	sprite.centered = false
 	# Usa solo il bordo superiore dell'asset. La vecchia sprite intera creava
@@ -100,6 +127,7 @@ func _add_ledge(rect: Rect2, depth_scale: float, wear: float) -> void:
 
 	# Bordo umido / sale sulla camminata.
 	var wet := Line2D.new()
+	wet.set_meta("generated_platform_preview", true)
 	wet.z_index = 1
 	wet.width = 2.0
 	wet.default_color = Color(0.62, 0.78, 0.74, 0.22 + wear * 0.1)
@@ -112,6 +140,7 @@ func _add_ledge(rect: Rect2, depth_scale: float, wear: float) -> void:
 	# Specular corto intermittente (pietra bagnata).
 	if rect.size.x > 160.0:
 		var sheen := Polygon2D.new()
+		sheen.set_meta("generated_platform_preview", true)
 		sheen.z_index = 1
 		var sx := rect.position.x + rect.size.x * (0.28 + wear)
 		sheen.polygon = PackedVector2Array([
@@ -140,6 +169,7 @@ func _add_waterline_foundation(rect: Rect2, wear: float) -> void:
 	if height <= 4.0:
 		return
 	var foundation := Sprite2D.new()
+	foundation.set_meta("generated_platform_preview", true)
 	foundation.name = "WaterlineFoundation"
 	foundation.z_index = -2
 	foundation.texture = art_profile.walkable_platform
@@ -155,6 +185,7 @@ func _add_waterline_foundation(rect: Rect2, wear: float) -> void:
 	foundation.set_meta("foundation_bottom_y", bottom)
 	add_child(foundation)
 	var contact := Line2D.new()
+	contact.set_meta("generated_platform_preview", true)
 	contact.z_index = -1
 	contact.width = 3.0
 	contact.default_color = Color(0.32, 0.62, 0.59, 0.24)
@@ -168,6 +199,7 @@ func _add_facade_bracket(rect: Rect2, wear: float) -> void:
 	var bracket_width := clampf(rect.size.x * 0.34, 42.0, 76.0)
 	var bracket_height := clampf(rect.size.x * 0.24, 34.0, 58.0)
 	var bracket := Sprite2D.new()
+	bracket.set_meta("generated_platform_preview", true)
 	bracket.name = "FacadeBracket"
 	bracket.z_index = -2
 	bracket.texture = art_profile.walkable_platform

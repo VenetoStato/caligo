@@ -42,6 +42,9 @@ uniform vec4 u_haze_color : source_color = vec4(0.55, 0.78, 0.82, 1.0);
 uniform float u_ink_strength : hint_range(0.0, 0.6) = 0.18;
 uniform float u_ink_threshold : hint_range(0.0, 0.4) = 0.075;
 uniform float u_motion_breath : hint_range(0.0, 1.0) = 0.16;
+// Sharpening can create pale halos around very dark outlines on some GPUs.
+// Keep it externally tunable so the debug panel can turn it down to zero.
+uniform float u_sharpen : hint_range(0.0, 0.3) = 0.0;
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
 uniform vec4 u_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);
@@ -200,7 +203,7 @@ void fragment() {
 		sample_screen(SCREEN_UV + vec2(0.0, px.y)) +
 		sample_screen(SCREEN_UV - vec2(0.0, px.y))
 	) * 0.25;
-	col = mix(col, sharp, 0.12 * (1.0 - abs(luma - 0.5) * 1.6));
+	col = mix(col, sharp, u_sharpen * (1.0 - abs(luma - 0.5) * 1.6));
 
 	// Contrasto + saturazione.
 	col = (col - vec3(0.5)) * u_contrast + vec3(0.5);

@@ -11,6 +11,10 @@ extends Node2D
 const FORE_WOOD := Color(0.3, 0.36, 0.42, 1.0)
 const FORE_CLOSE := Color(0.18, 0.22, 0.28, 1.0)
 const FOREGROUND_POLE := preload("res://Landscape/Dogana/bricola_foreground.svg")
+const DISTANT_FOG_DOGANA := preload("res://Landscape/Dogana/Generated/Parallax/dogana_distant_fog_v2.png")
+const DISTANT_SHIP_SHEET := preload("res://Landscape/Dogana/Generated/Parallax/distant_velieri_sheet_v1.png")
+const DISTANT_LAGOON_FOG := preload("res://Landscape/Dogana/Generated/Parallax/distant_lagoon_fog_v1.png")
+const DISTANT_SOFT_FOCUS := preload("res://Levels/Scenes/Dogana/background_softfocus.gdshader")
 
 var _camera: Camera2D
 var _origin := Vector2.ZERO
@@ -23,6 +27,9 @@ var _mid_near: Node2D
 var _near: Node2D
 var _fore: Node2D
 var _fore_close: Node2D
+var _distant_dogana: Node2D
+var _distant_ships: Node2D
+var _distant_fog: Node2D
 var _fore_motes: CPUParticles2D
 var _moon: Node2D
 var _interior_overlay: Polygon2D
@@ -41,6 +48,9 @@ func _ready() -> void:
 	_moon = _build_moon()
 	_horizon = _build_empty_layer("HorizonViolet", -22, "dogana_parallax_horizon")
 	_far = _build_empty_layer("FarLagoonSilhouettes", -19, "dogana_parallax_far")
+	_distant_dogana = _build_distant_dogana()
+	_distant_ships = _build_distant_ships()
+	_distant_fog = _build_distant_fog()
 	_mid = _build_mid_reflections()
 	_mid_near = _build_empty_layer("MidNearRooftops", -5, "dogana_parallax_mid_near")
 	_near = _build_empty_layer("NearAtmosphericFrames", 12, "dogana_parallax_near")
@@ -71,6 +81,9 @@ func _process(delta: float) -> void:
 	# Più lontano = spostamento minore. Il foreground anticipa leggermente.
 	_horizon.position += delta_cam * 0.05
 	_far.position += delta_cam * 0.12
+	_distant_dogana.position += delta_cam * 0.08
+	_distant_ships.position += delta_cam * 0.10
+	_distant_fog.position += delta_cam * 0.09
 	_mid.position += delta_cam * 0.26
 	_mid_near.position += delta_cam * 0.42
 	_near.position += delta_cam * 0.58
@@ -88,6 +101,15 @@ func _process(delta: float) -> void:
 		_bokeh_far.position.x = sin(t * 0.08) * 22.0
 	if _bokeh_near:
 		_bokeh_near.position.x = sin(t * 0.12 + 2.0) * 32.0
+	if _distant_ships:
+		for ship in _distant_ships.get_children():
+			ship.position.x += float(ship.get_meta("sail_speed", 0.0)) * delta
+			if ship.position.x > 6900.0:
+				ship.position.x = -900.0
+	if _distant_fog:
+		_distant_fog.position.x += sin(t * 0.11) * delta * 5.0
+		_distant_fog.position.y = sin(t * 0.17 + 0.8) * 9.0
+		_distant_fog.modulate.a = 0.24 + sin(t * 0.13) * 0.07
 	var inside := camera_pos.y < -100.0
 	_interior_overlay.modulate.a = move_toward(_interior_overlay.modulate.a, 0.5 if inside else 0.0, delta * 0.7)
 	if _moon:
@@ -167,6 +189,106 @@ func _build_mid_reflections() -> Node2D:
 	# La superficie ha gia' caustiche e schiuma nello shader: questo piano resta
 	# vuoto, il gruppo serve al test di coerenza.
 	return _build_empty_layer("MidLagoonGlints", -8, "dogana_parallax_mid")
+
+
+## Copia lontana della Dogana: stessa architettura, molto più piccola e
+## raffreddata dalla foschia. È scenografia pura e resta dietro alla Dogana
+## giocabile, ma davanti al cielo e alla luna.
+func _build_distant_dogana() -> Node2D:
+	var layer := Node2D.new()
+	layer.name = "DistantFogDogana"
+	# Stesso piano dell'architettura, ma questo nodo compare prima nell'albero:
+	# rimane dietro alla Dogana senza finire nascosto dal fondale.
+	layer.z_as_relative = false
+	layer.z_index = -17
+	layer.add_to_group("dogana_parallax_distant_architecture")
+	# L'immagine è larga poco più di una schermata: la ripetiamo con una lieve
+	# sovrapposizione per coprire tutta la Dogana senza interruzioni nel parallax.
+	for index in 6:
+		var sprite := Sprite2D.new()
+		sprite.texture = DISTANT_FOG_DOGANA
+		sprite.position = Vector2(620.0 + index * 1220.0, 286.0)
+		# +30% rispetto al primo passaggio: deve leggere come città lontana,
+		# non come una striscia sul fondo.
+		sprite.scale = Vector2(0.936, 0.936)
+		sprite.material = _make_distant_soft_focus(18.0, 0.10)
+		sprite.modulate = Color(0.72, 0.86, 1.0, 1.0)
+		sprite.z_index = 0
+		layer.add_child(sprite)
+	add_child(layer)
+	return layer
+
+
+## Velieri lontani ricavati dallo sprite-sheet raster: tre scale e velocità
+## diverse danno profondità senza introdurre collisioni.
+func _build_distant_ships() -> Node2D:
+	var layer := Node2D.new()
+	layer.name = "DistantSailingShips"
+	layer.z_as_relative = false
+	layer.z_index = -17
+	layer.add_to_group("dogana_parallax_distant_ships")
+	var fleet := [
+		[Vector2(-230, 390), 7.0, 0.64, 0],
+		[Vector2(150, 438), 4.0, 0.44, 1],
+		[Vector2(720, 418), 6.0, 0.52, 3],
+		[Vector2(4350, 353), 9.0, 0.72, 2],
+		[Vector2(5880, 418), 5.5, 0.52, 3],
+	]
+	for entry in fleet:
+		var ship := _make_distant_ship(float(entry[2]), int(entry[3]))
+		ship.position = entry[0]
+		ship.set_meta("sail_speed", float(entry[1]))
+		layer.add_child(ship)
+	add_child(layer)
+	return layer
+
+
+func _make_distant_ship(scale_mul: float, sheet_index: int) -> Node2D:
+	var ship := Node2D.new()
+	ship.scale = Vector2(scale_mul, scale_mul)
+	var sprite := Sprite2D.new()
+	sprite.texture = DISTANT_SHIP_SHEET
+	sprite.region_enabled = true
+	var frame_width := float(DISTANT_SHIP_SHEET.get_width()) / 4.0
+	sprite.region_rect = Rect2(frame_width * sheet_index, 0.0, frame_width, float(DISTANT_SHIP_SHEET.get_height()))
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	sprite.material = _make_distant_soft_focus(22.0, 0.12)
+	sprite.modulate = Color(0.66, 0.82, 0.95, 1.0)
+	ship.add_child(sprite)
+	return ship
+
+
+## Nebbia raster semitrasparente: attraversa lentamente la Dogana lontana e
+## i velieri, senza coprire la Dogana giocabile in primo piano.
+func _build_distant_fog() -> Node2D:
+	var layer := Node2D.new()
+	layer.name = "DistantLagoonFog"
+	layer.z_as_relative = false
+	layer.z_index = -17
+	layer.modulate = Color(0.72, 0.85, 1.0, 1.0)
+	layer.add_to_group("dogana_parallax_distant_fog")
+	for index in 5:
+		var sprite := Sprite2D.new()
+		sprite.texture = DISTANT_LAGOON_FOG
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		sprite.material = _make_distant_soft_focus(28.0, 0.08)
+		sprite.position = Vector2(360.0 + index * 1420.0, 430.0)
+		sprite.scale = Vector2(0.78, 0.78)
+		layer.add_child(sprite)
+	add_child(layer)
+	return layer
+
+
+## Sfocatura applicata alle texture raster lontane: non genera forme, filtra
+## soltanto gli asset già esistenti con il materiale di background del progetto.
+func _make_distant_soft_focus(blur_radius: float, tint_strength: float) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = DISTANT_SOFT_FOCUS
+	material.set_shader_parameter("blur_radius", blur_radius)
+	material.set_shader_parameter("edge_fade", 0.04)
+	material.set_shader_parameter("atmosphere_tint", Color(0.58, 0.76, 0.9, 1.0))
+	material.set_shader_parameter("tint_strength", tint_strength)
+	return material
 
 
 ## Piano frontale: pali d'ormeggio in massa piena che passano davanti al

@@ -1,6 +1,6 @@
 extends CanvasLayer
 
-const MIN_VISIBLE_TIME := 2.4
+const MIN_VISIBLE_TIME := 4.2
 const READY_FRAMES := 3
 const OVERLAY_FADE_IN := 1.4
 const OVERLAY_FADE_OUT := 2.1
@@ -11,6 +11,7 @@ const ARRIVAL_ART := preload("res://Landscape/Dogana/Illustrated/arrival.png")
 var _target_path := ""
 var _loading := false
 var _elapsed := 0.0
+var _displayed_progress := 0.0
 var _prepared_path := ""
 var _preparing := false
 var _prepared_scene: PackedScene
@@ -43,9 +44,10 @@ func load_scene(scene_path: String, instant_cover: bool = false) -> void:
 	_target_path = scene_path
 	_loading = true
 	_elapsed = 0.0
+	_displayed_progress = 0.0
 	_overlay.visible = true
 	_progress.value = 0.0
-	_status.text = "APRENDO LE ACQUE DELLA LAGUNA…"
+	_status.text = "CARICAMENTO…"
 	if instant_cover:
 		# La schermata precedente è già un velo opaco: niente fade-in da zero.
 		_overlay.modulate.a = 1.0
@@ -105,8 +107,12 @@ func _process(delta: float) -> void:
 	var progress_data: Array = []
 	var status := ResourceLoader.load_threaded_get_status(_target_path, progress_data)
 	var raw_progress := float(progress_data[0]) if not progress_data.is_empty() else 0.0
-	_progress.value = maxf(_progress.value, minf(raw_progress * 94.0, 94.0))
-	_update_status(_progress.value)
+	var target_progress := maxf(_displayed_progress, minf(raw_progress * 94.0, 94.0))
+	# Il loader thread può aggiornare a scatti: la barra conserva il valore reale
+	# ma lo raggiunge con un moto continuo, senza false pause al 94%.
+	_displayed_progress = move_toward(_displayed_progress, target_progress, delta * 68.0)
+	_progress.value = _displayed_progress
+	_update_status(_displayed_progress)
 
 	if status == ResourceLoader.THREAD_LOAD_LOADED:
 		set_process(false)
@@ -127,8 +133,10 @@ func _finish_loading() -> void:
 	var remaining := maxf(0.0, MIN_VISIBLE_TIME - _elapsed)
 	if remaining > 0.0:
 		await get_tree().create_timer(remaining, true, false, true).timeout
-	_progress.value = 100.0
-	_status.text = "COSTRUENDO LE ULTIME LUCI…"
+	_status.text = "CARICAMENTO…"
+	var progress_tween := create_tween()
+	progress_tween.tween_property(_progress, "value", 100.0, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await progress_tween.finished
 	# Copertura piena prima del swap scena: niente frame di clear-color.
 	_overlay.visible = true
 	_overlay.modulate.a = 1.0
@@ -140,7 +148,7 @@ func _finish_loading() -> void:
 		await get_tree().process_frame
 	await get_tree().physics_frame
 	await get_tree().process_frame
-	_status.text = "LA DOGANA È PRONTA"
+	_status.text = "PRONTO"
 	await get_tree().create_timer(0.12, true, false, true).timeout
 	var tween := create_tween()
 	tween.tween_property(_overlay, "modulate:a", 0.0, OVERLAY_FADE_OUT).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
@@ -168,14 +176,7 @@ func _fail(message: String) -> void:
 
 
 func _update_status(percent: float) -> void:
-	if percent < 30.0:
-		_status.text = "TRACCIANDO I CANALI…"
-	elif percent < 65.0:
-		_status.text = "RISVEGLIANDO LA LAGUNA…"
-	elif percent < 90.0:
-		_status.text = "DISPONENDO BRICOLE E ALTARI…"
-	else:
-		_status.text = "PREPARANDO PESCI E CALIGO…"
+	_status.text = "CARICAMENTO…"
 
 
 func _build_loading_ui() -> void:

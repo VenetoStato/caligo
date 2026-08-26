@@ -1,3 +1,4 @@
+@tool
 extends Node2D
 
 signal grace_activated(site_id: String)
@@ -33,6 +34,20 @@ const GRACE_CHARGE_TIME := 3.0
 
 
 func _ready() -> void:
+	if Engine.is_editor_hint():
+		# Keep the authoring viewport focused on the world/geometry. These
+		# CanvasLayers are still visible normally when the game is run.
+		for ui_name in ["GameMenu", "DoganaMap", "LoreReader", "MetroidvaniaHUD", "TutorialHints", "FeelDebugPanel"]:
+			var ui := get_node_or_null(ui_name) as CanvasItem
+			if ui:
+				ui.visible = false
+		return
+	# The scene stores the authoring-only hidden state; restore every runtime UI
+	# layer when the game actually starts.
+	for ui_name in ["GameMenu", "DoganaMap", "LoreReader", "MetroidvaniaHUD", "TutorialHints", "FeelDebugPanel"]:
+		var runtime_ui := get_node_or_null(ui_name) as CanvasItem
+		if runtime_ui:
+			runtime_ui.visible = true
 	# Lo stato di pausa appartiene ai modal della scena corrente; non va ereditato
 	# da una lettura/mappa rimasta aperta durante un reload o un test.
 	get_tree().paused = false
