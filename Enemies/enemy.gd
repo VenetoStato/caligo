@@ -1226,10 +1226,15 @@ func _update_combat_hook_escape(delta: float) -> void:
 		if _combat_hook_reel_active and not combat_hook_heavy:
 			# I volanti devono seguire davvero la lenza, non solo oscillare:
 			# la componente del reel prevale sul semplice hover.
-			target_y = clampf(target_y + _combat_hook_pull_velocity.y * 1.35, -260.0, 260.0)
+			var can_reel_up := _combat_hook_owner == null or global_position.y >= _combat_hook_owner.global_position.y - 24.0
+			if can_reel_up:
+				target_y = clampf(target_y + _combat_hook_pull_velocity.y * 1.35, -260.0, 260.0)
+			else:
+				target_y = maxf(target_y, 0.0)
 		velocity.y = move_toward(velocity.y, target_y, move_acceleration * 1.2 * delta)
 	else:
-		if _combat_hook_reel_active and not combat_hook_heavy and _combat_hook_pull_velocity.y < -1.0:
+		var can_reel_up := _combat_hook_owner == null or global_position.y >= _combat_hook_owner.global_position.y - 24.0
+		if _combat_hook_reel_active and not combat_hook_heavy and can_reel_up and _combat_hook_pull_velocity.y < -1.0:
 			# Anche un nemico leggero a terra può essere schiodato: il reel
 			# applica una trazione verticale, poi la gravità lo fa ricadere.
 			velocity.y = move_toward(

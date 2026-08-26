@@ -57,7 +57,16 @@ func apply_reel_force(force: Vector2) -> void:
 func pull_along_line(anchor: Vector2, haul: float, _allow_exit := false) -> void:
 	var to_anchor := anchor - global_position
 	if to_anchor.length_squared() > 1.0:
-		apply_central_force(to_anchor.normalized() * haul * 0.9)
+		var direction := to_anchor.normalized()
+		# Non superare la canna verso l'alto: senza un tether fisico la forza
+		# continuava ad accumularsi e l'esca saliva fuori scena all'infinito.
+		if to_anchor.y < -120.0:
+			direction.y = 0.0
+			if direction.length_squared() < 0.01:
+				linear_velocity.y = move_toward(linear_velocity.y, 0.0, haul * 0.08)
+			else:
+				direction = direction.normalized()
+		apply_central_force(direction * haul * 0.9)
 
 func release_from_hook() -> void:
 	hooked_to_player = false
@@ -71,6 +80,8 @@ func _on_hook_detected(hook: Node) -> void:
 		hook.call("_hook_fish", self)
 
 func _physics_process(_delta: float) -> void:
+	if hooked_to_player and player_ref is Node2D and global_position.y < (player_ref as Node2D).global_position.y - 150.0:
+		linear_velocity.y = minf(linear_velocity.y, 20.0)
 	var water := get_tree().get_first_node_in_group("water")
 	if water != null and water.has_method("get_surface_height"):
 		var surface := float(water.call("get_surface_height", global_position.x))
