@@ -5,6 +5,8 @@ uniform float intensity : hint_range(0.0, 1.0) = 0.62;
 uniform float fall_speed : hint_range(0.1, 3.0) = 1.0;
 uniform float wind : hint_range(-1.0, 1.0) = 0.16;
 uniform float aspect_ratio : hint_range(0.5, 3.0) = 1.777778;
+uniform float waterline_uv = 2.0;
+uniform float waterline_softness : hint_range(0.0, 0.03) = 0.004;
 
 float hash21(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21));
@@ -39,6 +41,14 @@ void fragment() {
 	float rain = far_rain * 0.16 + mid_rain * 0.34 + near_rain * 0.58;
 	float shimmer = 0.76 + hash21(floor(FRAGCOORD.xy * 0.5)) * 0.24;
 	vec3 rain_color = mix(vec3(0.28, 0.46, 0.55), vec3(0.68, 0.84, 0.88), near_rain * 0.7);
-	float alpha = clamp(rain * intensity * shimmer, 0.0, 0.24);
+	// The screen overlay used to continue under the water even though the
+	// physical drops stopped there. Fade every streak exactly at the dynamic
+	// world-space waterline supplied by dogana_depth_layers.gd.
+	float above_water = 1.0 - smoothstep(
+		waterline_uv - waterline_softness,
+		waterline_uv + waterline_softness,
+		uv.y
+	);
+	float alpha = clamp(rain * intensity * shimmer, 0.0, 0.24) * above_water;
 	COLOR = vec4(rain_color, alpha);
 }

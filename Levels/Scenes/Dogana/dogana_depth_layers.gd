@@ -28,7 +28,7 @@ const CITY_RAIN_SHADER := preload("res://Levels/Scenes/Dogana/city_rain.gdshader
 @export_range(0.0, 1.0, 0.01) var rain_intensity := 0.62
 @export_range(0.1, 3.0, 0.05) var rain_speed := 1.0
 @export_range(-1.0, 1.0, 0.01) var rain_wind := 0.16
-@export_range(2.0, 40.0, 1.0) var rain_collision_rate := 18.0
+@export_range(2.0, 60.0, 1.0) var rain_collision_rate := 32.0
 
 var _camera: Camera2D
 var _origin := Vector2.ZERO
@@ -47,6 +47,7 @@ var _distant_fog: Node2D
 var _rain_overlay: ColorRect
 var _rain_surface_fx: Node2D
 var _rain_collision_accumulator := 0.0
+var _rain_water_body: Node2D
 var _fore_motes: CPUParticles2D
 var _moon: Node2D
 var _interior_overlay: Polygon2D
@@ -131,6 +132,7 @@ func _process(delta: float) -> void:
 		_distant_fog.position.y = sin(t * 0.17 + 0.8) * fog_vertical_drift
 		_distant_fog.modulate.a = clampf(fog_opacity + sin(t * 0.13) * fog_opacity_pulse, 0.0, 1.0)
 	if rain_enabled:
+		_update_rain_water_clip()
 		_update_rain_collision_fx(delta)
 	var inside := camera_pos.y < -100.0
 	_interior_overlay.modulate.a = move_toward(_interior_overlay.modulate.a, 0.5 if inside else 0.0, delta * 0.7)
@@ -329,6 +331,7 @@ func apply_atmosphere_tuning() -> void:
 			var viewport_size := get_viewport_rect().size
 			if viewport_size.y > 0.0:
 				rain_material.set_shader_parameter("aspect_ratio", viewport_size.x / viewport_size.y)
+		_update_rain_water_clip()
 	if _rain_surface_fx:
 		_rain_surface_fx.visible = rain_enabled
 		if not rain_enabled:
@@ -371,10 +374,32 @@ func _build_rain_surface_fx() -> Node2D:
 	return root
 
 
+func _update_rain_water_clip() -> void:
+	if _rain_overlay == null or not rain_enabled:
+		return
+	var rain_material := _rain_overlay.material as ShaderMaterial
+	if rain_material == null:
+		return
+	if _rain_water_body == null or not is_instance_valid(_rain_water_body):
+		_rain_water_body = get_tree().get_first_node_in_group("water") as Node2D
+	if _rain_water_body == null or not _rain_water_body.has_method("get_surface_height"):
+		# Values below the viewport leave the whole screen raining until the
+		# water node has completed its own _ready().
+		rain_material.set_shader_parameter("waterline_uv", 2.0)
+		return
+	var viewport_size := get_viewport_rect().size
+	if viewport_size.y <= 0.0:
+		return
+	var sample_x := _camera.global_position.x if _camera != null else _rain_water_body.global_position.x
+	var surface_y := float(_rain_water_body.call("get_surface_height", sample_x))
+	var screen_surface := get_viewport().get_canvas_transform() * Vector2(sample_x, surface_y)
+	rain_material.set_shader_parameter("waterline_uv", screen_surface.y / viewport_size.y)
+
+
 func _update_rain_collision_fx(delta: float) -> void:
 	if _camera == null or _rain_surface_fx == null:
 		return
-	var mobile_ratio := 0.48 if OS.has_feature("mobile") else 1.0
+	var mobile_ratio := 0.62 if OS.has_feature("mobile") else 1.0
 	_rain_collision_accumulator += delta * rain_collision_rate * rain_intensity * mobile_ratio
 	var spawned := 0
 	while _rain_collision_accumulator >= 1.0 and spawned < 4:
