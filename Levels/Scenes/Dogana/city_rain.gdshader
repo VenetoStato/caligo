@@ -26,10 +26,15 @@ float waterline_noise(float x) {
 float streak_layer(vec2 uv, float columns, float speed, float phase, float width) {
 	float aspect = aspect_ratio;
 	vec2 p = vec2(uv.x * aspect, uv.y);
-	p.x -= p.y * (wind * 0.16);
 	// Le UV canvas crescono verso il basso; sottrarre il tempo fa scorrere
 	// visivamente le celle dall'alto verso il basso.
 	p.y -= TIME * fall_speed * speed;
+	// Apply slant after the animated Y. Previously X used the original screen Y,
+	// so streaks travelled inside almost fixed vertical columns. Each depth now
+	// has a slightly different natural drift even with zero wind.
+	float layer_slant = wind * 0.16 + (phase - 0.5) * 0.038;
+	p.x -= p.y * layer_slant;
+	p.x += sin(TIME * (0.31 + speed * 0.17) + phase * 11.0) * 0.012;
 	vec2 grid = vec2(columns * aspect, columns * 0.54);
 	vec2 id = floor(p * grid);
 	vec2 q = fract(p * grid) - 0.5;
