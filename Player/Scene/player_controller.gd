@@ -553,6 +553,8 @@ func _try_hit_enemy(target: Node) -> void:
 	_attack_hit_enemies.append(target)
 	if target.has_method("take_damage"):
 		target.take_damage(_current_attack_damage, global_position)
+		var defeated := ("current_health" in target and int(target.get("current_health")) <= 0)
+		_request_impact_feedback(0.34 if defeated else 0.2, 0.014 if defeated else 0.008)
 	if _power_strike_left > 0.0 and target == _power_strike_target:
 		_power_strike_hit = true
 		_spawn_power_strike_impact(target)
@@ -717,6 +719,16 @@ func _request_shake(intensity: float):
 	if cam and cam.has_method("add_shake"):
 		cam.add_shake(intensity)
 
+
+func _request_impact_feedback(shake: float, zoom_amount: float) -> void:
+	var cam := get_tree().get_first_node_in_group("camera")
+	if cam == null:
+		return
+	if cam.has_method("add_shake"):
+		cam.call("add_shake", shake)
+	if cam.has_method("add_zoom_pulse"):
+		cam.call("add_zoom_pulse", zoom_amount, 0.18 if shake < 0.3 else 0.24)
+
 # ===========================================
 # HEALTH UI
 # ===========================================
@@ -794,12 +806,12 @@ func _on_nail_connect(target: Node) -> void:
 		target.call("apply_hitstop", freeze)
 	if _attack_dir.y > 0.5:
 		_apply_pogo()
-		_request_shake(0.12)
+		_request_impact_feedback(0.2, 0.006)
 		return
 	if _attack_dir.y < -0.5:
 		if not is_on_floor():
 			velocity.y = maxf(velocity.y, 36.0)
-		_request_shake(0.1)
+		_request_impact_feedback(0.16, 0.004)
 		return
 	var away := 1.0
 	if target is Node2D:
@@ -808,7 +820,7 @@ func _on_nail_connect(target: Node) -> void:
 		away = -1.0 if facing_right else 1.0
 	velocity.x = away * (192.0 if heavy else 174.0)
 	_knockback_timer = maxf(_knockback_timer, 0.1)
-	_request_shake(0.12)
+	_request_impact_feedback(0.18, 0.006)
 
 
 ## Il blur e' applicato alle particelle generate quando la canna connette,
@@ -1543,7 +1555,7 @@ func take_damage(
 	invincibility_timer = invincibility_time
 	blink_timer = 0.0
 	
-	_request_shake(0.42)
+	_request_impact_feedback(0.5, 0.018)
 	
 	if current_health <= 0:
 		_on_death()
