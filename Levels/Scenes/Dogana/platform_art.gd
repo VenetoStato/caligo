@@ -10,11 +10,6 @@ extends Node2D
 		if is_inside_tree():
 			_rebuild_platform_art()
 
-@export var show_platform_guides := true:
-	set(value):
-		show_platform_guides = value
-		queue_redraw()
-
 const SEA_LEVEL_Y := 565.0
 
 var _top_padding := -1.0
@@ -53,31 +48,12 @@ func _texture_top_padding() -> float:
 
 func _ready() -> void:
 	add_to_group("dogana_generated_platform_art")
-	z_index = -1
+	# In editor il pontile reale deve restare sopra fondale e architettura per
+	# poterci posizionare props. A runtime conserva la profondita' prevista.
+	z_index = 50 if Engine.is_editor_hint() else -1
 	if Engine.is_editor_hint() and not preview_in_editor:
 		return
 	_rebuild_platform_art()
-	queue_redraw()
-
-
-func _draw() -> void:
-	if not Engine.is_editor_hint() or not show_platform_guides:
-		return
-	# Guide volutamente editor-only: mostra piano calpestabile e bordo di
-	# collisione anche quando la texture dipinta si confonde con il fondale.
-	var platforms := [
-		Rect2(-435, 460, 700, 96),
-		Rect2(395, 460, 630, 96),
-		Rect2(1190, 485, 915, 110),
-		Rect2(2060, 485, 1200, 110),
-		Rect2(3260, 485, 850, 110),
-		Rect2(4110, 485, 510, 110),
-		Rect2(4620, 485, 1120, 110),
-	]
-	for rect in platforms:
-		draw_rect(rect, Color(0.22, 0.86, 0.78, 0.08), true)
-		draw_line(rect.position, Vector2(rect.end.x, rect.position.y), Color(0.32, 1.0, 0.88, 0.9), 2.0)
-		draw_line(Vector2(rect.position.x, rect.end.y), rect.end, Color(0.22, 0.68, 0.72, 0.45), 1.0)
 
 
 func _rebuild_platform_art() -> void:
