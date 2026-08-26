@@ -6,6 +6,9 @@ var in_water := false
 var hooked_to_player := false
 var _bait_registered := false
 var player_ref: Node = null
+var _tether_anchor := Vector2.ZERO
+var _tether_length := 0.0
+var _tether_active := false
 
 const PLAYER_WATER_GRAVITY := 0.3
 const MAX_REEL_LIFT := 120.0
@@ -38,11 +41,13 @@ func set_player_reference(player: Node) -> void:
 	# Il cadavere resta un corpo fisico: il reel non annulla la gravità.
 	gravity_scale = PLAYER_WATER_GRAVITY if in_water else 1.0
 
-func set_line_tether(_anchor: Vector2, _length: float) -> void:
-	pass
+func set_line_tether(anchor: Vector2, length: float) -> void:
+	_tether_anchor = anchor
+	_tether_length = maxf(length, 28.0)
+	_tether_active = hooked_to_player
 
 func clear_line_tether() -> void:
-	pass
+	_tether_active = false
 
 func is_hanging() -> bool:
 	return false
@@ -138,9 +143,29 @@ func pull_along_line(anchor: Vector2, haul: float, _allow_exit := false) -> void
 
 func release_from_hook() -> void:
 	hooked_to_player = false
+	_tether_active = false
 	player_ref = null
 	can_sleep = true
 	gravity_scale = PLAYER_WATER_GRAVITY if in_water else 1.0
+
+
+func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
+	if not hooked_to_player or not _tether_active or _tether_length <= 0.0:
+		return
+	var body_position := state.transform.origin
+	var offset := body_position - _tether_anchor
+	var distance := offset.length()
+	if distance <= _tether_length or distance <= 0.001:
+		return
+	var outward := offset / distance
+	var corrected := state.transform
+	corrected.origin = _tether_anchor + outward * _tether_length
+	state.transform = corrected
+	# Elimina soltanto la velocita' che tende ulteriormente la corda; gravita',
+	# pendolo e movimento tangenziale della carcassa restano fisici.
+	var radial_speed := state.linear_velocity.dot(outward)
+	if radial_speed > 0.0:
+		state.linear_velocity -= outward * radial_speed
 
 func _on_hook_detected(hook: Node) -> void:
 	if hooked_to_player or hook == null:

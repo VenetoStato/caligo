@@ -92,6 +92,9 @@ signal locked_skill_requested
 @export var line_out_speed: float = 900.0
 @export var reel_in_speed: float = 300.0
 @export var reel_pull_force: float = 680.0
+## F breve lascia la carcassa; F tenuto abilita il rilascio controllato.
+@export var fishing_line_release_hold: float = 1.5
+@export var fishing_line_release_speed: float = 125.0
 @export var min_line_length_start: float = 40.0
 @export var spawn_forward_push: float = 18.0
 @export var min_forward_aim_dot: float = -0.05
@@ -299,6 +302,9 @@ var fishing_anim_started: bool = false
 var fishing_anim_finished: bool = false
 var is_charging: bool = false
 var current_charge_time: float = 0.0
+var _cast_hold_line_out_timer := 0.0
+var _cast_hold_line_out_tracking := false
+var _cast_hold_line_out_active := false
 var grab_anchors: Array[RigidBody2D] = []
 var is_swinging := false
 var using_fishing_hook: bool = true  # Default: amo da pesca + pastura; C = altro (amo da lancio)
@@ -1007,15 +1013,18 @@ func _input(event):
 			return
 	
 	if event.is_action_pressed("cast"):
-		# Un cadavere è un oggetto/esca persistente, non una cattura: F una
-		# seconda volta lo lascia esattamente dove si trova.
-		if line_extended and fish_hooked and _is_bait_carcass(current_fish):
-			_drop_hooked_carcass()
-			return
-		# F di nuovo sgancia subito un enemy: la canna non puo' restare bloccata
-		# su un pesante o su un bersaglio che non si vuole piu' trascinare.
+		# Gli enemy da combattimento mantengono lo sgancio immediato: il rilascio
+		# lungo riguarda la lenza da pesca e le sue esche, non il combat hook.
 		if line_extended and enemy_hooked:
 			_release_hooked_enemy(false)
+			return
+		# Con la lenza da pesca gia' fuori, F diventa un comando a pressione
+		# lunga: dopo 1,5 s lascia uscire corda. Sulla carcassa un tap mantiene
+		# il comportamento precedente e la lascia esattamente dov'e'.
+		if line_extended and line_mode == LineMode.FISHING and hook_instance:
+			_cast_hold_line_out_timer = 0.0
+			_cast_hold_line_out_tracking = true
+			_cast_hold_line_out_active = false
 			return
 		if not line_extended and hook_instance == null:
 			line_mode = LineMode.FISHING if using_fishing_hook or not grab_hook_unlocked else LineMode.GRAB
@@ -1039,6 +1048,16 @@ func _input(event):
 					current_charge_time = 0.0
 					_reset_cast_aim_from_mouse()
 	
+	if event.is_action_released("cast") and _cast_hold_line_out_tracking:
+		var released_line := _cast_hold_line_out_active
+		_cast_hold_line_out_timer = 0.0
+		_cast_hold_line_out_tracking = false
+		_cast_hold_line_out_active = false
+		target_line_length = current_line_length
+		if not released_line and fish_hooked and _is_bait_carcass(current_fish):
+			_drop_hooked_carcass()
+		return
+
 	if event.is_action_released("cast") or event.is_action_released("grab"):
 		if is_charging:
 			is_charging = false
@@ -2175,6 +2194,7 @@ func _update_effective_tension():
 	_effective_tension = clamp(_effective_tension, 0.0, 1.0)
 
 func _process_fishing(delta: float):
+	_update_cast_hold_line_out(delta)
 	_enemy_power_window_left = maxf(0.0, _enemy_power_window_left - delta)
 	_enemy_hook_feedback_timer = maxf(0.0, _enemy_hook_feedback_timer - delta)
 	# Hold R (o impulso tap): durante la pesca is_reeling guida la tirata.
@@ -2209,7 +2229,15 @@ func _process_fishing(delta: float):
 			current_fish.call("set_line_tether", rod_tip, current_line_length)
 
 func _update_line_length(delta: float):
-	if not is_reeling and current_line_length < target_line_length:
+	var corpse_bait := fish_hooked and _is_bait_carcass(current_fish)
+	if _cast_hold_line_out_active:
+		current_line_length = minf(max_line_length, current_line_length + fishing_line_release_speed * delta)
+		target_line_length = current_line_length
+	elif corpse_bait:
+		# Il peso non puo' creare corda dal nulla: resta alla lunghezza agganciata
+		# finche' il giocatore non tiene F abbastanza a lungo.
+		target_line_length = current_line_length
+	elif not is_reeling and current_line_length < target_line_length:
 		current_line_length = min(target_line_length, current_line_length + line_out_speed * delta)
 	if is_reeling:
 		var spd = grab_reel_in_speed if line_mode == LineMode.GRAB else reel_in_speed
@@ -2233,6 +2261,19 @@ func _update_line_length(delta: float):
 					detach_grab_anchor()
 				else:
 					_destroy_hook()
+
+
+func _update_cast_hold_line_out(delta: float) -> void:
+	if not _cast_hold_line_out_tracking:
+		return
+	if not Input.is_action_pressed("cast") or not line_extended or line_mode != LineMode.FISHING:
+		_cast_hold_line_out_timer = 0.0
+		_cast_hold_line_out_tracking = false
+		_cast_hold_line_out_active = false
+		return
+	_cast_hold_line_out_timer += delta
+	if _cast_hold_line_out_timer >= fishing_line_release_hold:
+		_cast_hold_line_out_active = true
 
 ## Colore, non parole: mentre la finestra del colpo forte e' aperta il
 ## personaggio vira in ambra e torna bianco appena scade.
@@ -2602,6 +2643,10 @@ func on_fish_hooked(fish: Node2D):
 	_fish_hook_start_dist = global_position.distance_to(fish.global_position)
 	if fish.has_method("set_player_reference"):
 		fish.call("set_player_reference", self)
+	if _is_bait_carcass(fish):
+		# Congela il metraggio raggiunto al momento dell'aggancio. Da qui in poi
+		# puo' aumentare soltanto con F tenuto.
+		target_line_length = current_line_length
 	_update_effective_tension()
 	# Solo una risposta tattile alla prima abboccata: la pesca resta invariata.
 	_request_shake(0.075)
@@ -2813,6 +2858,9 @@ func _on_fish_lost(_escaped: bool):
 	_fish_reel_progress = 0.0
 	_fish_hooked_time = 0.0
 	_fish_catch_jump_done = false
+	_cast_hold_line_out_timer = 0.0
+	_cast_hold_line_out_tracking = false
+	_cast_hold_line_out_active = false
 	_update_effective_tension()
 	if hook_instance and is_instance_valid(hook_instance):
 		if hook_instance.has_method("set_hooked_fish"):
@@ -3055,6 +3103,9 @@ func _reset_line_state():
 	line_extended = false
 	current_line_length = 0.0
 	target_line_length = 0.0
+	_cast_hold_line_out_timer = 0.0
+	_cast_hold_line_out_tracking = false
+	_cast_hold_line_out_active = false
 	line_mode = LineMode.NONE
 	fish_hooked = false
 	current_fish = null
