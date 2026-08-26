@@ -31,8 +31,15 @@ func _ready() -> void:
 	add_to_group("dogana_thorn")
 	z_as_relative = false
 	z_index = 12
-	if get_node_or_null("Art") == null:
+	_sprite = get_node_or_null("Art") as Sprite2D
+	if _sprite == null:
 		_build_visual()
+	else:
+		_sync_serialized_visual()
+	var editor_guide := get_node_or_null("EditorGuide") as CanvasItem
+	if editor_guide:
+		editor_guide.visible = Engine.is_editor_hint()
+		_sync_editor_guide(editor_guide)
 	# Mostra le spine nella viewport senza eseguire snap, danno o pogo mentre
 	# l'autore sta spostando gli elementi della scena.
 	if Engine.is_editor_hint():
@@ -185,6 +192,35 @@ func _resolve_texture() -> Texture2D:
 		if kind == Kind.CLUSTER and art_profile.thorn_cluster:
 			return art_profile.thorn_cluster
 	return null
+
+
+func _sync_serialized_visual() -> void:
+	var texture := _resolve_texture()
+	if _sprite == null or texture == null:
+		return
+	_sprite.texture = texture
+	if kind == Kind.BED:
+		var target_h := art_profile.thorn_bed_height if art_profile else 40.0
+		_sprite.scale = Vector2(
+			bed_width / float(texture.get_width()),
+			target_h / float(texture.get_height())
+		)
+	else:
+		var target_h := 96.0 if vertical else 68.0
+		var fitted := target_h / float(texture.get_height())
+		_sprite.scale = Vector2(fitted, fitted)
+	_seat_visual_on_anchor()
+
+
+func _sync_editor_guide(guide: CanvasItem) -> void:
+	if not (guide is Polygon2D):
+		return
+	var size := _pogo_size()
+	var half_w := size.x * 0.5
+	(guide as Polygon2D).polygon = PackedVector2Array([
+		Vector2(-half_w, -size.y), Vector2(half_w, -size.y),
+		Vector2(half_w, 0.0), Vector2(-half_w, 0.0),
+	])
 
 
 func _seat_visual_on_anchor() -> void:

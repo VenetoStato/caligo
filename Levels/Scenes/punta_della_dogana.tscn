@@ -176,6 +176,11 @@ texture_filter = 2
 scale = Vector2(0.683594, 0.25876)
 texture = ExtResource("38_platform_texture")
 
+[node name="EditorGuide" type="Polygon2D" parent="Gameplay/EditablePlatforms/PontileWest"]
+z_index = 90
+color = Color(0.05, 0.95, 1, 0.25)
+polygon = PackedVector2Array(0, 0, 700, 0, 700, 96, 0, 96)
+
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/PontileWest"]
 position = Vector2(350, 48)
 shape = SubResource("GroundArrivalWest")
@@ -190,6 +195,11 @@ centered = false
 texture_filter = 2
 scale = Vector2(0.615234, 0.25876)
 texture = ExtResource("38_platform_texture")
+
+[node name="EditorGuide" type="Polygon2D" parent="Gameplay/EditablePlatforms/PontileEast"]
+z_index = 90
+color = Color(0.05, 0.95, 1, 0.25)
+polygon = PackedVector2Array(0, 0, 630, 0, 630, 96, 0, 96)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/PontileEast"]
 position = Vector2(315, 48)
@@ -206,6 +216,11 @@ texture_filter = 2
 scale = Vector2(0.893555, 0.296496)
 texture = ExtResource("38_platform_texture")
 
+[node name="EditorGuide" type="Polygon2D" parent="Gameplay/EditablePlatforms/DoganaQuay"]
+z_index = 90
+color = Color(0.05, 0.95, 1, 0.25)
+polygon = PackedVector2Array(0, 0, 915, 0, 915, 110, 0, 110)
+
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/DoganaQuay"]
 position = Vector2(457.5, 55)
 shape = SubResource("EditableQuayA")
@@ -220,6 +235,11 @@ centered = false
 texture_filter = 2
 scale = Vector2(1.171875, 0.296496)
 texture = ExtResource("38_platform_texture")
+
+[node name="EditorGuide" type="Polygon2D" parent="Gameplay/EditablePlatforms/CustomsFront"]
+z_index = 90
+color = Color(0.05, 0.95, 1, 0.25)
+polygon = PackedVector2Array(0, 0, 1200, 0, 1200, 110, 0, 110)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/CustomsFront"]
 position = Vector2(600, 55)
@@ -236,6 +256,11 @@ texture_filter = 2
 scale = Vector2(0.830078, 0.296496)
 texture = ExtResource("38_platform_texture")
 
+[node name="EditorGuide" type="Polygon2D" parent="Gameplay/EditablePlatforms/CanalFront"]
+z_index = 90
+color = Color(0.05, 0.95, 1, 0.25)
+polygon = PackedVector2Array(0, 0, 850, 0, 850, 110, 0, 110)
+
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/CanalFront"]
 position = Vector2(425, 55)
 shape = SubResource("EditableQuayC")
@@ -251,6 +276,11 @@ texture_filter = 2
 scale = Vector2(0.498047, 0.296496)
 texture = ExtResource("38_platform_texture")
 
+[node name="EditorGuide" type="Polygon2D" parent="Gameplay/EditablePlatforms/FortunaFront"]
+z_index = 90
+color = Color(0.05, 0.95, 1, 0.25)
+polygon = PackedVector2Array(0, 0, 510, 0, 510, 110, 0, 110)
+
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/FortunaFront"]
 position = Vector2(255, 55)
 shape = SubResource("EditableQuayD")
@@ -265,6 +295,11 @@ centered = false
 texture_filter = 2
 scale = Vector2(1.09375, 0.296496)
 texture = ExtResource("38_platform_texture")
+
+[node name="EditorGuide" type="Polygon2D" parent="Gameplay/EditablePlatforms/SaluteFront"]
+z_index = 90
+color = Color(0.05, 0.95, 1, 0.25)
+polygon = PackedVector2Array(0, 0, 1120, 0, 1120, 110, 0, 110)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/SaluteFront"]
 position = Vector2(560, 55)

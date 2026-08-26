@@ -30,8 +30,15 @@ func _ready() -> void:
 	_home_y = position.y
 	if get_node_or_null("Floor") == null:
 		_build_collision()
-	if get_node_or_null("Art") == null:
+	_sprite = get_node_or_null("Art") as Sprite2D
+	if _sprite == null:
 		_build_visual()
+	else:
+		_sync_serialized_visual()
+	var editor_guide := get_node_or_null("EditorGuide") as CanvasItem
+	if editor_guide:
+		editor_guide.visible = Engine.is_editor_hint()
+		_sync_editor_guide(editor_guide)
 	# In editor servono arte e collisione reali per posizionare la pedana.
 	# La logica di crollo resta esclusivamente runtime.
 	if Engine.is_editor_hint():
@@ -127,6 +134,30 @@ func _build_painted_visual(texture: Texture2D) -> void:
 	_art_base = Vector2(0.0, -top_from_center * fitted)
 	_sprite.position = _art_base
 	add_child(_sprite)
+
+
+func _sync_serialized_visual() -> void:
+	var texture := _resolve_texture()
+	if _sprite == null or texture == null:
+		return
+	_sprite.texture = texture
+	var used := _used_rect(texture)
+	var src_w := maxf(float(used.size.x), 8.0)
+	var fitted := ledge_width / src_w
+	_sprite.scale = Vector2(fitted, fitted)
+	var top_from_center := float(used.position.y) - float(texture.get_height()) * 0.5
+	_art_base = Vector2(0.0, -top_from_center * fitted)
+	_sprite.position = _art_base
+
+
+func _sync_editor_guide(guide: CanvasItem) -> void:
+	if not (guide is Polygon2D):
+		return
+	var half := ledge_width * 0.5
+	(guide as Polygon2D).polygon = PackedVector2Array([
+		Vector2(-half, -3.0), Vector2(half, -3.0),
+		Vector2(half, 19.0), Vector2(-half, 19.0),
+	])
 
 
 func _used_rect(texture: Texture2D) -> Rect2i:

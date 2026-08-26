@@ -1,6 +1,18 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://Levels/Scenes/Dogana/pogo_thorn.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/dogana_thorn_cluster.png" id="2_art"]
 
 [node name="PogoThorn" type="Node2D"]
 script = ExtResource("1_script")
+
+[node name="Art" type="Sprite2D" parent="."]
+texture_filter = 2
+position = Vector2(0, -34)
+scale = Vector2(0.08, 0.08)
+texture = ExtResource("2_art")
+
+[node name="EditorGuide" type="Polygon2D" parent="."]
+z_index = 91
+color = Color(1, 0.18, 0.42, 0.42)
+polygon = PackedVector2Array(-17, -48, 17, -48, 17, 0, -17, 0)

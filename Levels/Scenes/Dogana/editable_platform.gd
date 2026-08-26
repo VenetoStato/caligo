@@ -17,6 +17,9 @@ func _ready() -> void:
 	z_index = -1
 	_sync_collision()
 	_sync_visual()
+	var editor_guide := get_node_or_null("EditorGuide") as CanvasItem
+	if editor_guide:
+		editor_guide.visible = Engine.is_editor_hint()
 
 
 func _sync_collision() -> void:
