@@ -197,6 +197,9 @@ func _check_real_hook_detection() -> void:
 func _check_light_enemy_pull_and_launch() -> void:
 	var light := _level.get_node("Gameplay/Encounters/GamberoWedge") as CharacterBody2D
 	_player.global_position = light.global_position + Vector2(-190, 0)
+	var previous_state := int(light.get("state"))
+	var previous_player: Node2D = light.get("player") as Node2D
+	var previous_velocity := light.velocity
 	if not bool(light.call("begin_combat_hook", _player)):
 		_fail("light enemy refused hook")
 		return
@@ -206,8 +209,14 @@ func _check_light_enemy_pull_and_launch() -> void:
 		_fail("light enemy did not receive physical pull")
 		return
 	light.call("release_combat_hook", Vector2(-1.0, -0.25), false)
-	if bool(light.call("is_combat_hooked")) or light.velocity.length() < 500.0:
-		_fail("light enemy was not launched on release")
+	if bool(light.call("is_combat_hooked")):
+		_fail("light enemy remained hooked after release")
+		return
+	if int(light.get("state")) != previous_state or light.get("player") != previous_player:
+		_fail("light enemy did not restore its pre-hook behavior")
+		return
+	if not light.velocity.is_equal_approx(previous_velocity):
+		_fail("normal release kept hook escape momentum")
 
 
 func _check_heavy_enemy_resistance() -> void:

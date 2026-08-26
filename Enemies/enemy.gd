@@ -148,6 +148,10 @@ var _step_cycle := 0.0
 var _combat_hook_owner: Node2D = null
 var _combat_hook_pull_velocity := Vector2.ZERO
 var _combat_hook_reel_active := false
+var _combat_hook_previous_state := State.IDLE
+var _combat_hook_previous_player: Node2D = null
+var _combat_hook_previous_velocity := Vector2.ZERO
+var _combat_hook_previous_facing := true
 
 const PATROL_TURN_INTERVAL := 0.38
 const CHASE_TURN_INTERVAL := 0.28
@@ -1145,8 +1149,12 @@ func is_combat_hook_heavy() -> bool:
 
 
 func begin_combat_hook(owner: Node2D) -> bool:
-	if not can_be_combat_hooked() or owner == null:
+	if not can_be_combat_hooked() or owner == null or _combat_hooked:
 		return false
+	_combat_hook_previous_state = state
+	_combat_hook_previous_player = player
+	_combat_hook_previous_velocity = velocity
+	_combat_hook_previous_facing = facing_right
 	_combat_hooked = true
 	_combat_hook_owner = owner
 	_combat_hook_pull_velocity = Vector2.ZERO
@@ -1235,14 +1243,25 @@ func release_combat_hook(launch_direction := Vector2.ZERO, powered := false) -> 
 	_combat_hook_reel_active = false
 	if state == State.DEAD:
 		return
-	if not combat_hook_heavy and launch_direction.length_squared() > 0.01:
+	state = _combat_hook_previous_state
+	player = _combat_hook_previous_player if is_instance_valid(_combat_hook_previous_player) else null
+	if state == State.AGGRO and player == null:
+		player = get_tree().get_first_node_in_group("player") as Node2D
+	elif state == State.IDLE:
+		player = null
+	facing_right = _combat_hook_previous_facing
+	if powered and not combat_hook_heavy and launch_direction.length_squared() > 0.01:
 		var direction := launch_direction.normalized()
-		direction.y = minf(direction.y, -0.28 if powered else -0.18)
-		var speed := combat_hook_power_launch_speed if powered else combat_hook_launch_speed
-		velocity = direction.normalized() * speed
-		_knockback_timer = 0.42 if powered else 0.28
-	state = State.AGGRO
-	player = get_tree().get_first_node_in_group("player") as Node2D
+		direction.y = minf(direction.y, -0.28)
+		velocity = direction.normalized() * combat_hook_power_launch_speed
+		_knockback_timer = 0.42
+	elif _stagger_timer > 0.0:
+		velocity = Vector2.ZERO
+	else:
+		velocity = _combat_hook_previous_velocity
+	if sprite_node:
+		sprite_node.flip_h = not facing_right
+	_sync_locomotion_clip()
 
 
 func is_combat_hooked() -> bool:
@@ -1429,6 +1448,13 @@ func reset_to_home() -> void:
 	velocity = Vector2.ZERO
 	state = State.IDLE
 	player = null
+	_combat_hooked = false
+	_combat_hook_owner = null
+	_combat_hook_pull_velocity = Vector2.ZERO
+	_combat_hook_reel_active = false
+	_combat_hook_previous_state = State.IDLE
+	_combat_hook_previous_player = null
+	_combat_hook_previous_velocity = Vector2.ZERO
 	current_health = max_health
 	_wake_timer = post_respawn_wake_delay
 	_special_timer = special_attack_cooldown * 0.65
