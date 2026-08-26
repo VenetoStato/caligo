@@ -351,7 +351,7 @@ func rain_impact_at(global_x: float, strength: float = 1.0) -> void:
 	# World rain is intentionally sparse enough that almost every visible drop
 	# can own a ripple. Keep only a tiny guard against multiple callbacks in the
 	# same rendering instant; mobile retains a slightly wider safety margin.
-	_rain_ripple_cooldown = 0.012 if not OS.has_feature("mobile") else 0.025
+	_rain_ripple_cooldown = 0.0 if not OS.has_feature("mobile") else 0.012
 
 
 ## Returns the interpolated physical surface Y in global coordinates.

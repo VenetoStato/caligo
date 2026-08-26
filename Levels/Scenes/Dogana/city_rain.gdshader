@@ -70,6 +70,14 @@ void fragment() {
 		local_waterline + waterline_softness,
 		uv.y
 	);
-	float alpha = clamp(rain * intensity * shimmer, 0.0, 0.24) * above_water;
+	// Procedural streaks cannot emit gameplay events. Clear them before the
+	// contact band so they never form a fake row of impacts on the surface.
+	// World-space Line2D drops cross this final gap and each owns a real ripple.
+	float contact_clearance = 1.0 - smoothstep(
+		local_waterline - 0.065,
+		local_waterline - 0.018,
+		uv.y
+	);
+	float alpha = clamp(rain * intensity * shimmer, 0.0, 0.24) * above_water * contact_clearance;
 	COLOR = vec4(rain_color, alpha);
 }

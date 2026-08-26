@@ -54,8 +54,8 @@ func _physics_process(_delta: float) -> void:
 		push_error("Rain impact did not create a visible surface ripple.")
 		get_tree().quit(1)
 		return
-	if _rain_ripple_peak < 4:
-		push_error("Consecutive rain drops were over-throttled instead of producing near 1:1 ripples.")
+	if _rain_ripple_peak < 6:
+		push_error("Desktop rain drops did not produce one ripple per water impact.")
 		get_tree().quit(1)
 		return
 	get_tree().quit(0)
