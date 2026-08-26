@@ -82,6 +82,7 @@ var _body_splash_cooldowns: Dictionary = {}
 var _fish_textures: Array[Texture2D] = []
 var _visual_splash_cooldown := 0.0
 var _rain_ripple_cooldown := 0.0
+var _carcass_bait_count := 0
 
 const FISH_VARIANT_PATHS: PackedStringArray = [
 	"res://Landscape/Sprites/fish_boops1.png",
@@ -593,6 +594,41 @@ func spawn_fish_in_water() -> void:
 				randf_range(bounds.position.y + bounds.size.y * 0.2, bounds.position.y + bounds.size.y * 0.65)
 			)
 		call_deferred("_add_fish_to_scene", fish, scene, spawn_position)
+
+
+func register_carcass_bait(world_position: Vector2) -> void:
+	# Una carcassa attira un solo predatore grande: evita accumuli infiniti se
+	# il cadavere resta in acqua a lungo.
+	if _carcass_bait_count >= 8:
+		return
+	if fish_scene == null:
+		fish_scene = load("res://fish.tscn") as PackedScene
+	if fish_scene == null:
+		return
+	_carcass_bait_count += 1
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	var fish := fish_scene.instantiate()
+	if fish == null:
+		return
+	fish.set_meta("bait_giant", true)
+	if fish.has_method("set_fish_texture") and not _fish_textures.is_empty():
+		fish.call("set_fish_texture", _fish_textures[(_carcass_bait_count - 1) % _fish_textures.size()], 0.2)
+	fish.scale = Vector2.ONE
+	var sprite := fish.get_node_or_null("Fishes")
+	if sprite == null:
+		sprite = fish.get_node_or_null("Sprite2D")
+	if sprite != null and not fish.has_method("set_fish_texture"):
+		sprite.scale = Vector2.ONE * 0.2
+	for property in ["struggle_strength", "hooked_max_speed", "reel_resistance"]:
+		if property in fish:
+			fish.set(property, float(fish.get(property)) * 1.65)
+	var collision := fish.get_node_or_null("CollisionShape2D") as CollisionShape2D
+	if collision != null:
+		collision.scale = Vector2.ONE * 0.9
+	var spawn_position := world_position + Vector2(randf_range(-110.0, 110.0), randf_range(64.0, 118.0))
+	call_deferred("_add_fish_to_scene", fish, scene, spawn_position)
 
 
 func _add_fish_to_scene(fish: Node, scene: Node, spawn_position: Vector2) -> void:

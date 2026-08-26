@@ -1420,6 +1420,7 @@ func _die(launch_velocity: Vector2 = Vector2.ZERO) -> void:
 	var dead_scale := Vector2(maxf(live_scale_x, 0.04), maxf(live_scale_y, 0.04))
 
 	var rb: RigidBody2D = RigidBody2D.new()
+	rb.set_script(load("res://dead_enemy_carcass.gd"))
 	rb.name = "Dead Gamberetto"
 	rb.collision_layer = 2
 	rb.collision_mask = 1
@@ -1453,15 +1454,8 @@ func _die(launch_velocity: Vector2 = Vector2.ZERO) -> void:
 					rb.apply_torque_impulse(signf(launch_velocity.x) * 90.0),
 			CONNECT_ONE_SHOT
 		)
-	var cleanup_timer := Timer.new()
-	cleanup_timer.one_shot = true
-	cleanup_timer.wait_time = 12.0
-	cleanup_timer.autostart = true
-	cleanup_timer.timeout.connect(func() -> void:
-		if is_instance_valid(rb):
-			rb.queue_free()
-	)
-	rb.add_child(cleanup_timer)
+	# Il cadavere resta disponibile come oggetto fisico/esca: non viene più
+	# rimosso automaticamente dopo pochi secondi.
 	visible = false
 	set_physics_process(false)
 	# Rimane dormiente dove e stato sconfitto. Solo dogana_level, quando il

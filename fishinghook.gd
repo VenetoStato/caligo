@@ -329,6 +329,9 @@ func _check_if_fish(node: Node):
 		return
 	if player_ref != null and node == player_ref:
 		return
+	if node.has_method("is_bait_carcass") and bool(node.call("is_bait_carcass")):
+		_hook_fish(node as Node2D)
+		return
 
 	var is_fish := false
 	if node.is_in_group(fish_group_name):

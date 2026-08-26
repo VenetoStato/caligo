@@ -167,12 +167,47 @@ func _ready():
 	_setup_underwater_shader()
 	_setup_detection_area()
 	_individual_speed_scale = randf_range(0.78, 1.18)
+	if bool(get_meta("bait_giant", false)):
+		_setup_bait_predator_fx()
 	_next_swim_change = swim_change_interval * randf_range(0.72, 1.45)
 	_pick_new_swim_direction()
 	var animation_player := get_node_or_null("AnimationPlayer") as AnimationPlayer
 	if animation_player:
 		# L'animazione viene avanzata direttamente: evita cache invalide durante i cambi scena rapidi.
 		animation_player.active = false
+
+
+func _setup_bait_predator_fx() -> void:
+	# Predatore attirato dalla carcassa: particelle sottili, blu-verdi, attorno
+	# alla sagoma senza trasformarlo in un alone pieno.
+	var motes := CPUParticles2D.new()
+	motes.name = "BaitPredatorMotes"
+	motes.amount = 10 if not OS.has_feature("mobile") else 5
+	motes.lifetime = 0.9
+	motes.preprocess = 0.25
+	motes.explosiveness = 0.05
+	motes.randomness = 0.8
+	motes.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	motes.emission_rect_extents = Vector2(34.0, 10.0)
+	motes.direction = Vector2.UP
+	motes.spread = 180.0
+	motes.gravity = Vector2(0.0, -8.0)
+	motes.initial_velocity_min = 8.0
+	motes.initial_velocity_max = 22.0
+	motes.scale_amount_min = 0.22
+	motes.scale_amount_max = 0.55
+	motes.color = Color(0.38, 0.9, 0.84, 0.46)
+	var gradient := Gradient.new()
+	gradient.colors = PackedColorArray([Color.WHITE, Color(1, 1, 1, 0)])
+	var tex := GradientTexture2D.new()
+	tex.gradient = gradient
+	tex.width = 16
+	tex.height = 16
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(1.0, 0.5)
+	motes.texture = tex
+	add_child(motes)
 
 
 func _configure_tutorial_fish() -> void:
