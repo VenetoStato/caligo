@@ -399,15 +399,19 @@ func _spawn_collision_rain_drop() -> void:
 		return
 	var query := PhysicsRayQueryParameters2D.create(start, finish)
 	query.collision_mask = 1
-	query.collide_with_areas = false
+	# WaterBody is an Area2D. Including areas lets rain hit its true dynamic
+	# surface instead of disappearing through the basin.
+	query.collide_with_areas = true
 	query.collide_with_bodies = true
 	var hit := space.intersect_ray(query)
 	var target := finish
 	var did_hit := not hit.is_empty()
 	var normal := Vector2.UP
+	var collider: Object = null
 	if did_hit:
 		target = hit.position as Vector2
 		normal = hit.normal as Vector2
+		collider = hit.get("collider") as Object
 
 	var drop := Line2D.new()
 	drop.name = "RainDrop"
@@ -420,13 +424,18 @@ func _spawn_collision_rain_drop() -> void:
 	var tween := create_tween()
 	tween.tween_property(drop, "global_position", target, maxf(0.05, travel_time))
 	if did_hit:
-		tween.tween_callback(_spawn_rain_impact.bind(target, normal))
+		tween.tween_callback(_spawn_rain_impact.bind(target, normal, collider))
 	tween.tween_callback(drop.queue_free)
 
 
-func _spawn_rain_impact(at: Vector2, normal: Vector2) -> void:
+func _spawn_rain_impact(at: Vector2, normal: Vector2, collider: Object = null) -> void:
 	if _rain_surface_fx == null or not rain_enabled:
 		return
+	if collider != null and is_instance_valid(collider) and collider is Node:
+		var hit_node := collider as Node
+		if hit_node.is_in_group("water") and hit_node.has_method("rain_impact_at"):
+			hit_node.call("rain_impact_at", at.x, rain_intensity)
+			return
 	var particles := CPUParticles2D.new()
 	particles.name = "SurfaceSplash"
 	particles.one_shot = true

@@ -58,7 +58,7 @@ func _check_water_api() -> void:
 		return
 	var water := Area2D.new()
 	water.set_script(water_script)
-	for method in ["splash_at", "get_surface_height", "get_surface_slope", "get_water_bounds_global_rect"]:
+	for method in ["splash_at", "rain_impact_at", "get_surface_height", "get_surface_slope", "get_water_bounds_global_rect"]:
 		if not water.has_method(method):
 			_failures.append("Water API missing method: %s" % method)
 	water.free()

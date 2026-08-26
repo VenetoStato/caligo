@@ -44,5 +44,16 @@ func _draw() -> void:
 	var draw_color := Color(_color.r, _color.g, _color.b, _color.a * alpha)
 	for droplet in _droplets:
 		draw_circle(droplet["position"], droplet["radius"], draw_color)
-	draw_arc(Vector2.ZERO, _ring_radius, PI * 1.08, PI * 1.92, 26, draw_color, 2.4)
-	draw_line(Vector2(-28.0, 1.0), Vector2(28.0, 1.0), draw_color, 3.0)
+	draw_arc(Vector2.ZERO, _ring_radius, PI * 1.08, PI * 1.92, 26, draw_color, 2.6)
+	_draw_surface_ellipse(_ring_radius * 1.15, maxf(2.0, _ring_radius * 0.16), draw_color, 2.2)
+	var wake_color := Color(draw_color.r, draw_color.g, draw_color.b, draw_color.a * 0.52)
+	_draw_surface_ellipse(_ring_radius * 1.75, maxf(2.0, _ring_radius * 0.12), wake_color, 1.5)
+	draw_line(Vector2(-38.0, 1.0), Vector2(38.0, 1.0), draw_color, 3.2)
+
+
+func _draw_surface_ellipse(radius_x: float, radius_y: float, color: Color, width: float) -> void:
+	var points := PackedVector2Array()
+	for index in 41:
+		var angle := TAU * float(index) / 40.0
+		points.append(Vector2(cos(angle) * radius_x, sin(angle) * radius_y))
+	draw_polyline(points, color, width, true)

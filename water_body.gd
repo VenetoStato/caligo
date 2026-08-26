@@ -9,6 +9,7 @@ extends Area2D
 const SPRING_SCRIPT := preload("res://water_spring.gd")
 const WATER_SHADER := preload("res://Water/water_mobile.gdshader")
 const SPLASH_EFFECT_SCRIPT := preload("res://Water/water_splash_effect.gd")
+const RAIN_RIPPLE_EFFECT_SCRIPT := preload("res://Water/water_rain_ripple_effect.gd")
 const RIPPLE_COUNT := 4
 const RIPPLE_UNIFORMS: PackedStringArray = ["ripple_0", "ripple_1", "ripple_2", "ripple_3"]
 
@@ -80,6 +81,7 @@ var _next_ripple: int = 0
 var _body_splash_cooldowns: Dictionary = {}
 var _fish_textures: Array[Texture2D] = []
 var _visual_splash_cooldown := 0.0
+var _rain_ripple_cooldown := 0.0
 
 const FISH_VARIANT_PATHS: PackedStringArray = [
 	"res://Landscape/Sprites/fish_boops1.png",
@@ -234,6 +236,7 @@ func _physics_process(delta: float) -> void:
 		return
 	var safe_delta := minf(delta, 1.0 / 20.0)
 	_visual_splash_cooldown = maxf(0.0, _visual_splash_cooldown - safe_delta)
+	_rain_ripple_cooldown = maxf(0.0, _rain_ripple_cooldown - safe_delta)
 	var pass_delta := safe_delta / float(passes)
 	for _pass_index in passes:
 		for spring in springs:
@@ -325,6 +328,28 @@ func _spawn_visual_splash(global_x: float, impulse: float) -> void:
 	splash.call("setup", impulse, foam_color)
 
 
+## Called by world-space rain when a drop intersects this Area2D. Rain uses a
+## much smaller physical impulse than actors, but keeps a separate visual
+## cooldown so it never suppresses the player's entry splash.
+func rain_impact_at(global_x: float, strength: float = 1.0) -> void:
+	if springs.is_empty():
+		return
+	var safe_strength := clampf(strength, 0.35, 1.8)
+	var impulse := randf_range(8.0, 15.0) * safe_strength
+	var radius := randf_range(18.0, 30.0) * safe_strength
+	splash_at(global_x, impulse, radius)
+	if _rain_ripple_cooldown > 0.0:
+		return
+	var ripple := Node2D.new()
+	ripple.name = "RainWaterRipple"
+	ripple.set_script(RAIN_RIPPLE_EFFECT_SCRIPT)
+	add_child(ripple)
+	ripple.global_position = Vector2(global_x, get_surface_height(global_x) - 1.0)
+	ripple.z_index = 14
+	ripple.call("setup", foam_color, safe_strength)
+	_rain_ripple_cooldown = 0.035 if not OS.has_feature("mobile") else 0.07
+
+
 ## Returns the interpolated physical surface Y in global coordinates.
 func get_surface_height(global_x: float) -> float:
 	if springs.is_empty():
@@ -377,6 +402,9 @@ func get_water_bounds_global_rect() -> Rect2:
 func _on_body_entered(body: Node2D) -> void:
 	if body == null:
 		return
+	# The player bounces inside set_in_water(). Preserve the actual impact
+	# velocity first, otherwise the splash is calculated from the rebound.
+	var entry_velocity := _body_velocity(body)
 	if not bodies_in_water.has(body):
 		bodies_in_water.append(body)
 	if body is CharacterBody2D and body.has_method("set_in_water"):
@@ -385,7 +413,7 @@ func _on_body_entered(body: Node2D) -> void:
 		body.call("in_water")
 	elif body.has_method("set_in_water"):
 		body.call("set_in_water", true)
-	_emit_body_splash(body, true)
+	_emit_body_splash(body, true, entry_velocity)
 
 
 func _on_body_exited(body: Node2D) -> void:
@@ -456,20 +484,27 @@ func _apply_rigid_buoyancy(body: RigidBody2D) -> void:
 	body.apply_central_force(Vector2(drag_force.x, drag_force.y - upward_force))
 
 
-func _emit_body_splash(body: Node2D, entering: bool) -> void:
-	var velocity := Vector2.ZERO
+func _body_velocity(body: Node2D) -> Vector2:
+	if body is RigidBody2D:
+		return (body as RigidBody2D).linear_velocity
+	if body is CharacterBody2D:
+		return (body as CharacterBody2D).velocity
+	return Vector2.ZERO
+
+
+func _emit_body_splash(body: Node2D, entering: bool, velocity_override := Vector2(INF, INF)) -> void:
+	var velocity := _body_velocity(body)
+	if is_finite(velocity_override.x) and is_finite(velocity_override.y):
+		velocity = velocity_override
 	var mass := nominal_character_mass
 	if body is RigidBody2D:
-		velocity = (body as RigidBody2D).linear_velocity
 		mass = maxf((body as RigidBody2D).mass, 0.1)
-	elif body is CharacterBody2D:
-		velocity = (body as CharacterBody2D).velocity
 
 	var impact_speed := maxf(absf(velocity.y), velocity.length() * (0.45 if entering else 0.28))
 	if body is CharacterBody2D:
 		impact_speed = maxf(impact_speed, absf(velocity.x) * 0.7)
 	if entering:
-		impact_speed = maxf(impact_speed, 110.0)
+		impact_speed = maxf(impact_speed, 175.0 if body is CharacterBody2D else 110.0)
 	if impact_speed < impact_velocity_threshold:
 		return
 	var direction := signf(velocity.y)
@@ -477,6 +512,8 @@ func _emit_body_splash(body: Node2D, entering: bool) -> void:
 		direction = 1.0
 	var impulse := direction * impact_speed * sqrt(mass) * impact_impulse_scale
 	var radius := character_wake_radius if body is CharacterBody2D else clampf(42.0 + sqrt(mass) * 18.0, 48.0, 140.0)
+	if entering and body is CharacterBody2D:
+		radius = maxf(radius, 104.0)
 	splash_at(body.global_position.x, impulse, radius)
 	_body_splash_cooldowns[body.get_instance_id()] = interaction_interval
 
