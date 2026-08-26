@@ -38,6 +38,7 @@ const CITY_RAIN_SHADER := preload("res://Levels/Scenes/Dogana/city_rain.gdshader
 var _camera: Camera2D
 var _origin := Vector2.ZERO
 var _last_camera := Vector2.ZERO
+var _rain_camera_velocity := Vector2.ZERO
 
 var _horizon: Node2D
 var _far: Node2D
@@ -107,6 +108,12 @@ func _process(delta: float) -> void:
 	var camera_pos := _camera.global_position
 	var delta_cam := camera_pos - _last_camera
 	_last_camera = camera_pos
+	# Le gocce fisiche sono in world-space, mentre la camera segue il salto.
+	# Memorizziamo la velocità verticale della camera per compensare la velocità
+	# di caduta: quando la camera scende con il player, una goccia non deve
+	# sembrare rallentare sullo schermo.
+	var camera_velocity := delta_cam / maxf(delta, 0.0001)
+	_rain_camera_velocity = _rain_camera_velocity.lerp(camera_velocity, clampf(delta * 14.0, 0.0, 1.0))
 	# Più lontano = spostamento minore. Il foreground anticipa leggermente.
 	_horizon.position += delta_cam * 0.05
 	_far.position += delta_cam * 0.12
@@ -515,7 +522,12 @@ func _spawn_collision_rain_drop() -> void:
 	drop.points = PackedVector2Array([Vector2(-rain_wind * 8.0, -randf_range(20.0, 34.0)), Vector2.ZERO])
 	drop.global_position = start
 	_rain_surface_fx.add_child(drop)
-	var travel_time := start.distance_to(target) / maxf(760.0, 1040.0 * rain_speed)
+	var base_fall_speed := maxf(760.0, 1040.0 * rain_speed)
+	# Camera verso il basso = movimento apparente più lento; aggiungiamo la
+	# sua componente verticale alla velocità world-space della goccia. Se la
+	# camera sale, la compensazione si riduce senza mai invertire il moto.
+	var compensated_fall_speed := maxf(420.0, base_fall_speed + _rain_camera_velocity.y)
+	var travel_time := start.distance_to(target) / compensated_fall_speed
 	var tween := create_tween()
 	tween.tween_property(drop, "global_position", target, maxf(0.05, travel_time))
 	if did_hit:
