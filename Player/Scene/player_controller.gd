@@ -2614,6 +2614,42 @@ func on_fish_hooked(fish: Node2D):
 func on_fish_spawned(fish: Node2D):
 	on_fish_hooked(fish)
 
+
+func on_bait_predator_bite(predator: Node2D, bait: Node2D) -> bool:
+	if (
+		predator == null
+		or bait == null
+		or not is_instance_valid(predator)
+		or not fish_hooked
+		or current_fish != bait
+	):
+		return false
+	if bait.has_method("release_from_hook"):
+		bait.call("release_from_hook")
+	current_fish = predator
+	_fish_hooked_time = 0.0
+	_fish_reel_progress = 0.0
+	_fish_hook_start_dist = global_position.distance_to(predator.global_position)
+	_fish_catch_jump_done = false
+	fish_struggle_active = true
+	fish_struggle_timer = 0.0
+	fish_struggle_phase_timer = 0.0
+	fish_escape_timer = 0.0
+	if predator.has_method("set_player_reference"):
+		predator.call("set_player_reference", self)
+	if predator.has_method("start_struggle"):
+		predator.call("start_struggle")
+	if hook_instance and is_instance_valid(hook_instance) and hook_instance.has_method("set_hooked_fish"):
+		hook_instance.call("set_hooked_fish", predator)
+	current_line_length = clampf(
+		get_rod_tip_position().distance_to(get_fish_center_position(predator)),
+		28.0,
+		max_line_length
+	)
+	target_line_length = current_line_length
+	_request_shake(0.2)
+	return true
+
 func _update_fish_struggle(delta: float):
 	if not is_instance_valid(current_fish):
 		_on_fish_lost(false)

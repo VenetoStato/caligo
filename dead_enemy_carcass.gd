@@ -148,6 +148,20 @@ func _on_hook_detected(hook: Node) -> void:
 	if hook.has_method("_hook_fish"):
 		hook.call("_hook_fish", self)
 
+
+func on_predator_bite(predator: Node2D) -> bool:
+	if predator == null or not is_instance_valid(predator):
+		return false
+	sleeping = false
+	var bite_direction := predator.global_position - global_position
+	if bite_direction.length_squared() > 1.0:
+		apply_central_impulse(bite_direction.normalized() * 18.0)
+	# Se la carcassa è ancora sulla lenza, il morso trasferisce l'aggancio al
+	# predatore: da questo frame il pesce grosso è quello che lotta col player.
+	if hooked_to_player and player_ref != null and player_ref.has_method("on_bait_predator_bite"):
+		return bool(player_ref.call("on_bait_predator_bite", predator, self))
+	return false
+
 func _physics_process(_delta: float) -> void:
 	if hooked_to_player and player_ref is Node2D:
 		var lift := (player_ref as Node2D).global_position.y - global_position.y
@@ -167,7 +181,7 @@ func _physics_process(_delta: float) -> void:
 			linear_damp = 3.2
 			if not _bait_registered and water.has_method("register_carcass_bait"):
 				_bait_registered = true
-				water.call_deferred("register_carcass_bait", global_position)
+				water.call_deferred("register_carcass_bait", self)
 		elif not now_in_water and in_water:
 			in_water = false
 			gravity_scale = 1.0

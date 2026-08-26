@@ -134,6 +134,9 @@ var _swim_animation_time := 0.0
 var _bait_target_active := false
 var _bait_target := Vector2.ZERO
 var _bait_linger_timer := 0.0
+var _bait_target_node: Node2D = null
+var _bitten_bait: Node2D = null
+var _bait_bite_timer := 0.0
 
 func _ready():
 	add_to_group("fish")
@@ -173,7 +176,11 @@ func _ready():
 	if bool(get_meta("bait_giant", false)):
 		_setup_bait_predator_fx()
 		_bait_target = get_meta("bait_target_position", Vector2.ZERO) as Vector2
-		_bait_target_active = _bait_target != Vector2.ZERO
+		var target_candidate: Variant = get_meta("bait_target_node", null)
+		if target_candidate is Node2D and is_instance_valid(target_candidate):
+			_bait_target_node = target_candidate as Node2D
+			_bait_target = _bait_target_node.global_position
+		_bait_target_active = _bait_target_node != null or _bait_target != Vector2.ZERO
 		_bait_linger_timer = 0.0
 	_next_swim_change = swim_change_interval * randf_range(0.72, 1.45)
 	_pick_new_swim_direction()
@@ -469,16 +476,42 @@ func _process_swimming(delta: float):
 	elif _bait_target_active:
 		# Il predatore entra dalla profondità/fuori campo e punta rapidamente alla
 		# carcassa, senza richiedere un amo per restare in inseguimento.
+		if _bait_target_node != null and is_instance_valid(_bait_target_node):
+			_bait_target = _bait_target_node.global_position
+		elif _bait_target_node != null:
+			_bait_target_node = null
 		var bait_dir := (_bait_target - global_position).normalized()
 		# Arrivo prioritario: il predatore deve attraversare rapidamente il bordo
 		# fuori campo, senza essere rallentato dal normale nuoto.
 		var bait_speed := maxf(attraction_speed * 4.2, 300.0)
 		desired = bait_dir * bait_speed
-		if global_position.distance_to(_bait_target) < 42.0:
+		if global_position.distance_to(_bait_target) < 34.0:
 			_bait_target_active = false
+			var transferred := false
+			if _bait_target_node != null and is_instance_valid(_bait_target_node):
+				_bitten_bait = _bait_target_node
+				if _bait_target_node.has_method("on_predator_bite"):
+					transferred = bool(_bait_target_node.call("on_predator_bite", self))
+			if transferred:
+				_bitten_bait = null
+				_bait_bite_timer = 0.0
+			else:
+				_bait_bite_timer = 8.0
 			_bait_linger_timer = 6.0
 			home_position = _bait_target
 			_pick_new_swim_direction()
+
+	elif _bitten_bait != null and is_instance_valid(_bitten_bait) and _bait_bite_timer > 0.0:
+		# Morso visibile anche se la carcassa è stata sganciata: il pesce resta
+		# con la bocca sull'esca e la segue, invece di limitarsi a passarle vicino.
+		_bait_bite_timer = maxf(0.0, _bait_bite_timer - delta)
+		_bait_target = _bitten_bait.global_position
+		var to_bitten_bait := _bait_target - global_position
+		if to_bitten_bait.length() > 18.0:
+			desired = to_bitten_bait.normalized() * maxf(attraction_speed * 2.1, 150.0)
+		else:
+			var bite_tangent := Vector2(-to_bitten_bait.y, to_bitten_bait.x).normalized() if to_bitten_bait.length_squared() > 1.0 else Vector2.RIGHT
+			desired = to_bitten_bait * 4.2 + bite_tangent * 10.0
 
 	elif _bait_linger_timer > 0.0:
 		# Dopo l'ingresso resta in zona esca abbastanza a lungo da poter

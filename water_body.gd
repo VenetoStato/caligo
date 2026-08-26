@@ -596,9 +596,17 @@ func spawn_fish_in_water() -> void:
 		call_deferred("_add_fish_to_scene", fish, scene, spawn_position)
 
 
-func register_carcass_bait(world_position: Vector2) -> void:
+func register_carcass_bait(bait: Variant) -> void:
 	# Una carcassa attira un solo predatore grande: evita accumuli infiniti se
 	# il cadavere resta in acqua a lungo.
+	var bait_node: Node2D = bait if bait is Node2D else null
+	var world_position := Vector2.ZERO
+	if bait_node != null and is_instance_valid(bait_node):
+		world_position = bait_node.global_position
+	elif bait is Vector2:
+		world_position = bait as Vector2
+	else:
+		return
 	if _carcass_bait_count >= 8:
 		return
 	if fish_scene == null:
@@ -614,6 +622,10 @@ func register_carcass_bait(world_position: Vector2) -> void:
 		return
 	fish.set_meta("bait_giant", true)
 	fish.set_meta("bait_target_position", world_position)
+	if bait_node != null:
+		# Riferimento vivo: se il player trascina l'esca, il predatore cambia
+		# rotta ogni frame invece di raggiungere il vecchio punto nell'acqua.
+		fish.set_meta("bait_target_node", bait_node)
 	if fish.has_method("set_fish_texture") and not _fish_textures.is_empty():
 		fish.call("set_fish_texture", _fish_textures[(_carcass_bait_count - 1) % _fish_textures.size()], 0.2)
 	fish.scale = Vector2.ONE
