@@ -97,3 +97,12 @@ func _physics_process(_delta: float) -> void:
 			in_water = false
 			gravity_scale = 1.0 if not hooked_to_player else 0.15
 			linear_damp = 0.0
+		if in_water:
+			# L'esca galleggia come una pastura pesante: scende lentamente ma non
+			# può sprofondare fuori dal volume di pesca.
+			var max_depth := surface + 190.0
+			if global_position.y > max_depth:
+				global_position.y = max_depth
+				linear_velocity.y = minf(linear_velocity.y, 0.0)
+			else:
+				linear_velocity.y = move_toward(linear_velocity.y, 7.0, 18.0 * _delta)

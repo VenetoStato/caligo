@@ -133,6 +133,7 @@ var _target_swim_direction := Vector2.RIGHT
 var _swim_animation_time := 0.0
 var _bait_target_active := false
 var _bait_target := Vector2.ZERO
+var _bait_linger_timer := 0.0
 
 func _ready():
 	add_to_group("fish")
@@ -173,6 +174,7 @@ func _ready():
 		_setup_bait_predator_fx()
 		_bait_target = get_meta("bait_target_position", Vector2.ZERO) as Vector2
 		_bait_target_active = _bait_target != Vector2.ZERO
+		_bait_linger_timer = 0.0
 	_next_swim_change = swim_change_interval * randf_range(0.72, 1.45)
 	_pick_new_swim_direction()
 	var animation_player := get_node_or_null("AnimationPlayer") as AnimationPlayer
@@ -464,7 +466,17 @@ func _process_swimming(delta: float):
 		desired = bait_dir * attraction_speed * 2.4
 		if global_position.distance_to(_bait_target) < 42.0:
 			_bait_target_active = false
+			_bait_linger_timer = 6.0
+			home_position = _bait_target
 			_pick_new_swim_direction()
+
+	elif _bait_linger_timer > 0.0:
+		# Dopo l'ingresso resta in zona esca abbastanza a lungo da poter
+		# abboccare: orbita lentamente invece di invertire e sparire.
+		_bait_linger_timer = maxf(0.0, _bait_linger_timer - delta)
+		var to_bait := _bait_target - global_position
+		var orbit := Vector2(-to_bait.y, to_bait.x).normalized() if to_bait.length_squared() > 1.0 else Vector2.RIGHT
+		desired = to_bait.normalized() * attraction_speed * 0.72 + orbit * natural_swim_speed * 0.5
 
 	elif is_attracted and attraction_target != Vector2.ZERO:
 		# Se l'amo/pastura è stata distrutta, torna a nuotare normale (così il pesce resta pescabile)
