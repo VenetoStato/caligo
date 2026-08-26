@@ -59,16 +59,16 @@ func _ready() -> void:
 		_fail("a fixed traversal lamp was allowed to fall")
 		return
 
-	# Impatto ambientale: 7 HP, quindi un aiuto forte ma non una kill gratuita.
+	# Impatto ambientale: 10 HP, un premio evidente per un appiglio rischioso.
 	var boss := MockBoss.new()
 	boss.add_to_group("dogana_boss")
 	add_child(boss)
 	boss.global_position = lamp_body.global_position
 	falling_lamp.call("_try_damage_boss")
-	if boss.current_health != 21:
-		_fail("falling lamp dealt %d damage instead of 7" % (28 - boss.current_health))
+	if boss.current_health != 18:
+		_fail("falling lamp dealt %d damage instead of 10" % (28 - boss.current_health))
 		return
-	print("CALIGO_BOSS_LAMP_DROP_OK: standard hook, 2 fragile pendulums, 7 boss damage")
+	print("CALIGO_BOSS_LAMP_DROP_OK: standard hook, 2 fragile pendulums, 10 boss damage")
 	get_tree().quit(0)
 
 

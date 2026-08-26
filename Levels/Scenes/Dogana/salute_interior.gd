@@ -61,12 +61,14 @@ func _build_room_collision() -> void:
 ## Lampade gotiche a pendolo: l'amo della canna ci si appende per uscire
 ## dagli attacchi che spazzano tutto il pavimento della navata.
 func _build_ceiling_rings() -> void:
-	var heights := [-268.0, -318.0, -292.0, -330.0, -276.0]
+	# Più bassi e grandi: si leggono subito come appigli/armi ambientali,
+	# non come semplice decorazione del soffitto.
+	var heights := [-220.0, -250.0, -232.0, -258.0, -224.0]
 	for index in heights.size():
 		var lamp := LAMP_SCENE.instantiate() as Node2D
 		lamp.name = "CeilingLamp_%d" % index
-		lamp.position = Vector2(4560.0 + index * 290.0, FLOOR_Y + float(heights[index]))
-		lamp.set("chain_length", 64.0 + float(index % 3) * 8.0)
+		lamp.position = Vector2(4510.0 + index * 275.0, FLOOR_Y + float(heights[index]))
+		lamp.set("chain_length", 96.0 + float(index % 3) * 10.0)
 		# Solo due lampadari sono armi ambientali. Gli altri restano appigli
 		# affidabili per evitare la marea e gli attacchi a pavimento.
 		lamp.set("droppable", index in [1, 3])

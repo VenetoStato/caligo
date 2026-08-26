@@ -4,11 +4,11 @@ extends Node2D
 const ART := preload("res://Landscape/Dogana/Generated/gothic_hanging_lamp.png")
 const DoganaFx := preload("res://Levels/Scenes/Dogana/dogana_fx.gd")
 
-@export var chain_length := 78.0
+@export var chain_length := 104.0
 @export var lamp_mass := 2.4
 @export var droppable := false
-@export var reel_time_to_drop := 0.72
-@export var boss_impact_damage := 7
+@export var reel_time_to_drop := 0.58
+@export var boss_impact_damage := 10
 
 var _anchor: StaticBody2D
 var _body: RigidBody2D
@@ -39,7 +39,7 @@ func reel_grapple(player: Node2D, delta: float) -> bool:
 	_body.apply_central_force(pull_direction * 920.0)
 	_body.apply_torque(160.0 * signf(pull_direction.x if not is_zero_approx(pull_direction.x) else 1.0))
 	var progress := clampf(_reel_stress / maxf(reel_time_to_drop, 0.01), 0.0, 1.0)
-	_chain.width = lerpf(2.4, 4.8, progress)
+	_chain.width = lerpf(3.2, 5.8, progress)
 	_chain.default_color = Color(0.12, 0.1, 0.08, 0.95).lerp(Color(0.72, 0.86, 0.82, 1.0), progress)
 	if _reel_stress >= reel_time_to_drop:
 		_drop_lamp(player.global_position)
@@ -91,7 +91,7 @@ func _build() -> void:
 	_body.set_meta("grapple_owner", self)
 	_body.add_to_group("dogana_grapple_point")
 	var body_shape := CircleShape2D.new()
-	body_shape.radius = 14.0
+	body_shape.radius = 24.0
 	var body_col := CollisionShape2D.new()
 	body_col.shape = body_shape
 	_body.add_child(body_col)
@@ -99,21 +99,21 @@ func _build() -> void:
 	sprite.texture = ART
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	if ART:
-		var fitted := 72.0 / maxf(float(ART.get_height()), 1.0)
+		var fitted := 104.0 / maxf(float(ART.get_height()), 1.0)
 		sprite.scale = Vector2(fitted, fitted)
 		sprite.position.y = 8.0
 	sprite.z_index = 1
 	_body.add_child(sprite)
 	var glow := PointLight2D.new()
-	glow.energy = 0.55
-	glow.texture_scale = 0.55
+	glow.energy = 0.9
+	glow.texture_scale = 0.78
 	glow.color = Color(1.0, 0.82, 0.42, 1.0)
 	_body.add_child(glow)
 	add_child(_body)
 
 	_chain = Line2D.new()
 	_chain.name = "Chain"
-	_chain.width = 2.4
+	_chain.width = 3.2
 	_chain.default_color = Color(0.16, 0.3, 0.31, 0.95) if droppable else Color(0.12, 0.1, 0.08, 0.95)
 	_chain.antialiased = true
 	_chain.z_index = 0
@@ -165,7 +165,7 @@ func _try_damage_boss() -> void:
 			continue
 		var boss := boss_node as Node2D
 		var offset := boss.global_position - _body.global_position
-		if absf(offset.x) > 92.0 or absf(offset.y) > 125.0 or not boss.has_method("take_damage"):
+		if absf(offset.x) > 138.0 or absf(offset.y) > 168.0 or not boss.has_method("take_damage"):
 			continue
 		var health_before := int(boss.get("current_health"))
 		boss.call("take_damage", boss_impact_damage, _body.global_position)

@@ -76,16 +76,24 @@ func _draw() -> void:
 func _draw_melee_zone(width: float, height: float, tint: Color) -> void:
 	var facing := signf(_dir.x) if absf(_dir.x) > 0.01 else 1.0
 	var shown_width := lerpf(width * 0.32, width, _progress)
-	var left := 12.0 if facing > 0.0 else -12.0 - shown_width
-	var rect := Rect2(left, -height, shown_width, height + 8.0)
+	var center := Vector2(0.0, -36.0)
+	var base_angle := 0.0 if facing > 0.0 else PI
+	var half_angle := 0.54 if height < 90.0 else 0.68
 	var pulse := 0.72 + sin(Time.get_ticks_msec() * 0.025) * 0.18
 	var fill_alpha := 0.24 * pulse if _active else (0.07 + _progress * 0.12)
-	draw_rect(rect, Color(tint.r, tint.g, tint.b, fill_alpha), true)
-	draw_rect(rect, Color(tint.r, tint.g, tint.b, 0.95 if _active else 0.4 + _progress * 0.48), false, 3.5 if _active else 2.2)
-	var stripe_x := rect.position.x + 12.0 if facing > 0.0 else rect.end.x - 12.0
-	while (stripe_x < rect.end.x if facing > 0.0 else stripe_x > rect.position.x):
-		draw_line(Vector2(stripe_x, rect.position.y), Vector2(stripe_x + 28.0 * facing, rect.end.y), Color(tint.r, tint.g, tint.b, 0.28 if _active else 0.13), 1.4, true)
-		stripe_x += 32.0 * facing
+	var wedge := PackedVector2Array([center])
+	for point_index in 13:
+		var t := float(point_index) / 12.0
+		var angle := base_angle + lerpf(-half_angle, half_angle, t)
+		wedge.append(center + Vector2.from_angle(angle) * shown_width)
+	draw_colored_polygon(wedge, Color(tint.r, tint.g, tint.b, fill_alpha))
+	draw_arc(center, shown_width, base_angle - half_angle, base_angle + half_angle, 24, Color(tint.r, tint.g, tint.b, 0.96 if _active else 0.4 + _progress * 0.48), 3.4 if _active else 2.2, true)
+	draw_arc(center, shown_width * 0.56, base_angle - half_angle, base_angle + half_angle, 18, Color(tint.r, tint.g, tint.b, 0.38 if _active else 0.18), 1.4, true)
+	for ray_index in 4:
+		var ray_t := (float(ray_index) + 1.0) / 5.0
+		var ray_angle := base_angle + lerpf(-half_angle * 0.86, half_angle * 0.86, ray_t)
+		var ray := Vector2.from_angle(ray_angle)
+		draw_line(center + ray * 14.0, center + ray * shown_width, Color(tint.r, tint.g, tint.b, 0.22 if _active else 0.1), 1.15, true)
 
 
 func _draw_countdown_ticks(center: Vector2, radius: float) -> void:
