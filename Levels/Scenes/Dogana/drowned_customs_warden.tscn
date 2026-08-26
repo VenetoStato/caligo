@@ -4,13 +4,13 @@
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/drowned_customs_warden.png" id="2_texture"]
 
 [sub_resource type="RectangleShape2D" id="BodyShape"]
-size = Vector2(128, 132)
+size = Vector2(89.6, 92.4)
 
 [sub_resource type="RectangleShape2D" id="HurtShape"]
-size = Vector2(178, 208)
+size = Vector2(124.6, 145.6)
 
 [sub_resource type="RectangleShape2D" id="AttackShape"]
-size = Vector2(214, 148)
+size = Vector2(149.8, 103.6)
 
 [node name="DrownedCustomsWarden" type="CharacterBody2D" groups=["dogana_boss"]]
 collision_layer = 2
@@ -18,16 +18,18 @@ collision_mask = 1
 script = ExtResource("1_script")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
-position = Vector2(0, -111)
-scale = Vector2(0.46, 0.46)
+# Il bordo opaco inferiore della texture (y~946/1024) cade a quota zero:
+# il Custode poggia sul pavimento invece di restare interrato.
+position = Vector2(0, -140)
+scale = Vector2(0.322, 0.322)
 texture = ExtResource("2_texture")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(0, -66)
+position = Vector2(0, -46.2)
 shape = SubResource("BodyShape")
 
 [node name="Hurtbox" type="Area2D" parent="."]
-position = Vector2(0, -102)
+position = Vector2(0, -71.4)
 collision_layer = 2
 collision_mask = 4
 
@@ -35,7 +37,7 @@ collision_mask = 4
 shape = SubResource("HurtShape")
 
 [node name="AttackHitbox" type="Area2D" parent="."]
-position = Vector2(0, -76)
+position = Vector2(0, -53.2)
 collision_layer = 0
 collision_mask = 2
 monitoring = false

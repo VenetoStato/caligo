@@ -220,11 +220,20 @@ func _check_heavy_enemy_resistance() -> void:
 	if moved or heavy.velocity.length() > 1.0:
 		_fail("heavy enemy was moved by fishing combat")
 		return
-	# Lo sgancio deve essere sempre disponibile: nessun soft-lock della lenza.
+	# Il pesante non si muove: e' il player a essere lanciato verso di lui.
 	heavy.call("begin_combat_hook", _player)
+	_player.global_position = heavy.global_position + Vector2(-190.0, 0.0)
+	_player.velocity = Vector2.ZERO
 	_player.set("current_hooked_enemy", heavy)
 	_player.set("enemy_hooked", true)
+	_player.set("is_reeling", true)
+	_player.call("_reel_enemy_to_player", 0.1)
+	if _player.velocity.length() < 100.0 or heavy.velocity.length() > 1.0:
+		_fail("heavy reel did not launch player toward stationary enemy")
+		return
+	# Lo sgancio deve essere sempre disponibile: nessun soft-lock della lenza.
 	_player.call("_release_hooked_enemy", false)
+	_player.set("is_reeling", false)
 	if bool(_player.get("enemy_hooked")) or bool(heavy.call("is_combat_hooked")):
 		_fail("heavy enemy could not be detached")
 
@@ -234,17 +243,24 @@ func _check_timed_power_attack() -> void:
 	light.set_physics_process(false)
 	light.call("reset_to_home")
 	light.set_physics_process(false)
-	_player.global_position = light.global_position + Vector2(-150, 0)
-	_player.velocity = Vector2(260, 0)
+	_player.global_position = light.global_position + Vector2(-50, 0)
+	_player.velocity = Vector2.ZERO
 	var health_before := int(light.get("current_health"))
 	_player.call("on_enemy_hooked", light, null)
-	_player.set("_enemy_power_window_left", 0.25)
 	_player.call("_reel_enemy_to_player", 0.016)
-	if int(light.get("current_health")) != health_before - int(_player.get("enemy_power_damage")):
-		_fail("timed approach did not deal powered damage")
+	if float(_player.get("_power_strike_left")) <= 0.0:
+		_fail("reel finish did not open highlighted power window")
 		return
-	if bool(_player.get("enemy_hooked")) or light.velocity.length() < 700.0:
-		_fail("powered strike did not release and launch target")
+	if int(light.get("current_health")) != health_before:
+		_fail("reel dealt automatic damage before the timed follow-up hit")
+		return
+	_player.call("_enable_attack_hitbox", int(_player.get("enemy_power_damage")))
+	_player.call("_try_hit_enemy", light)
+	if int(light.get("current_health")) != health_before - int(_player.get("enemy_power_damage")):
+		_fail("highlighted follow-up hit did not deal powered damage")
+		return
+	if bool(_player.get("enemy_hooked")):
+		_fail("power window kept the enemy attached")
 
 
 func _check_collision_visuals_hidden() -> void:

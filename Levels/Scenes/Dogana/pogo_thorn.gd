@@ -10,7 +10,9 @@ enum Kind { CLUSTER, BED }
 @export var bed_width := 96.0
 @export var vertical := false
 @export var damage := 1
-@export var snap_to_ground := true
+# Gli elementi sono authoring-first: posizione e rotazione salvate nella scena
+# devono essere identiche a runtime. Lo snap resta disponibile solo opt-in.
+@export var snap_to_ground := false
 @export var art_profile: DoganaArtProfile = preload("res://Levels/Scenes/Dogana/dogana_art_profile.tres")
 
 const OUTLINE_PX := 2.5

@@ -2,6 +2,7 @@ extends CharacterBody2D
 
 const FISH_CATCH_EFFECT_SCRIPT := preload("res://Fx/fish_catch_effect.gd")
 const FOOTSTEP_DUST := preload("res://Fx/footstep_dust.gd")
+const PARTICLE_BURST := preload("res://Fx/particle_burst.gd")
 
 signal respawned
 signal fish_caught(health_restored: int)
@@ -117,6 +118,9 @@ signal locked_skill_requested
 @export var enemy_power_damage := 3
 @export var power_strike_window := 1.05
 @export var idle_hook_pull_ratio := 0.44
+@export var heavy_reel_player_speed := 610.0
+@export var heavy_reel_acceleration := 1900.0
+@export var heavy_power_ready_distance := 96.0
 const POWER_STRIKE_TINT := Color(1.0, 0.72, 0.3, 1.0)
 
 @export_category("Offsets")
@@ -2020,9 +2024,12 @@ func cast_hook_charged():
 	add_collision_exception_with(rb)
 	get_tree().current_scene.add_child(hook_instance)
 	var start = get_rod_tip_position()
-	var dir = get_cast_direction()
-	var facing = get_facing_vector()
-	hook_instance.global_position = start + dir * spawn_forward_push + facing * (spawn_forward_push * 0.4)
+	# Usa esattamente la direzione mostrata dall'indicatore: prima il lancio
+	# rileggeva il mouse al release e poteva divergere dalla traiettoria preview.
+	var dir := _display_cast_direction.normalized()
+	if dir.length_squared() < 0.01:
+		dir = get_cast_direction()
+	hook_instance.global_position = start + dir * spawn_forward_push
 	rb.linear_velocity = dir * (cast_speed * power)
 	if hook_instance.has_method("set_hook_type"):
 		hook_instance.call("set_hook_type", "grab" if line_mode == LineMode.GRAB else "fishing")
@@ -2350,7 +2357,7 @@ func on_enemy_hooked(enemy: CharacterBody2D, source_hook: Node = null) -> void:
 	_request_shake(0.14)
 
 
-func _reel_enemy_to_player(_delta: float, pull_ratio := 1.0) -> void:
+func _reel_enemy_to_player(delta: float, pull_ratio := 1.0) -> void:
 	if not is_instance_valid(current_hooked_enemy):
 		_release_hooked_enemy(false)
 		return
@@ -2360,20 +2367,24 @@ func _reel_enemy_to_player(_delta: float, pull_ratio := 1.0) -> void:
 	var heavy := bool(current_hooked_enemy.call("is_combat_hook_heavy"))
 	if heavy:
 		current_hooked_enemy.call("apply_combat_hook_pull", rod, 0.0)
+		if not is_reeling:
+			return
+		var toward_heavy := to_enemy.normalized() if dist > 0.01 else Vector2.ZERO
+		# Il peso resta fermo: il reel trasforma la lenza in una carrucola e
+		# lancia il player verso il bersaglio.
+		velocity = velocity.move_toward(
+			toward_heavy * heavy_reel_player_speed,
+			heavy_reel_acceleration * delta * maxf(pull_ratio, 0.35)
+		)
+		current_line_length = maxf(28.0, minf(current_line_length, dist))
 		if _enemy_hook_feedback_timer <= 0.0:
-			_request_shake(0.035)
-			_enemy_hook_feedback_timer = 0.18
+			_request_shake(0.045)
+			_enemy_hook_feedback_timer = 0.14
+		if dist <= heavy_power_ready_distance:
+			_open_enemy_power_window(current_hooked_enemy)
 		return
 	current_hooked_enemy.call("apply_combat_hook_pull", rod, enemy_reel_pull_speed * pull_ratio)
-	var toward_speed := 0.0
-	if dist > 0.01:
-		toward_speed = velocity.dot(to_enemy / dist)
-	var powered := _enemy_power_window_left > 0.0 and toward_speed >= enemy_power_min_speed
-	if powered:
-		current_hooked_enemy.call("take_damage", enemy_power_damage, global_position)
-		_release_hooked_enemy(true)
-		_request_shake(0.65)
-	elif dist <= enemy_reel_finish_distance:
+	if dist <= enemy_reel_finish_distance:
 		_land_reeled_enemy()
 
 
@@ -2381,9 +2392,20 @@ func _reel_enemy_to_player(_delta: float, pull_ratio := 1.0) -> void:
 ## il momento in cui il colpo vale doppio. Lo dicono la posa del nemico e
 ## l'aura sulla canna, non una riga di testo.
 func _land_reeled_enemy() -> void:
-	if is_instance_valid(current_hooked_enemy) and current_hooked_enemy.has_method("stagger"):
-		current_hooked_enemy.call("stagger", power_strike_window)
+	_open_enemy_power_window(current_hooked_enemy)
+
+
+func _open_enemy_power_window(enemy: CharacterBody2D) -> void:
+	if not is_instance_valid(enemy):
+		return
+	var impact_position := enemy.global_position + Vector2(0.0, -18.0)
+	if enemy.has_method("stagger"):
+		enemy.call("stagger", power_strike_window)
 	_power_strike_left = power_strike_window
+	PARTICLE_BURST.spawn(
+		get_tree().current_scene, impact_position,
+		Color(1.0, 0.72, 0.3, 0.84), 9, Vector2.UP, 24.0, 74.0, 0.52
+	)
 	_release_hooked_enemy(false)
 	_request_shake(0.28)
 

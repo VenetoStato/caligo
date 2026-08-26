@@ -322,6 +322,9 @@ func apply_atmosphere_tuning() -> void:
 			rain_material.set_shader_parameter("intensity", rain_intensity)
 			rain_material.set_shader_parameter("fall_speed", rain_speed)
 			rain_material.set_shader_parameter("wind", rain_wind)
+			var viewport_size := get_viewport_rect().size
+			if viewport_size.y > 0.0:
+				rain_material.set_shader_parameter("aspect_ratio", viewport_size.x / viewport_size.y)
 	if _rain_surface_fx:
 		_rain_surface_fx.visible = rain_enabled
 		for child in _rain_surface_fx.get_children():

@@ -1160,6 +1160,17 @@ func begin_combat_hook(owner: Node2D) -> bool:
 	_melee_windup_remaining = 0.0
 	if _attack_hitbox:
 		_attack_hitbox.set_deferred("monitoring", false)
+	_hit_flash_timer = maxf(_hit_flash_timer, 0.16)
+	if sprite_node:
+		sprite_node.modulate = Color(0.62, 1.08, 1.02, 1.0)
+	PARTICLE_BURST.spawn(
+		get_tree().current_scene,
+		global_position + Vector2(0.0, -14.0),
+		Color(0.44, 0.92, 0.84, 0.78),
+		7, Vector2.UP, 18.0, 58.0, 0.42
+	)
+	_play_clip("hurt", true)
+	queue_redraw()
 	return true
 
 

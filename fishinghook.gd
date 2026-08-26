@@ -48,6 +48,7 @@ var is_visible: bool = true
 
 var fish_detection_area: Area2D = null
 var _fish_scan_timer := 0.0
+var _enemy_scan_timer := 0.0
 
 func _ready():
 	original_gravity_scale = gravity_scale
@@ -161,6 +162,10 @@ func _physics_process(delta: float):
 		linear_velocity = Vector2.ZERO
 	if not is_anchored and hooked_fish == null and hooked_enemy == null:
 		_scan_grapples()
+		_enemy_scan_timer -= delta
+		if _enemy_scan_timer <= 0.0:
+			_enemy_scan_timer = 0.06
+			_scan_nearby_enemies()
 	if in_water and not is_anchored:
 		# In acqua: gravità 0, quindi smorza la velocità verticale verso target
 		var target_vy = sink_speed if sink_slowly_in_water else 0.0
@@ -178,6 +183,17 @@ func _scan_nearby_fish() -> void:
 	for fish in get_tree().get_nodes_in_group(fish_group_name):
 		if fish is Node2D and (fish as Node2D).global_position.distance_squared_to(global_position) <= radius_squared:
 			_check_if_fish(fish)
+
+
+func _scan_nearby_enemies() -> void:
+	# Polling leggero di riserva: alcune varianti hanno hurtbox piccole o molto
+	# scalate e il solo segnale area_entered poteva mancare un lancio veloce.
+	var radius_squared := pow(fish_detection_radius * 1.85, 2)
+	for candidate in get_tree().get_nodes_in_group("enemy"):
+		if candidate is Node2D and (candidate as Node2D).global_position.distance_squared_to(global_position) <= radius_squared:
+			_check_if_enemy(candidate)
+			if hooked_enemy != null:
+				return
 
 func _update_sprite_rotation():
 	if sprite == null:

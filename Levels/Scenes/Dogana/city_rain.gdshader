@@ -4,6 +4,7 @@ render_mode unshaded, blend_mix;
 uniform float intensity : hint_range(0.0, 1.0) = 0.62;
 uniform float fall_speed : hint_range(0.1, 3.0) = 1.0;
 uniform float wind : hint_range(-1.0, 1.0) = 0.16;
+uniform float aspect_ratio : hint_range(0.5, 3.0) = 1.777778;
 
 float hash21(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21));
@@ -12,7 +13,7 @@ float hash21(vec2 p) {
 }
 
 float streak_layer(vec2 uv, float columns, float speed, float phase, float width) {
-	float aspect = SCREEN_PIXEL_SIZE.y / max(SCREEN_PIXEL_SIZE.x, 0.000001);
+	float aspect = aspect_ratio;
 	vec2 p = vec2(uv.x * aspect, uv.y);
 	p.x -= p.y * (wind * 0.16);
 	p.y += TIME * fall_speed * speed;
