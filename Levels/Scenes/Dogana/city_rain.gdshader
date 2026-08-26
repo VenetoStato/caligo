@@ -38,7 +38,9 @@ float streak_layer(vec2 uv, float columns, float speed, float phase, float width
 	q.x += q.y * (wind * 0.42);
 	float line = 1.0 - smoothstep(width, width * 2.5, abs(q.x));
 	float segment = smoothstep(-0.49, -0.18, q.y) * (1.0 - smoothstep(0.08, 0.49, q.y));
-	float active = smoothstep(0.54, 0.86, seed);
+	// Fewer decorative streaks: the world-space drops below are now the main
+	// readable rain and almost every one produces a real surface contact.
+	float active = smoothstep(0.68, 0.93, seed);
 	return line * segment * active;
 }
 

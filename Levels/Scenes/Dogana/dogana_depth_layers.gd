@@ -28,7 +28,7 @@ const CITY_RAIN_SHADER := preload("res://Levels/Scenes/Dogana/city_rain.gdshader
 @export_range(0.0, 1.0, 0.01) var rain_intensity := 0.62
 @export_range(0.1, 3.0, 0.05) var rain_speed := 1.0
 @export_range(-1.0, 1.0, 0.01) var rain_wind := 0.16
-@export_range(2.0, 72.0, 1.0) var rain_collision_rate := 44.0
+@export_range(2.0, 72.0, 1.0) var rain_collision_rate := 36.0
 
 var _camera: Camera2D
 var _origin := Vector2.ZERO
@@ -48,6 +48,7 @@ var _rain_overlay: ColorRect
 var _rain_surface_fx: Node2D
 var _rain_collision_accumulator := 0.0
 var _rain_water_body: Node2D
+var _rain_spawn_sequence := 0
 var _fore_motes: CPUParticles2D
 var _moon: Node2D
 var _interior_overlay: Polygon2D
@@ -413,8 +414,14 @@ func _spawn_collision_rain_drop() -> void:
 	var zoom := maxf(absf(_camera.zoom.x), 0.01)
 	var half_width := viewport_size.x / zoom * 0.62
 	var half_height := viewport_size.y / zoom * 0.66
+	# Golden-ratio spacing covers the whole visible waterline over consecutive
+	# drops. A small jitter keeps it natural without allowing long dry gaps.
+	var coverage := fposmod(float(_rain_spawn_sequence) * 0.61803398875, 1.0)
+	_rain_spawn_sequence += 1
+	var coverage_x := lerpf(-half_width, half_width, coverage)
+	var jitter := randf_range(-half_width * 0.045, half_width * 0.045)
 	var start := Vector2(
-		_camera.global_position.x + randf_range(-half_width, half_width),
+		_camera.global_position.x + clampf(coverage_x + jitter, -half_width, half_width),
 		_camera.global_position.y - half_height
 	)
 	var fall_vector := Vector2(rain_wind * 150.0, half_height * 2.05)

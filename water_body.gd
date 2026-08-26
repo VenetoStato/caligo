@@ -343,11 +343,15 @@ func rain_impact_at(global_x: float, strength: float = 1.0) -> void:
 	var ripple := Node2D.new()
 	ripple.name = "RainWaterRipple"
 	ripple.set_script(RAIN_RIPPLE_EFFECT_SCRIPT)
+	ripple.add_to_group("water_rain_ripple")
 	add_child(ripple)
 	ripple.global_position = Vector2(global_x, get_surface_height(global_x) - 1.0)
 	ripple.z_index = 14
 	ripple.call("setup", foam_color, safe_strength)
-	_rain_ripple_cooldown = 0.035 if not OS.has_feature("mobile") else 0.07
+	# World rain is intentionally sparse enough that almost every visible drop
+	# can own a ripple. Keep only a tiny guard against multiple callbacks in the
+	# same rendering instant; mobile retains a slightly wider safety margin.
+	_rain_ripple_cooldown = 0.012 if not OS.has_feature("mobile") else 0.025
 
 
 ## Returns the interpolated physical surface Y in global coordinates.

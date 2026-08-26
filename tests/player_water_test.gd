@@ -9,14 +9,16 @@ var _entries := 0
 var _was_in_water := false
 var _strongest_bounce := 0.0
 var _rain_ripple_seen := false
+var _rain_ripple_peak := 0
 
 
 func _physics_process(_delta: float) -> void:
 	_frame += 1
-	if _frame == 82 and _water.has_method("rain_impact_at"):
-		_water.call("rain_impact_at", 520.0, 1.0)
+	if _frame >= 82 and _frame <= 87 and _water.has_method("rain_impact_at"):
+		_water.call("rain_impact_at", 470.0 + float(_frame - 82) * 18.0, 1.0)
 	if _water.get_node_or_null("RainWaterRipple") != null:
 		_rain_ripple_seen = true
+	_rain_ripple_peak = maxi(_rain_ripple_peak, get_tree().get_nodes_in_group("water_rain_ripple").size())
 	if "springs" in _water:
 		for spring in _water.springs:
 			_peak_wave = maxf(
@@ -50,6 +52,10 @@ func _physics_process(_delta: float) -> void:
 		return
 	if not _rain_ripple_seen:
 		push_error("Rain impact did not create a visible surface ripple.")
+		get_tree().quit(1)
+		return
+	if _rain_ripple_peak < 4:
+		push_error("Consecutive rain drops were over-throttled instead of producing near 1:1 ripples.")
 		get_tree().quit(1)
 		return
 	get_tree().quit(0)
