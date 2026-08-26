@@ -1,4 +1,3 @@
-@tool
 extends StaticBody2D
 ## Frammento di pontile: arte dipinta, alcune assi crollano se ci resti sopra.
 

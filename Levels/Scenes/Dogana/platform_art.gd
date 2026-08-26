@@ -54,6 +54,29 @@ func _ready() -> void:
 	if Engine.is_editor_hint() and not preview_in_editor:
 		return
 	_rebuild_platform_art()
+	queue_redraw()
+
+
+func _draw() -> void:
+	if not Engine.is_editor_hint() or not preview_in_editor:
+		return
+	if art_profile == null or art_profile.walkable_platform == null:
+		return
+	# Preview della piattaforma REALE, disegnata direttamente nel CanvasItem:
+	# resta affidabile nell'editor anche se Godot non conserva i figli tool.
+	var texture := art_profile.walkable_platform
+	var platforms := [
+		Rect2(-435, 460, 700, 96),
+		Rect2(395, 460, 630, 96),
+		Rect2(1190, 485, 915, 110),
+		Rect2(2060, 485, 1200, 110),
+		Rect2(3260, 485, 850, 110),
+		Rect2(4110, 485, 510, 110),
+		Rect2(4620, 485, 1120, 110),
+	]
+	var source := Rect2(Vector2.ZERO, texture.get_size())
+	for rect in platforms:
+		draw_texture_rect_region(texture, rect, source)
 
 
 func _rebuild_platform_art() -> void:
