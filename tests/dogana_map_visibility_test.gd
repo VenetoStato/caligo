@@ -21,8 +21,8 @@ func _ready() -> void:
 		_fail("closing the map did not restore the running game")
 		return
 	var button := map.get_node("MapButton") as Button
-	if "MAPPA" not in button.text or "[M]" not in button.text:
-		_fail("the visible map button lost its keyboard hint")
+	if button.text != "" or "[M]" not in button.tooltip_text:
+		_fail("the map button is no longer the subtle glyph with its M shortcut in the tooltip")
 		return
 	print("CALIGO_MAP_VISIBILITY_OK: visible CanvasLayer, overlay and pause lifecycle")
 	get_tree().quit(0)

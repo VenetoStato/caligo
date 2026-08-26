@@ -138,6 +138,7 @@ theme_override_colors/font_pressed_color = Color(0.95, 0.8, 0.42, 1)
 theme_override_font_sizes/font_size = 13
 text = "DEBUG: VIAGGIO GRAZIE"
 tooltip_text = "Se attivo, rende cliccabili anche le Grazie non ancora scoperte."
+visible = false
 
 [node name="MapCanvas" type="Control" parent="Overlay/Frame"]
 offset_left = 26.0

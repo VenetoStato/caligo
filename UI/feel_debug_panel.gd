@@ -1,6 +1,8 @@
 extends CanvasLayer
 ## Finestra chiudibile per il feel di salto. F3 apre/chiude. Salva solo se premi Salva.
 
+signal debug_mode_changed(enabled: bool)
+
 const USER_SAVE := "user://feel_tuning.cfg"
 const PROJECT_SAVE := "res://Player/feel_tuning.cfg"
 
@@ -52,6 +54,7 @@ var _camera: Camera2D
 var _depth: Node2D
 var _window: PanelContainer
 var _open_btn: Button
+var _debug_flag: CheckButton
 var _status: Label
 var _labels: Dictionary = {}
 var _sliders: Dictionary = {}
@@ -68,15 +71,17 @@ var _rain_check: CheckButton
 func _ready() -> void:
 	layer = 96
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	add_to_group("dogana_debug_tools")
 	_build_open_button()
 	_build_window()
 	call_deferred("_bind_targets")
-	_show_window(true)
+	_set_debug_enabled(false)
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F3:
-		_show_window(not _window.visible)
+		if is_debug_enabled():
+			_show_window(not _window.visible)
 		get_viewport().set_input_as_handled()
 
 
@@ -122,13 +127,24 @@ func _build_open_button() -> void:
 	host.set_anchors_preset(Control.PRESET_FULL_RECT)
 	host.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(host)
+	_debug_flag = CheckButton.new()
+	_debug_flag.text = "DEBUG"
+	_debug_flag.focus_mode = Control.FOCUS_NONE
+	_debug_flag.tooltip_text = "Mostra gli strumenti di tuning e abilita il viaggio debug tra le Grazie"
+	_debug_flag.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_debug_flag.position = Vector2(12, 10)
+	_debug_flag.size = Vector2(82, 26)
+	_debug_flag.add_theme_font_size_override("font_size", 11)
+	_debug_flag.modulate = Color(0.62, 0.83, 0.78, 0.62)
+	_debug_flag.toggled.connect(_set_debug_enabled)
+	host.add_child(_debug_flag)
 	_open_btn = Button.new()
-	_open_btn.text = "Feel"
+	_open_btn.text = "FEEL"
 	_open_btn.focus_mode = Control.FOCUS_NONE
 	_open_btn.tooltip_text = "Apri parametri di movimento e grafica (F3)"
 	_open_btn.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	_open_btn.position = Vector2(12, 12)
-	_open_btn.size = Vector2(72, 28)
+	_open_btn.position = Vector2(100, 10)
+	_open_btn.size = Vector2(58, 26)
 	_open_btn.pressed.connect(func() -> void: _show_window(true))
 	host.add_child(_open_btn)
 
@@ -288,9 +304,23 @@ func _on_drag_handle_gui_input(event: InputEvent) -> void:
 func _show_window(open: bool) -> void:
 	if _window == null:
 		return
-	_window.visible = open
+	_window.visible = open and is_debug_enabled()
 	if _open_btn:
-		_open_btn.visible = not open
+		_open_btn.visible = is_debug_enabled() and not open
+
+
+func is_debug_enabled() -> bool:
+	return _debug_flag != null and _debug_flag.button_pressed
+
+
+func _set_debug_enabled(enabled: bool) -> void:
+	if _debug_flag and _debug_flag.button_pressed != enabled:
+		_debug_flag.set_pressed_no_signal(enabled)
+	if _open_btn:
+		_open_btn.visible = enabled
+	if _window:
+		_window.visible = false
+	debug_mode_changed.emit(enabled)
 
 
 func _on_slider(value: float, key: String, label_text: String, graphics: bool) -> void:

@@ -115,10 +115,12 @@ func _draw_player_marker() -> void:
 	else:
 		var normalized_x := clampf(_player_world_position.x / 6000.0, 0.0, 1.0)
 		position = Vector2(lerpf(size.x * 0.065, size.x * 0.955, normalized_x), size.y * 0.69)
-	var pulse := 7.0 + sin(_time * 4.0) * 1.6
-	draw_circle(position, pulse + 5.0, Color(0.2, 0.9, 0.76, 0.13))
-	draw_circle(position, pulse, Color(0.28, 0.92, 0.78, 0.92))
-	draw_circle(position, 2.5, Color(0.93, 0.82, 0.48, 1.0))
+	# Il punto deve orientare, non dominare la carta: un piccolo ago d'ottone
+	# con alone lento e quasi trasparente, invece del vecchio pallino pulsante.
+	var breath := 0.5 + sin(_time * 2.2) * 0.12
+	draw_arc(position, 7.0, -PI * 0.8, PI * 0.8, 18, Color(0.55, 0.86, 0.74, 0.22 + breath * 0.16), 1.0, true)
+	draw_circle(position, 3.2, Color(0.82, 0.72, 0.46, 0.88))
+	draw_circle(position, 1.15, Color(0.94, 0.9, 0.74, 0.96))
 
 
 func _draw_room(region_id: String, rect: Rect2, label: String) -> void:
