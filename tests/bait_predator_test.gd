@@ -8,6 +8,7 @@ const CARCASS_SCRIPT := preload("res://dead_enemy_carcass.gd")
 var _bait: RigidBody2D
 var _predator: RigidBody2D
 var _frame := 0
+var _expected_bait_position := Vector2(410.0, 270.0)
 
 
 func _ready() -> void:
@@ -32,18 +33,21 @@ func _physics_process(_delta: float) -> void:
 	# Sposta l'esca dopo che il predatore ha già iniziato la rotta: deve
 	# correggere il bersaglio vivo, non proseguire verso la posizione iniziale.
 	if _frame == 18:
-		_bait.position = Vector2(410.0, 270.0)
+		_bait.position = _expected_bait_position
 	if _frame < 210:
 		return
-	var bitten: Variant = _predator.get("_bitten_bait")
 	var target: Vector2 = _predator.get("_bait_target") as Vector2
-	if bitten != _bait:
-		push_error("Large predator did not bite the moving carcass bait.")
+	if is_instance_valid(_bait) and not _bait.is_queued_for_deletion():
+		push_error("Large predator did not consume the carcass bait.")
 		get_tree().quit(1)
 		return
-	if target.distance_to(_bait.global_position) > 2.0:
+	if target.distance_to(_expected_bait_position) > 2.0:
 		push_error("Predator target did not follow the moved carcass.")
 		get_tree().quit(1)
 		return
-	print("CALIGO_BAIT_PREDATOR_OK: live target followed and carcass bitten")
+	if bool(_predator.get("_bait_target_active")):
+		push_error("Large predator never completed the bait approach.")
+		get_tree().quit(1)
+		return
+	print("CALIGO_BAIT_PREDATOR_OK: live target followed and carcass consumed")
 	get_tree().quit(0)

@@ -158,9 +158,13 @@ func on_predator_bite(predator: Node2D) -> bool:
 		apply_central_impulse(bite_direction.normalized() * 18.0)
 	# Se la carcassa è ancora sulla lenza, il morso trasferisce l'aggancio al
 	# predatore: da questo frame il pesce grosso è quello che lotta col player.
+	var transferred := false
 	if hooked_to_player and player_ref != null and player_ref.has_method("on_bait_predator_bite"):
-		return bool(player_ref.call("on_bait_predator_bite", predator, self))
-	return false
+		transferred = bool(player_ref.call("on_bait_predator_bite", predator, self))
+	# Il morso consuma sempre l'esca. La rimozione e' differita cosi' il player
+	# puo' prima trasferire in sicurezza lenza e riferimento al predatore.
+	call_deferred("queue_free")
+	return transferred
 
 func _physics_process(_delta: float) -> void:
 	if hooked_to_player and player_ref is Node2D:

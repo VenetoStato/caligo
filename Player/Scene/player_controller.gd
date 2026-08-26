@@ -158,6 +158,11 @@ const POWER_STRIKE_TINT := Color(1.0, 0.72, 0.3, 1.0)
 @export var fish_reel_distance: float = 42.0
 @export var fish_catch_jump_distance: float = 72.0
 @export var fish_pull_strength: float = 220.0
+## Trascinamento reale esercitato dai predatori giganti mentre sono sulla lenza.
+@export var bait_predator_drag_speed: float = 145.0
+@export var bait_predator_drag_acceleration: float = 680.0
+@export var bait_predator_shake_strength: float = 0.075
+@export var bait_predator_shake_interval: float = 0.10
 ## Progresso reel richiesto prima della cattura (0–1). Il morso da solo NON basta.
 @export var min_reel_progress_to_catch: float = 0.7
 @export var reel_progress_per_second: float = 0.75
@@ -2656,7 +2661,15 @@ func _update_fish_struggle(delta: float):
 		return
 	_fish_hooked_time += delta
 	_fishing_feedback_timer = maxf(0.0, _fishing_feedback_timer - delta)
-	if is_reeling and _fishing_feedback_timer <= 0.0:
+	var bait_predator := _is_bait_predator(current_fish)
+	if bait_predator:
+		_apply_bait_predator_drag(delta)
+	if bait_predator and _fishing_feedback_timer <= 0.0:
+		# Il tremolio resta attivo per tutta la lotta, non soltanto mentre si
+		# preme reel: comunica che il pesce grosso sta trascinando il player.
+		_request_shake(bait_predator_shake_strength * (1.2 if fish_struggle_active else 0.75))
+		_fishing_feedback_timer = bait_predator_shake_interval if fish_struggle_active else bait_predator_shake_interval * 1.6
+	elif is_reeling and _fishing_feedback_timer <= 0.0:
 		# Micro impulso, non un camera shake invasivo: rende leggibile la tirata.
 		_request_shake(0.035 if not fish_struggle_active else 0.055)
 		_fishing_feedback_timer = 0.16 if not fish_struggle_active else 0.11
@@ -2717,6 +2730,39 @@ func _update_fish_struggle(delta: float):
 				current_fish.call("apply_struggle_force", (fp - rod).normalized() * fish_pull_strength * delta)
 			if fish_struggle_phase_timer >= fish_struggle_phase_duration:
 				_stop_fish_struggle()
+
+
+func _is_bait_predator(target: Node) -> bool:
+	return (
+		target != null
+		and is_instance_valid(target)
+		and bool(target.get_meta("bait_giant", false))
+	)
+
+
+func _apply_bait_predator_drag(delta: float) -> void:
+	if not _is_bait_predator(current_fish):
+		return
+	var to_fish := get_fish_center_position(current_fish) - global_position
+	# Trazione soprattutto orizzontale: abbastanza verticale da far sentire la
+	# lotta in acqua, senza annullare gravita' e controllo del platforming.
+	to_fish.y *= 0.35
+	if to_fish.length_squared() <= 1.0:
+		return
+	var line_ratio := clampf(
+		global_position.distance_to(get_fish_center_position(current_fish)) / maxf(current_line_length, 1.0),
+		0.45,
+		1.35
+	)
+	var struggle_multiplier := 1.22 if fish_struggle_active else 0.82
+	var target_velocity := to_fish.normalized() * bait_predator_drag_speed * line_ratio * struggle_multiplier
+	velocity.x = move_toward(velocity.x, target_velocity.x, bait_predator_drag_acceleration * delta)
+	if not is_on_floor() or target_velocity.y < 0.0:
+		velocity.y = move_toward(
+			velocity.y,
+			target_velocity.y * 0.45,
+			bait_predator_drag_acceleration * 0.35 * delta
+		)
 
 
 func _is_current_fish_out_of_water() -> bool:

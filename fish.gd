@@ -483,7 +483,7 @@ func _process_swimming(delta: float):
 		var bait_dir := (_bait_target - global_position).normalized()
 		# Arrivo prioritario: il predatore deve attraversare rapidamente il bordo
 		# fuori campo, senza essere rallentato dal normale nuoto.
-		var bait_speed := maxf(attraction_speed * 4.2, 300.0)
+		var bait_speed := maxf(attraction_speed * 4.7, 335.0)
 		desired = bait_dir * bait_speed
 		if global_position.distance_to(_bait_target) < 34.0:
 			_bait_target_active = false
