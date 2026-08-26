@@ -68,7 +68,7 @@ func _find_parallax_with_preview(node: Node) -> Node:
 	var n: Node = node
 	while n:
 		if n is ParallaxBackground and n.get_script():
-			var path := n.get_script().resource_path
+			var path: String = str(n.get_script().resource_path)
 			if path.get_file() == "parallax_preview.gd":
 				return n
 		n = n.get_parent()

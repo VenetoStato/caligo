@@ -176,8 +176,8 @@ func _check_dependencies():
 	else:
 		var check_args := [ "-c", "import psd_tools; import PIL; print('ok')" ]
 		var out: Array = []
-		var code = OS.execute(py_cmd, check_args, out, true, true)
-		if code == 0:
+		var py_code := OS.execute(py_cmd, check_args, out, true, true)
+		if py_code == 0:
 			_python_ok = true
 			_log("OK Python + psd-tools: '%s' con psd-tools e Pillow" % py_cmd)
 		else:

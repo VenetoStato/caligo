@@ -4,11 +4,14 @@ extends Node2D
 const WATER_SURFACE_Y := 565.0
 const QUAY_TOP_Y := 485.0
 
+@export var build_continuous_collision := true
+
 
 func _ready() -> void:
 	# Il fronte della Punta resta una singola banchina orizzontale: i vecchi
 	# rami sospesi sono stati rimossi dalla scena, non nascosti a runtime.
-	_build_continuous_quay()
+	if build_continuous_collision:
+		_build_continuous_quay()
 	_build_waterline_contact()
 	_build_grounded_salute_entrance()
 	_move_boss_arena_inside()

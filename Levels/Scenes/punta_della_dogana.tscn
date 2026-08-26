@@ -1,4 +1,4 @@
-[gd_scene load_steps=40 format=3 uid="uid://3ccaqnqh276l"]
+[gd_scene load_steps=47 format=3 uid="uid://3ccaqnqh276l"]
 
 [ext_resource type="Script" uid="uid://b6j5qjydisr3v" path="res://Levels/Scenes/Dogana/dogana_level.gd" id="1_level"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/dogana_environment.tscn" id="2_environment"]
@@ -30,12 +30,28 @@
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/lore_reader.tscn" id="33_lore_reader"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/pogo_thorn.tscn" id="34_thorn"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/wooden_ledge.tscn" id="36_ledge"]
+[ext_resource type="Script" path="res://Levels/Scenes/Dogana/editable_platform.gd" id="37_editable_platform"]
 
 [sub_resource type="RectangleShape2D" id="GroundArrivalWest"]
 size = Vector2(700, 96)
 
 [sub_resource type="RectangleShape2D" id="GroundArrivalEast"]
 size = Vector2(630, 96)
+
+[sub_resource type="RectangleShape2D" id="EditableQuayA"]
+size = Vector2(915, 110)
+
+[sub_resource type="RectangleShape2D" id="EditableQuayB"]
+size = Vector2(1200, 110)
+
+[sub_resource type="RectangleShape2D" id="EditableQuayC"]
+size = Vector2(850, 110)
+
+[sub_resource type="RectangleShape2D" id="EditableQuayD"]
+size = Vector2(510, 110)
+
+[sub_resource type="RectangleShape2D" id="EditableQuayE"]
+size = Vector2(1120, 110)
 
 [sub_resource type="RectangleShape2D" id="BossArenaFloor"]
 size = Vector2(1120, 110)
@@ -128,6 +144,7 @@ visible = false
 visible = false
 
 [node name="GeneratedPlatformArt" parent="Gameplay" instance=ExtResource("17_platform_art")]
+visible = false
 z_index = -1
 
 [node name="EldritchFishingProps" parent="Gameplay" instance=ExtResource("15_props")]
@@ -136,6 +153,7 @@ visible = false
 [node name="SaluteInterior" parent="Gameplay" instance=ExtResource("30_salute_interior")]
 
 [node name="SimplifiedWaterfront" parent="Gameplay" instance=ExtResource("31_waterfront")]
+build_continuous_collision = false
 
 [node name="WorldBounds" parent="Gameplay" instance=ExtResource("22_bounds")]
 
@@ -144,8 +162,74 @@ position = Vector2(70, 447)
 
 [node name="Geometry" type="Node2D" parent="Gameplay" groups=["dogana_geometry"]]
 
+[node name="EditablePlatforms" type="Node2D" parent="Gameplay" groups=["dogana_editable_platforms"]]
+
+[node name="PontileWest" type="StaticBody2D" parent="Gameplay/EditablePlatforms" groups=["dogana_platform"]]
+position = Vector2(-435, 460)
+script = ExtResource("37_editable_platform")
+platform_size = Vector2(700, 96)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/PontileWest"]
+position = Vector2(350, 48)
+shape = SubResource("GroundArrivalWest")
+
+[node name="PontileEast" type="StaticBody2D" parent="Gameplay/EditablePlatforms" groups=["dogana_platform"]]
+position = Vector2(395, 460)
+script = ExtResource("37_editable_platform")
+platform_size = Vector2(630, 96)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/PontileEast"]
+position = Vector2(315, 48)
+shape = SubResource("GroundArrivalEast")
+
+[node name="DoganaQuay" type="StaticBody2D" parent="Gameplay/EditablePlatforms" groups=["dogana_platform"]]
+position = Vector2(1190, 485)
+script = ExtResource("37_editable_platform")
+platform_size = Vector2(915, 110)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/DoganaQuay"]
+position = Vector2(457.5, 55)
+shape = SubResource("EditableQuayA")
+
+[node name="CustomsFront" type="StaticBody2D" parent="Gameplay/EditablePlatforms" groups=["dogana_platform"]]
+position = Vector2(2060, 485)
+script = ExtResource("37_editable_platform")
+platform_size = Vector2(1200, 110)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/CustomsFront"]
+position = Vector2(600, 55)
+shape = SubResource("EditableQuayB")
+
+[node name="CanalFront" type="StaticBody2D" parent="Gameplay/EditablePlatforms" groups=["dogana_platform"]]
+position = Vector2(3260, 485)
+script = ExtResource("37_editable_platform")
+platform_size = Vector2(850, 110)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/CanalFront"]
+position = Vector2(425, 55)
+shape = SubResource("EditableQuayC")
+
+[node name="FortunaFront" type="StaticBody2D" parent="Gameplay/EditablePlatforms" groups=["dogana_platform"]]
+position = Vector2(4110, 485)
+script = ExtResource("37_editable_platform")
+platform_size = Vector2(510, 110)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/FortunaFront"]
+position = Vector2(255, 55)
+shape = SubResource("EditableQuayD")
+
+[node name="SaluteFront" type="StaticBody2D" parent="Gameplay/EditablePlatforms" groups=["dogana_platform"]]
+position = Vector2(4620, 485)
+script = ExtResource("37_editable_platform")
+platform_size = Vector2(1120, 110)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/SaluteFront"]
+position = Vector2(560, 55)
+shape = SubResource("EditableQuayE")
+
 [node name="ArrivalBoatDockWest" type="StaticBody2D" parent="Gameplay/Geometry" groups=["dogana_platform"]]
 position = Vector2(-85, 508)
+collision_layer = 0
 collision_mask = 2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/ArrivalBoatDockWest"]
@@ -153,6 +237,7 @@ shape = SubResource("GroundArrivalWest")
 
 [node name="ArrivalBoatDockEast" type="StaticBody2D" parent="Gameplay/Geometry" groups=["dogana_platform"]]
 position = Vector2(710, 508)
+collision_layer = 0
 collision_mask = 2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/ArrivalBoatDockEast"]
@@ -160,6 +245,7 @@ shape = SubResource("GroundArrivalEast")
 
 [node name="Quay" type="StaticBody2D" parent="Gameplay/Geometry" groups=["dogana_platform"]]
 position = Vector2(1585, 540)
+collision_layer = 0
 collision_mask = 2
 
 [node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Gameplay/Geometry/Quay"]

@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3]
+[gd_scene load_steps=22 format=3]
 
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/lagoon_backdrop.svg" id="1_bg"]
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/salute_silhouette.svg" id="2_salute"]
@@ -18,6 +18,7 @@
 [ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/module_salute.png" id="20_salute"]
 [ext_resource type="Script" path="res://Levels/Scenes/Dogana/dogana_depth_layers.gd" id="21_depth"]
 [ext_resource type="Shader" path="res://Levels/Scenes/Dogana/background_softfocus.gdshader" id="22_softfocus"]
+[ext_resource type="Script" path="res://Levels/Scenes/Dogana/parallax_scene_preview.gd" id="23_preview"]
 
 [sub_resource type="ShaderMaterial" id="PanoramaBlend"]
 shader = ExtResource("12_blend")
@@ -38,6 +39,9 @@ script = ExtResource("14_art_director")
 
 [node name="DepthLayers" type="Node2D" parent="."]
 script = ExtResource("21_depth")
+
+[node name="ParallaxScenePreview" type="Node2D" parent="." groups=["dogana_editor_parallax_preview"]]
+script = ExtResource("23_preview")
 
 [node name="SkyAndLagoon" type="Node2D" parent="." groups=["dogana_background"]]
 z_index = -20
