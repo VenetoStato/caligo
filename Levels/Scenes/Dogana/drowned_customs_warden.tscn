@@ -1,7 +1,7 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://Levels/Scenes/Dogana/drowned_customs_warden.gd" id="1_script"]
-[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/drowned_customs_warden.png" id="2_texture"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/drowned_customs_warden-v2.png" id="2_texture"]
 
 [sub_resource type="RectangleShape2D" id="BodyShape"]
 size = Vector2(89.6, 92.4)
@@ -12,6 +12,9 @@ size = Vector2(124.6, 145.6)
 [sub_resource type="RectangleShape2D" id="AttackShape"]
 size = Vector2(149.8, 103.6)
 
+[sub_resource type="RectangleShape2D" id="ContactShape"]
+size = Vector2(66, 68)
+
 [node name="DrownedCustomsWarden" type="CharacterBody2D" groups=["dogana_boss"]]
 collision_layer = 2
 collision_mask = 1
@@ -20,24 +23,26 @@ script = ExtResource("1_script")
 [node name="Sprite2D" type="Sprite2D" parent="."]
 # Il bordo opaco inferiore della texture (y~946/1024) cade a quota zero:
 # un margine di 26 px lo mantiene davanti al bordo prospettico del pavimento.
-position = Vector2(0, -166)
-scale = Vector2(0.322, 0.322)
+position = Vector2(0, -96)
+scale = Vector2(0.161, 0.161)
 texture = ExtResource("2_texture")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(0, -59.2)
+position = Vector2(0, -31)
 shape = SubResource("BodyShape")
+scale = Vector2(0.58, 0.62)
 
 [node name="Hurtbox" type="Area2D" parent="."]
-position = Vector2(0, -97.4)
+position = Vector2(0, -49)
 collision_layer = 2
 collision_mask = 4
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
 shape = SubResource("HurtShape")
+scale = Vector2(0.56, 0.56)
 
 [node name="AttackHitbox" type="Area2D" parent="."]
-position = Vector2(0, -79.2)
+position = Vector2(0, -42)
 collision_layer = 0
 collision_mask = 2
 monitoring = false
@@ -45,3 +50,13 @@ monitorable = false
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="AttackHitbox"]
 shape = SubResource("AttackShape")
+scale = Vector2(0.76, 0.72)
+
+[node name="ContactDamage" type="Area2D" parent="."]
+position = Vector2(0, -34)
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="ContactDamage"]
+shape = SubResource("ContactShape")

@@ -4,12 +4,14 @@ extends Node2D
 var _kind := -1
 var _dir := Vector2.RIGHT
 var _progress := 0.0
+var _active := false
 
 
-func set_preview(kind: int, direction: Vector2, progress: float) -> void:
+func set_preview(kind: int, direction: Vector2, progress: float, active := false) -> void:
 	_kind = kind
 	_dir = direction if direction.length_squared() > 0.01 else Vector2.RIGHT
 	_progress = clampf(progress, 0.0, 1.0)
+	_active = active
 	visible = _kind >= 0
 	queue_redraw()
 
@@ -19,24 +21,19 @@ func _draw() -> void:
 		return
 	match _kind:
 		0: # LUNGE
-			var tip := _dir * lerpf(40.0, 150.0, _progress)
-			draw_line(Vector2(0, -40), tip + Vector2(0, -40), Color(0.45, 1.0, 0.86, 0.35 + _progress * 0.45), 3.0, true)
-			draw_circle(tip + Vector2(0, -40), 8.0 + _progress * 6.0, Color(0.45, 1.0, 0.86, 0.25 + _progress * 0.4))
+			_draw_melee_zone(176.0, 78.0, Color(1.0, 0.32, 0.18, 1.0))
 		1: # SLAM
 			var radius := lerpf(28.0, 96.0, _progress)
-			draw_arc(Vector2(0, 8), radius, 0.0, TAU, 48, Color(0.95, 0.45, 0.32, 0.35 + _progress * 0.5), 3.0, true)
-			draw_circle(Vector2(0, 8), radius * 0.35, Color(0.95, 0.45, 0.32, 0.08 + _progress * 0.1))
+			draw_circle(Vector2(0, 0), radius, Color(1.0, 0.22, 0.12, 0.07 + _progress * 0.12))
+			draw_arc(Vector2(0, 0), radius, 0.0, TAU, 48, Color(1.0, 0.36, 0.2, 0.42 + _progress * 0.5), 3.0, true)
+			_draw_countdown_ticks(Vector2(0, 0), radius)
 		2: # WAVE
 			for i in 3:
 				var ang := (-0.22 + 0.22 * float(i))
 				var tip2 := _dir.rotated(ang) * lerpf(50.0, 170.0, _progress)
 				draw_line(Vector2(0, -70), tip2 + Vector2(0, -70), Color(0.4, 0.9, 1.0, 0.28 + _progress * 0.45), 2.2, true)
 		3: # SWEEP
-			var sweep_dir := signf(_dir.x) if absf(_dir.x) > 0.01 else 1.0
-			var width := lerpf(60.0, 150.0, _progress)
-			var rect := Rect2(minf(0.0, sweep_dir * width), -110.0, absf(width), 90.0)
-			draw_rect(rect, Color(0.95, 0.75, 0.35, 0.12 + _progress * 0.18), true)
-			draw_rect(rect, Color(0.95, 0.75, 0.35, 0.4 + _progress * 0.4), false, 2.0)
+			_draw_melee_zone(164.0, 94.0, Color(1.0, 0.62, 0.16, 1.0))
 		4: # SPIRAL
 			for arm in 4:
 				var ang := _progress * TAU * 1.4 + TAU * float(arm) / 4.0
@@ -68,3 +65,32 @@ func _draw() -> void:
 				var height := lerpf(18.0, 96.0, _progress)
 				draw_rect(Rect2(x - 10.0, 8.0 - height, 20.0, height), Color(0.72, 0.32, 0.95, 0.1 + _progress * 0.2), true)
 				draw_line(Vector2(x, 8.0), Vector2(x, 8.0 - height), Color(0.86, 0.48, 1.0, 0.4 + _progress * 0.45), 2.4, true)
+		10: # FLOOD
+			var half_width := lerpf(90.0, 520.0, _progress)
+			var top := lerpf(34.0, -150.0, _progress)
+			var flood_rect := Rect2(-half_width, top, half_width * 2.0, 158.0 - top)
+			draw_rect(flood_rect, Color(0.16, 0.58, 1.0, 0.06 + _progress * 0.12), true)
+			draw_line(Vector2(-half_width, top), Vector2(half_width, top), Color(0.35, 0.78, 1.0, 0.45 + _progress * 0.45), 4.0, true)
+
+
+func _draw_melee_zone(width: float, height: float, tint: Color) -> void:
+	var facing := signf(_dir.x) if absf(_dir.x) > 0.01 else 1.0
+	var shown_width := lerpf(width * 0.32, width, _progress)
+	var left := 12.0 if facing > 0.0 else -12.0 - shown_width
+	var rect := Rect2(left, -height, shown_width, height + 8.0)
+	var pulse := 0.72 + sin(Time.get_ticks_msec() * 0.025) * 0.18
+	var fill_alpha := 0.24 * pulse if _active else (0.07 + _progress * 0.12)
+	draw_rect(rect, Color(tint.r, tint.g, tint.b, fill_alpha), true)
+	draw_rect(rect, Color(tint.r, tint.g, tint.b, 0.95 if _active else 0.4 + _progress * 0.48), false, 3.5 if _active else 2.2)
+	var stripe_x := rect.position.x + 12.0 if facing > 0.0 else rect.end.x - 12.0
+	while (stripe_x < rect.end.x if facing > 0.0 else stripe_x > rect.position.x):
+		draw_line(Vector2(stripe_x, rect.position.y), Vector2(stripe_x + 28.0 * facing, rect.end.y), Color(tint.r, tint.g, tint.b, 0.28 if _active else 0.13), 1.4, true)
+		stripe_x += 32.0 * facing
+
+
+func _draw_countdown_ticks(center: Vector2, radius: float) -> void:
+	for index in 8:
+		var angle := TAU * float(index) / 8.0
+		var direction := Vector2.from_angle(angle)
+		var enabled := float(index) / 8.0 <= _progress
+		draw_line(center + direction * (radius - 9.0), center + direction * (radius + 5.0), Color(1.0, 0.5, 0.28, 0.88 if enabled else 0.18), 2.4, true)

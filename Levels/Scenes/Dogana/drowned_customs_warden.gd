@@ -11,10 +11,12 @@ const FOOTSTEP_DUST := preload("res://Fx/footstep_dust.gd")
 const FLOOD_SURGE_SCRIPT := preload("res://Levels/Scenes/Dogana/boss_flood_surge.gd")
 
 const MAX_BOSS_TRANSIENTS := 72
-const BASE_SPRITE_POSITION := Vector2(0.0, -166.0)
-const BASE_BODY_SHAPE_POSITION := Vector2(0.0, -59.2)
-const BASE_HURTBOX_POSITION := Vector2(0.0, -97.4)
-const BASE_ATTACK_HITBOX_POSITION := Vector2(0.0, -79.2)
+const BASE_SPRITE_POSITION := Vector2(0.0, -96.0)
+const BASE_SPRITE_SCALE := Vector2(0.161, 0.161)
+const BASE_BODY_SHAPE_POSITION := Vector2(0.0, -31.0)
+const BASE_HURTBOX_POSITION := Vector2(0.0, -49.0)
+const BASE_ATTACK_HITBOX_POSITION := Vector2(0.0, -42.0)
+const BASE_CONTACT_POSITION := Vector2(0.0, -34.0)
 
 @export var max_health := 28
 @export var move_speed := 78.0
@@ -24,6 +26,8 @@ const BASE_ATTACK_HITBOX_POSITION := Vector2(0.0, -79.2)
 @export var attack_cooldown := 1.35
 @export var attack_damage := 1
 @export var heavy_attack_damage := 2
+@export var contact_damage := 1
+@export var contact_damage_cooldown := 0.72
 @export var gravity := 620.0
 @export var variant_texture: Texture2D
 @export var art_kit: EnemyArtKit
@@ -37,6 +41,7 @@ const ARENA_RIGHT := 5700.0
 @onready var _sprite: Sprite2D = $Sprite2D
 @onready var _hurtbox: Area2D = $Hurtbox
 @onready var _attack_hitbox: Area2D = $AttackHitbox
+@onready var _contact_damage_area: Area2D = $ContactDamage
 
 var state := State.DORMANT
 var current_health := 28
@@ -45,6 +50,8 @@ var _state_timer := 0.0
 var _attack_timer := 0.0
 var _invulnerability_timer := 0.0
 var _attack_has_hit := false
+var _contact_damage_timer := 0.0
+var _windup_duration := 0.72
 var _base_scale := Vector2.ONE
 var _wound_overlay: Sprite2D
 var _wound_light: PointLight2D
@@ -91,17 +98,20 @@ func _ready() -> void:
 	# Sprite2D dell'istanza: il Custode risultava enorme dentro il pavimento anche
 	# se la sottoscena era corretta. L'allineamento runtime e' qui autoritativo.
 	_sprite.position = BASE_SPRITE_POSITION
+	_sprite.scale = BASE_SPRITE_SCALE
 	var body_shape := get_node_or_null("CollisionShape2D") as CollisionShape2D
 	if body_shape:
 		body_shape.position = BASE_BODY_SHAPE_POSITION
 	_hurtbox.position = BASE_HURTBOX_POSITION
 	_attack_hitbox.position = BASE_ATTACK_HITBOX_POSITION
+	_contact_damage_area.position = BASE_CONTACT_POSITION
 	current_health = max_health
 	_base_scale = _sprite.scale
 	_base_sprite_position = _sprite.position
 	_home_position = global_position
 	_hurtbox.area_entered.connect(_on_hurtbox_area_entered)
 	_attack_hitbox.body_entered.connect(_on_attack_hit_body)
+	_contact_damage_area.body_entered.connect(_on_contact_body_entered)
 	_attack_hitbox.monitoring = false
 	_attack_hitbox.monitorable = false
 	_attack_hitbox.collision_mask = 2
@@ -116,6 +126,7 @@ func _physics_process(delta: float) -> void:
 		return
 	_invulnerability_timer = maxf(0.0, _invulnerability_timer - delta)
 	_attack_timer = maxf(0.0, _attack_timer - delta)
+	_contact_damage_timer = maxf(0.0, _contact_damage_timer - delta)
 	_state_timer = maxf(0.0, _state_timer - delta)
 	velocity.y += gravity * delta
 
@@ -131,6 +142,7 @@ func _physics_process(delta: float) -> void:
 	if _animated:
 		_animated.flip_h = face_right
 	_update_telegraph(to_player)
+	_update_contact_damage()
 
 	match state:
 		State.DORMANT:
@@ -422,6 +434,7 @@ func reset_encounter() -> void:
 	_attack_chain_step = 0
 	_invulnerability_timer = 0.0
 	_attack_timer = 0.0
+	_contact_damage_timer = 0.0
 	_state_timer = 0.0
 	_hurt_anim = 0.0
 	_anim_state = "dormant"
@@ -499,6 +512,7 @@ func _begin_windup(to_player: Vector2) -> void:
 			_state_timer = 0.9
 			_pending_damage = heavy_attack_damage
 			_sprite.modulate = Color(0.3, 0.66, 1.15, 1.0)
+	_windup_duration = _state_timer
 
 
 func _pick_attack(to_player: Vector2) -> AttackKind:
@@ -543,6 +557,7 @@ func _pick_attack(to_player: Vector2) -> AttackKind:
 
 func _commit_attack(to_player: Vector2) -> void:
 	_sprite.modulate = Color.WHITE
+	_spawn_attack_release_fx(to_player)
 	match _pending_kind:
 		AttackKind.LUNGE:
 			_begin_lunge(to_player)
@@ -959,15 +974,16 @@ func _enable_melee_hitbox(scale_x: float) -> void:
 	_attack_has_hit = false
 	_attack_hitbox.monitoring = true
 	_attack_hitbox.monitorable = true
-	_attack_hitbox.scale = Vector2(scale_x, 1.0)
+	_attack_hitbox.scale = Vector2(0.76 * scale_x, 0.72)
 	var facing := 1.0 if _sprite.flip_h else -1.0
-	_attack_hitbox.position.x = 36.0 * facing
+	_attack_hitbox.position = Vector2(58.0 * facing, BASE_ATTACK_HITBOX_POSITION.y)
 
 
 func _disable_melee_hitbox() -> void:
 	_attack_hitbox.set_deferred("monitoring", false)
 	_attack_hitbox.set_deferred("monitorable", false)
-	_attack_hitbox.scale = Vector2.ONE
+	_attack_hitbox.scale = Vector2(0.76, 0.72)
+	_attack_hitbox.position = BASE_ATTACK_HITBOX_POSITION
 
 
 func _on_hurtbox_area_entered(area: Area2D) -> void:
@@ -1042,7 +1058,67 @@ func _on_attack_hit_body(body: Node2D) -> void:
 	_attack_has_hit = true
 	if body.has_method("take_damage"):
 		body.call_deferred("take_damage", _pending_damage, global_position)
+	_spawn_damage_impact(body.global_position, _pending_damage >= 2)
 	_shake_camera(0.28 if _pending_damage >= 2 else 0.16)
+
+
+func _on_contact_body_entered(body: Node2D) -> void:
+	_try_contact_damage(body)
+
+
+func _update_contact_damage() -> void:
+	if _contact_damage_timer > 0.0 or state == State.DORMANT or state == State.DEAD:
+		return
+	for body in _contact_damage_area.get_overlapping_bodies():
+		if body is Node2D and _try_contact_damage(body as Node2D):
+			return
+
+
+func _try_contact_damage(body: Node2D) -> bool:
+	if _contact_damage_timer > 0.0 or state == State.DORMANT or state == State.DEAD:
+		return false
+	if not body.is_in_group("player") or not body.has_method("take_damage"):
+		return false
+	_contact_damage_timer = contact_damage_cooldown
+	body.call_deferred("take_damage", contact_damage, global_position)
+	_spawn_damage_impact(body.global_position, false)
+	_shake_camera(0.12)
+	return true
+
+
+func _spawn_damage_impact(at: Vector2, heavy: bool) -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	PARTICLE_BURST.spawn(
+		scene,
+		at,
+		Color(1.0, 0.38, 0.22, 0.9),
+		18 if heavy else 10,
+		Vector2.UP,
+		38.0,
+		145.0 if heavy else 96.0,
+		0.58
+	)
+
+
+func _spawn_attack_release_fx(to_player: Vector2) -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	var direction := to_player.normalized() if to_player.length_squared() > 0.01 else Vector2.RIGHT
+	var heavy := _pending_damage >= 2
+	var tint := Color(1.0, 0.38, 0.2, 0.92) if heavy else Color(0.32, 0.95, 0.84, 0.9)
+	PARTICLE_BURST.spawn(
+		scene,
+		global_position + Vector2(0.0, -42.0) + direction * 18.0,
+		tint,
+		18 if heavy else 12,
+		direction,
+		44.0,
+		132.0 if heavy else 96.0,
+		0.52
+	)
 
 
 func _die() -> void:
@@ -1053,6 +1129,7 @@ func _die() -> void:
 	collision_mask = 0
 	_hurtbox.set_deferred("monitoring", false)
 	_attack_hitbox.set_deferred("monitoring", false)
+	_contact_damage_area.set_deferred("monitoring", false)
 	if _telegraph:
 		_telegraph.visible = false
 	_spawn_death_motes()
@@ -1092,6 +1169,7 @@ func restore_defeated() -> void:
 	_hurtbox.set_deferred("monitoring", false)
 	_attack_hitbox.set_deferred("monitoring", false)
 	_attack_hitbox.set_deferred("monitorable", false)
+	_contact_damage_area.set_deferred("monitoring", false)
 	_sprite.hide()
 	if _telegraph:
 		_telegraph.visible = false
@@ -1117,11 +1195,16 @@ func _build_telegraph() -> void:
 func _update_telegraph(to_player: Vector2) -> void:
 	if _telegraph == null or not _telegraph.has_method("set_preview"):
 		return
-	if state != State.WINDUP:
-		_telegraph.call("set_preview", -1, Vector2.ZERO, 0.0)
+	if state == State.WINDUP:
+		var progress := 1.0 - clampf(_state_timer / maxf(_windup_duration, 0.01), 0.0, 1.0)
+		_telegraph.call("set_preview", int(_pending_kind), to_player.normalized(), progress, false)
 		return
-	var progress := 1.0 - clampf(_state_timer / 0.72, 0.0, 1.0)
-	_telegraph.call("set_preview", int(_pending_kind), to_player.normalized(), progress)
+	if state == State.LUNGE or state == State.SWEEP:
+		var active_kind := AttackKind.LUNGE if state == State.LUNGE else AttackKind.SWEEP
+		var facing := Vector2.RIGHT if _sprite.flip_h else Vector2.LEFT
+		_telegraph.call("set_preview", int(active_kind), facing, 1.0, true)
+		return
+	_telegraph.call("set_preview", -1, Vector2.ZERO, 0.0, false)
 
 
 func _spawn_death_motes() -> void:
