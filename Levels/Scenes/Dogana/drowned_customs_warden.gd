@@ -9,6 +9,7 @@ const PROJECTILE_SCRIPT := preload("res://Enemies/enemy_projectile.gd")
 const TELEGRAPH_SCRIPT := preload("res://Levels/Scenes/Dogana/boss_telegraph.gd")
 const FOOTSTEP_DUST := preload("res://Fx/footstep_dust.gd")
 const FLOOD_SURGE_SCRIPT := preload("res://Levels/Scenes/Dogana/boss_flood_surge.gd")
+const BOSS_ATTACK_FX_SCRIPT := preload("res://Levels/Scenes/Dogana/boss_attack_fx.gd")
 
 const MAX_BOSS_TRANSIENTS := 72
 const BASE_SPRITE_POSITION := Vector2(0.0, -96.0)
@@ -513,6 +514,7 @@ func _begin_windup(to_player: Vector2) -> void:
 			_pending_damage = heavy_attack_damage
 			_sprite.modulate = Color(0.3, 0.66, 1.15, 1.0)
 	_windup_duration = _state_timer
+	_spawn_charge_fx(to_player)
 
 
 func _pick_attack(to_player: Vector2) -> AttackKind:
@@ -1100,6 +1102,10 @@ func _spawn_damage_impact(at: Vector2, heavy: bool) -> void:
 		145.0 if heavy else 96.0,
 		0.58
 	)
+	var impact_fx := BOSS_ATTACK_FX_SCRIPT.new() as Node2D
+	impact_fx.call("setup", Vector2.UP, Color(1.0, 0.32, 0.18, 1.0), heavy, 1)
+	scene.add_child(impact_fx)
+	impact_fx.global_position = at
 
 
 func _spawn_attack_release_fx(to_player: Vector2) -> void:
@@ -1119,6 +1125,23 @@ func _spawn_attack_release_fx(to_player: Vector2) -> void:
 		132.0 if heavy else 96.0,
 		0.52
 	)
+	var release_fx := BOSS_ATTACK_FX_SCRIPT.new() as Node2D
+	release_fx.call("setup", direction, tint, heavy, 0)
+	scene.add_child(release_fx)
+	release_fx.global_position = global_position + Vector2(0.0, -42.0) + direction * 18.0
+
+
+func _spawn_charge_fx(to_player: Vector2) -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	var direction := to_player.normalized() if to_player.length_squared() > 0.01 else Vector2.RIGHT
+	var heavy := _pending_damage >= 2
+	var tint := Color(1.0, 0.5, 0.18, 1.0) if heavy else Color(0.3, 0.9, 1.0, 1.0)
+	var charge_fx := BOSS_ATTACK_FX_SCRIPT.new() as Node2D
+	charge_fx.call("setup", direction, tint, heavy, 2)
+	scene.add_child(charge_fx)
+	charge_fx.global_position = global_position + Vector2(0.0, -64.0)
 
 
 func _die() -> void:

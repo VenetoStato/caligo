@@ -82,10 +82,18 @@ func _physics_process(delta: float) -> void:
 
 
 func _draw() -> void:
+	var side := direction.orthogonal()
 	for index in range(_trail.size() - 1, -1, -1):
 		var alpha := (1.0 - float(index) / maxf(1.0, _trail.size())) * 0.28
 		draw_circle(_trail[index], radius * (0.35 + alpha), Color(tint.r, tint.g, tint.b, alpha))
 	draw_circle(Vector2.ZERO, radius * 1.7, Color(tint.r, tint.g, tint.b, 0.14))
+	draw_arc(Vector2.ZERO, radius * 1.32, direction.angle() - 1.55, direction.angle() + 1.55, 12, Color(tint.r, tint.g, tint.b, 0.6), 1.25, true)
+	draw_colored_polygon(PackedVector2Array([
+		direction * radius * 1.7,
+		side * radius * 0.78,
+		-direction * radius * 0.62,
+		-side * radius * 0.78,
+	]), Color(tint.r, tint.g, tint.b, 0.24))
 	draw_circle(Vector2.ZERO, radius, tint)
 	draw_circle(-direction * radius * 0.25, radius * 0.32, Color(0.94, 1.0, 0.83, 0.9))
 
