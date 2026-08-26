@@ -2621,6 +2621,17 @@ func _update_fish_struggle(delta: float):
 		_fishing_feedback_timer = 0.16 if not fish_struggle_active else 0.11
 
 	var fish_out := _is_current_fish_out_of_water()
+	var corpse_bait := current_fish.has_method("is_bait_carcass") and bool(current_fish.call("is_bait_carcass"))
+	if corpse_bait:
+		# Una carcassa non lotta e non deve entrare nella finestra di struggle:
+		# altrimenti _reel_fish_to_player tornava subito senza applicare il tiro.
+		fish_struggle_active = false
+		fish_escape_timer = 0.0
+		if current_fish.has_method("set_wrong_reel"):
+			current_fish.call("set_wrong_reel", false)
+		if is_reeling:
+			_fish_reel_progress = minf(1.25, _fish_reel_progress + reel_progress_per_second * delta)
+		return
 	# Fuori acqua / in uscita: niente lotta ne' fuga — solo issaggio.
 	if fish_out or _fish_catch_jump_done:
 		if fish_struggle_active:

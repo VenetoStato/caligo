@@ -342,6 +342,13 @@ func _physics_process(delta: float):
 	elif is_hooked_to_player:
 		_start_hanging_out_of_water()
 		_process_hooked_out_of_water(delta)
+	elif _bait_target_active:
+		# Il predatore nasce fuori dai limiti della laguna: resta comunque in
+		# modalità nuoto mentre raggiunge la carcassa, senza essere fatto cadere
+		# dal ramo "fuori acqua" o bloccato dal clamp dei bordi.
+		in_water = true
+		_set_hanging(false)
+		_process_swimming(delta)
 	else:
 		_set_hanging(false)
 		_process_falling(delta)
@@ -463,7 +470,10 @@ func _process_swimming(delta: float):
 		# Il predatore entra dalla profondità/fuori campo e punta rapidamente alla
 		# carcassa, senza richiedere un amo per restare in inseguimento.
 		var bait_dir := (_bait_target - global_position).normalized()
-		desired = bait_dir * attraction_speed * 2.4
+		# Arrivo prioritario: il predatore deve attraversare rapidamente il bordo
+		# fuori campo, senza essere rallentato dal normale nuoto.
+		var bait_speed := maxf(attraction_speed * 4.2, 300.0)
+		desired = bait_dir * bait_speed
 		if global_position.distance_to(_bait_target) < 42.0:
 			_bait_target_active = false
 			_bait_linger_timer = 6.0

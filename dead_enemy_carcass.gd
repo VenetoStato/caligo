@@ -65,7 +65,9 @@ func apply_reel_force(force: Vector2) -> void:
 		elif lift > MAX_REEL_LIFT * 0.55 and limited.y < 0.0:
 			var remaining := inverse_lerp(MAX_REEL_LIFT, MAX_REEL_LIFT * 0.55, lift)
 			limited.y *= clampf(remaining, 0.0, 1.0)
-	apply_central_force(limited * 1.15)
+	# Peso maggiore dell'esca normale, ma abbastanza trazione da vincere la
+	# gravità ridotta dell'acqua quando il giocatore la reel-a.
+	apply_central_force(limited * 1.45)
 
 func pull_along_line(anchor: Vector2, haul: float, _allow_exit := false) -> void:
 	var to_anchor := anchor - global_position
