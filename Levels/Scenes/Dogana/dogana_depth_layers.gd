@@ -440,7 +440,7 @@ func _spawn_collision_rain_drop() -> void:
 		if collider != null and collider is Node and (collider as Node).is_in_group("water"):
 			# Each streak penetrates the surface by a slightly different amount.
 			# The ripple itself remains anchored to WaterBody's physical surface.
-			target.y += randf_range(4.0, 13.0)
+			target.y += randf_range(3.0, 18.0)
 
 	var drop := Line2D.new()
 	drop.name = "RainDrop"

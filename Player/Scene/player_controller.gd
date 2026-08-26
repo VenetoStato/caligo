@@ -121,6 +121,10 @@ signal locked_skill_requested
 @export var heavy_reel_player_speed := 610.0
 @export var heavy_reel_acceleration := 1900.0
 @export var heavy_power_ready_distance := 96.0
+@export var light_hook_drag_speed := 58.0
+@export var light_hook_drag_acceleration := 360.0
+@export var heavy_hook_drag_speed := 245.0
+@export var heavy_hook_drag_acceleration := 1250.0
 const POWER_STRIKE_TINT := Color(1.0, 0.72, 0.3, 1.0)
 
 @export_category("Offsets")
@@ -2099,6 +2103,10 @@ func _process_fishing(delta: float):
 	_update_power_strike_tint()
 	if enemy_hooked and not is_instance_valid(current_hooked_enemy):
 		_release_hooked_enemy(false)
+	if enemy_hooked and is_instance_valid(current_hooked_enemy):
+		if current_hooked_enemy.has_method("set_combat_hook_reeling"):
+			current_hooked_enemy.call("set_combat_hook_reeling", is_reeling)
+		_apply_enemy_hook_resistance(delta)
 	if line_extended and hook_instance:
 		_update_line_length(delta)
 		_sync_hook_to_rope(delta)
@@ -2382,6 +2390,37 @@ func _reel_enemy_to_player(delta: float, pull_ratio := 1.0) -> void:
 	current_hooked_enemy.call("apply_combat_hook_pull", rod, enemy_reel_pull_speed * pull_ratio)
 	if dist <= enemy_reel_finish_distance:
 		_land_reeled_enemy()
+
+
+func _apply_enemy_hook_resistance(delta: float) -> void:
+	if not enemy_hooked or not is_instance_valid(current_hooked_enemy):
+		return
+	var to_enemy := current_hooked_enemy.global_position - global_position
+	var distance := to_enemy.length()
+	if distance <= 0.01:
+		return
+	# A little slack remains after attachment. Drag ramps in progressively as
+	# the enemy moves away instead of snapping the player on the first frame.
+	var taut_ratio := distance / maxf(current_line_length, 1.0)
+	var tension := smoothstep(0.86, 1.08, taut_ratio)
+	if tension <= 0.0:
+		return
+	var heavy := bool(current_hooked_enemy.call("is_combat_hook_heavy"))
+	var direction := to_enemy / distance
+	var enemy_escape_speed := maxf(current_hooked_enemy.velocity.dot(direction), 0.0)
+	var drag_speed := (
+		minf(heavy_hook_drag_speed + enemy_escape_speed * 0.38, heavy_hook_drag_speed * 1.35)
+		if heavy else
+		minf(light_hook_drag_speed + enemy_escape_speed * 0.18, light_hook_drag_speed * 1.3)
+	)
+	var acceleration := heavy_hook_drag_acceleration if heavy else light_hook_drag_acceleration
+	velocity.x = move_toward(velocity.x, direction.x * drag_speed, acceleration * tension * delta)
+	# Heavy targets pull in their actual direction. Light ones mostly scuff the
+	# player horizontally and only influence Y while airborne.
+	if heavy and (not is_on_floor() or absf(to_enemy.y) > 34.0):
+		velocity.y = move_toward(velocity.y, direction.y * drag_speed, acceleration * 0.62 * tension * delta)
+	elif not heavy and not is_on_floor():
+		velocity.y = move_toward(velocity.y, direction.y * drag_speed * 0.18, acceleration * 0.12 * tension * delta)
 
 
 ## Il nemico tirato sotto la canna arriva sbilanciato e resta scoperto: e'

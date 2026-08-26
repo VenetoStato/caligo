@@ -79,6 +79,8 @@ enum AttackPattern {
 @export var combat_hook_heavy := false
 @export var combat_hook_launch_speed := 560.0
 @export var combat_hook_power_launch_speed := 760.0
+@export_range(0.2, 1.5, 0.05) var combat_hook_escape_ratio := 0.95
+@export_range(0.2, 1.2, 0.05) var combat_hook_heavy_escape_ratio := 0.62
 
 @export_category("Visual")
 @export var sprite_node: Node2D = null
@@ -145,6 +147,7 @@ var _patrol_pause := 0.0
 var _step_cycle := 0.0
 var _combat_hook_owner: Node2D = null
 var _combat_hook_pull_velocity := Vector2.ZERO
+var _combat_hook_reel_active := false
 
 const PATROL_TURN_INTERVAL := 0.38
 const CHASE_TURN_INTERVAL := 0.28
@@ -347,8 +350,9 @@ func _physics_process(delta: float) -> void:
 		return
 	_patrol_turn_cooldown = maxf(0.0, _patrol_turn_cooldown - delta)
 	_chase_switch_cooldown = maxf(0.0, _chase_switch_cooldown - delta)
-	# La lenza prende temporaneamente il controllo del moto. I pesanti si piantano
-	# a terra; i leggeri seguono una velocita' fisica verso la canna.
+	# La lenza limita il combattimento, ma non cancella la volonta' di movimento.
+	# L'avversario continua a fuggire e la tensione risultante viene trasferita
+	# al player dal controller della pesca.
 	if _stagger_timer > 0.0 and not _combat_hooked:
 		_stagger_timer = maxf(0.0, _stagger_timer - delta)
 		velocity.x = move_toward(velocity.x, 0.0, move_friction * 1.6 * delta)
@@ -371,13 +375,7 @@ func _physics_process(delta: float) -> void:
 		if not sprite_node.modulate.is_equal_approx(_original_modulate) and _hit_flash_timer <= 0.0:
 			sprite_node.modulate = sprite_node.modulate.lerp(_original_modulate, delta * 6.0)
 	if _combat_hooked:
-		if combat_hook_heavy:
-			velocity.x = move_toward(velocity.x, 0.0, move_friction * 2.5 * delta)
-		else:
-			velocity.x = move_toward(velocity.x, _combat_hook_pull_velocity.x, 1250.0 * delta)
-			velocity.y = move_toward(velocity.y, _combat_hook_pull_velocity.y, 1050.0 * delta)
-		if not hovering:
-			velocity.y += gravity * 0.55 * delta
+		_update_combat_hook_escape(delta)
 		move_and_slide()
 		queue_redraw()
 		return
@@ -1152,8 +1150,7 @@ func begin_combat_hook(owner: Node2D) -> bool:
 	_combat_hooked = true
 	_combat_hook_owner = owner
 	_combat_hook_pull_velocity = Vector2.ZERO
-	if combat_hook_heavy:
-		velocity.x = 0.0
+	_combat_hook_reel_active = false
 	state = State.AGGRO
 	player = owner
 	_special_windup_remaining = 0.0
@@ -1189,7 +1186,44 @@ func apply_combat_hook_pull(target: Vector2, pull_speed: float) -> bool:
 	# attraversare soffitti o piattaforme sottili.
 	direction.y = minf(direction.y, -0.18)
 	_combat_hook_pull_velocity = direction.normalized() * pull_speed
+	_combat_hook_reel_active = pull_speed > 0.0
 	return true
+
+
+func set_combat_hook_reeling(active: bool) -> void:
+	_combat_hook_reel_active = active
+	if not active:
+		_combat_hook_pull_velocity = Vector2.ZERO
+
+
+func _update_combat_hook_escape(delta: float) -> void:
+	if _combat_hook_owner == null or not is_instance_valid(_combat_hook_owner):
+		release_combat_hook()
+		return
+	var away := global_position - _combat_hook_owner.global_position
+	var escape_sign := signf(away.x)
+	if is_zero_approx(escape_sign):
+		escape_sign = 1.0 if facing_right else -1.0
+	var escape_ratio := combat_hook_heavy_escape_ratio if combat_hook_heavy else combat_hook_escape_ratio
+	var escape_x := escape_sign * move_speed * escape_ratio
+	var target_x := escape_x
+	if _combat_hook_reel_active and not combat_hook_heavy:
+		# The enemy still pushes against the reel; the player's pull wins only
+		# when its force exceeds this escape intent.
+		target_x += _combat_hook_pull_velocity.x
+	velocity.x = move_toward(velocity.x, target_x, move_acceleration * 1.45 * delta)
+	if hovering:
+		var hover_target := _home_position.y + sin(Time.get_ticks_msec() * 0.0032) * 7.0
+		var target_y := clampf((hover_target - global_position.y) * 3.2, -45.0, 45.0)
+		if _combat_hook_reel_active and not combat_hook_heavy:
+			target_y += _combat_hook_pull_velocity.y
+		velocity.y = move_toward(velocity.y, target_y, move_acceleration * 1.2 * delta)
+	else:
+		velocity.y += gravity * 0.72 * delta
+	facing_right = velocity.x >= 0.0
+	if sprite_node:
+		sprite_node.flip_h = not facing_right
+	_sync_locomotion_clip()
 
 
 func release_combat_hook(launch_direction := Vector2.ZERO, powered := false) -> void:
@@ -1198,6 +1232,7 @@ func release_combat_hook(launch_direction := Vector2.ZERO, powered := false) -> 
 	_combat_hooked = false
 	_combat_hook_owner = null
 	_combat_hook_pull_velocity = Vector2.ZERO
+	_combat_hook_reel_active = false
 	if state == State.DEAD:
 		return
 	if not combat_hook_heavy and launch_direction.length_squared() > 0.01:

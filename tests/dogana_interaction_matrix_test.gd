@@ -34,6 +34,8 @@ func _ready() -> void:
 	if _failed: return
 	_check_heavy_enemy_resistance()
 	if _failed: return
+	_check_hooked_enemy_drag()
+	if _failed: return
 	_check_timed_power_attack()
 	if _failed: return
 	_check_collision_visuals_hidden()
@@ -236,6 +238,41 @@ func _check_heavy_enemy_resistance() -> void:
 	_player.set("is_reeling", false)
 	if bool(_player.get("enemy_hooked")) or bool(heavy.call("is_combat_hooked")):
 		_fail("heavy enemy could not be detached")
+
+
+func _check_hooked_enemy_drag() -> void:
+	var light := _level.get_node("Gameplay/Encounters/GamberoWedge") as CharacterBody2D
+	light.call("reset_to_home")
+	light.set_physics_process(false)
+	_player.global_position = light.global_position + Vector2(-190.0, 0.0)
+	_player.velocity = Vector2.ZERO
+	light.velocity = Vector2(90.0, 0.0)
+	light.call("begin_combat_hook", _player)
+	_player.set("current_hooked_enemy", light)
+	_player.set("enemy_hooked", true)
+	_player.set("current_line_length", 145.0)
+	_player.call("_apply_enemy_hook_resistance", 0.1)
+	var light_drag := absf(_player.velocity.x)
+	_player.call("_release_hooked_enemy", false)
+	if light_drag < 12.0 or light_drag > 70.0:
+		_fail("light hooked enemy drag is not subtle: %.2f" % light_drag)
+		return
+
+	var heavy := _level.get_node("Gameplay/Encounters/TideBloaterCanal") as CharacterBody2D
+	heavy.call("reset_to_home")
+	heavy.set_physics_process(false)
+	_player.global_position = heavy.global_position + Vector2(-190.0, 0.0)
+	_player.velocity = Vector2.ZERO
+	heavy.velocity = Vector2(55.0, 0.0)
+	heavy.call("begin_combat_hook", _player)
+	_player.set("current_hooked_enemy", heavy)
+	_player.set("enemy_hooked", true)
+	_player.set("current_line_length", 145.0)
+	_player.call("_apply_enemy_hook_resistance", 0.1)
+	var heavy_drag := absf(_player.velocity.x)
+	_player.call("_release_hooked_enemy", false)
+	if heavy_drag < light_drag * 2.0:
+		_fail("heavy hooked enemy did not pull harder: light %.2f, heavy %.2f" % [light_drag, heavy_drag])
 
 
 func _check_timed_power_attack() -> void:

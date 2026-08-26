@@ -55,8 +55,9 @@ void fragment() {
 	// world-space waterline supplied by dogana_depth_layers.gd.
 	// A shallow, smoothly varying penetration avoids revealing the water mask
 	// as one perfectly straight cutoff line.
-	float waterline_variation = (waterline_noise(uv.x * 38.0) - 0.5) * 0.012;
-	float local_waterline = waterline_uv + 0.009 + waterline_variation;
+	float broad_variation = (waterline_noise(uv.x * 13.0 + 4.7) - 0.5) * 0.012;
+	float fine_variation = (waterline_noise(uv.x * 47.0) - 0.5) * 0.011;
+	float local_waterline = waterline_uv + 0.012 + broad_variation + fine_variation;
 	float above_water = 1.0 - smoothstep(
 		local_waterline - waterline_softness,
 		local_waterline + waterline_softness,
