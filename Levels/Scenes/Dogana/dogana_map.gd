@@ -51,6 +51,10 @@ func _style_map_glyph() -> void:
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# La scena principale salva questo CanvasLayer nascosto per non coprire la
+	# viewport dell'editor. In gioco deve riattivarsi autonomamente: altrimenti M
+	# metteva in pausa con l'overlay figlio visibile dentro un parent invisibile.
+	visible = true
 	_overlay.visible = false
 	_map_button.pressed.connect(toggle_map)
 	_style_map_glyph()
@@ -111,12 +115,14 @@ func open_map() -> void:
 	if reader and reader.has_method("close_entry"):
 		reader.call("close_entry")
 	_was_paused = get_tree().paused
-	get_tree().paused = true
+	visible = true
 	_overlay.visible = true
-	_overlay.modulate.a = 0.0
+	_overlay.modulate.a = 1.0
 	$Overlay/Frame.scale = Vector2(0.96, 0.96)
+	# Pausa soltanto dopo che l'intera gerarchia CanvasLayer -> Overlay e' stata
+	# resa visibile. Anche senza tween non puo' piu' esistere un freeze "cieco".
+	get_tree().paused = true
 	var tween := create_tween().set_parallel(true)
-	tween.tween_property(_overlay, "modulate:a", 1.0, 0.2)
 	tween.tween_property($Overlay/Frame, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK)
 	_refresh()
 	if _canvas.has_method("set_map_state"):
