@@ -1002,6 +1002,11 @@ func _input(event):
 			return
 	
 	if event.is_action_pressed("cast"):
+		# Un cadavere è un oggetto/esca persistente, non una cattura: F una
+		# seconda volta lo lascia esattamente dove si trova.
+		if line_extended and fish_hooked and _is_bait_carcass(current_fish):
+			_drop_hooked_carcass()
+			return
 		# F di nuovo sgancia subito un enemy: la canna non puo' restare bloccata
 		# su un pesante o su un bersaglio che non si vuole piu' trascinare.
 		if line_extended and enemy_hooked:
@@ -2734,6 +2739,10 @@ func _on_fish_lost(_escaped: bool):
 			hook_instance.call("show_hook")
 
 func _can_finish_fish_catch(dist: float) -> bool:
+	# Le carcasse restano nel mondo e possono essere riutilizzate come esca.
+	# Non devono mai passare dal premio/catch che elimina i pesci vivi.
+	if _is_bait_carcass(current_fish):
+		return false
 	if fish_struggle_active:
 		return false
 	if _fish_hooked_time < min_hooked_time_before_catch:
@@ -2908,6 +2917,8 @@ func _tether_fish_to_line(rod: Vector2, max_len: float) -> void:
 
 func _complete_fish_catch(fish: Node2D) -> void:
 	if fish == null or not is_instance_valid(fish):
+		return
+	if _is_bait_carcass(fish):
 		return
 	var health_before := current_health
 	heal(fish_health_reward)
@@ -3118,6 +3129,24 @@ func release_fish():
 		if is_instance_valid(current_fish) and current_fish.has_method("release_from_hook"):
 			current_fish.call("release_from_hook")
 		_on_fish_lost(false)
+
+
+func _is_bait_carcass(target: Node) -> bool:
+	return (
+		target != null
+		and is_instance_valid(target)
+		and target.has_method("is_bait_carcass")
+		and bool(target.call("is_bait_carcass"))
+	)
+
+
+func _drop_hooked_carcass() -> void:
+	if not fish_hooked or not _is_bait_carcass(current_fish):
+		return
+	if current_fish.has_method("release_from_hook"):
+		current_fish.call("release_from_hook")
+	_on_fish_lost(false)
+	_destroy_hook()
 
 func retract_line():
 	if line_extended:
