@@ -37,6 +37,11 @@ const ATMOSPHERE_TUNING := [
 	{"key": "fog_opacity", "label": "Opacita nebbia", "min": 0.0, "max": 1.0, "step": 0.01},
 	{"key": "fog_opacity_pulse", "label": "Respiro nebbia", "min": 0.0, "max": 0.5, "step": 0.01},
 	{"key": "fog_vertical_drift", "label": "Deriva nebbia", "min": 0.0, "max": 30.0, "step": 0.5},
+	{"key": "foreground_fog_opacity", "label": "Nebbia frontale — opacita", "min": 0.0, "max": 1.0, "step": 0.01},
+	{"key": "foreground_fog_opacity_pulse", "label": "Nebbia frontale — respiro", "min": 0.0, "max": 0.2, "step": 0.01},
+	{"key": "foreground_fog_blur", "label": "Nebbia frontale — blur", "min": 0.0, "max": 40.0, "step": 0.5},
+	{"key": "foreground_fog_horizontal_drift", "label": "Nebbia frontale — deriva X", "min": 0.0, "max": 30.0, "step": 0.5},
+	{"key": "foreground_fog_drift", "label": "Nebbia frontale — deriva Y", "min": 0.0, "max": 30.0, "step": 0.5},
 	{"key": "rain_intensity", "label": "Intensita pioggia", "min": 0.0, "max": 1.0, "step": 0.01},
 	{"key": "rain_speed", "label": "Velocita pioggia", "min": 0.1, "max": 3.0, "step": 0.05},
 	{"key": "rain_wind", "label": "Vento pioggia", "min": -1.0, "max": 1.0, "step": 0.01},
@@ -193,7 +198,7 @@ func _build_window() -> void:
 		_add_slider(box, setting, true)
 
 	var atmosphere_title := Label.new()
-	atmosphere_title.text = "ATMOSFERA — nebbia e sfocatura lontana"
+	atmosphere_title.text = "ATMOSFERA — nebbia lontana + frontale"
 	atmosphere_title.add_theme_font_size_override("font_size", 13)
 	atmosphere_title.add_theme_color_override("font_color", Color(0.55, 0.82, 1.0, 1.0))
 	box.add_child(atmosphere_title)

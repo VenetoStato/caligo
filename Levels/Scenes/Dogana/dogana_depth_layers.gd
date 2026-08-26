@@ -25,6 +25,9 @@ const CITY_RAIN_SHADER := preload("res://Levels/Scenes/Dogana/city_rain.gdshader
 @export_range(0.0, 0.5, 0.01) var fog_opacity_pulse := 0.07
 @export_range(0.0, 30.0, 0.5) var fog_vertical_drift := 9.0
 @export_range(0.0, 1.0, 0.01) var foreground_fog_opacity := 0.28
+@export_range(0.0, 1.0, 0.01) var foreground_fog_opacity_pulse := 0.025
+@export_range(0.0, 40.0, 0.5) var foreground_fog_blur := 20.0
+@export_range(0.0, 30.0, 0.5) var foreground_fog_horizontal_drift := 8.0
 @export_range(0.0, 30.0, 0.5) var foreground_fog_drift := 11.0
 @export var rain_enabled := false
 @export_range(0.0, 1.0, 0.01) var rain_intensity := 0.62
@@ -140,10 +143,10 @@ func _process(delta: float) -> void:
 	if _foreground_fog:
 		# Opposite drift and phase to the distant veil: the two planes separate
 		# perceptually instead of sliding as one painted background.
-		_foreground_fog.position.x -= sin(t * 0.11) * delta * 8.0
+		_foreground_fog.position.x -= sin(t * 0.11) * delta * foreground_fog_horizontal_drift
 		_foreground_fog.position.y = sin(t * 0.17 + 2.35) * foreground_fog_drift
 		_foreground_fog.modulate.a = clampf(
-			fog_opacity * foreground_fog_opacity - sin(t * 0.13) * fog_opacity_pulse * 0.35,
+			fog_opacity * foreground_fog_opacity - sin(t * 0.13) * foreground_fog_opacity_pulse,
 			0.0,
 			1.0
 		)
@@ -334,7 +337,7 @@ func _build_foreground_fog() -> Node2D:
 		sprite.texture = DISTANT_LAGOON_FOG
 		sprite.flip_h = true
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		sprite.material = _make_distant_soft_focus(maxf(12.0, distant_fog_blur * 0.72), 0.13)
+		sprite.material = _make_distant_soft_focus(foreground_fog_blur, 0.13)
 		sprite.position = Vector2(360.0 + index * 1420.0, 438.0)
 		sprite.scale = Vector2(0.86, 0.86)
 		layer.add_child(sprite)
@@ -358,7 +361,7 @@ func apply_atmosphere_tuning() -> void:
 	_set_layer_blur(_distant_dogana, distant_dogana_blur)
 	_set_layer_blur(_distant_ships, distant_ships_blur)
 	_set_layer_blur(_distant_fog, distant_fog_blur)
-	_set_layer_blur(_foreground_fog, maxf(12.0, distant_fog_blur * 0.72))
+	_set_layer_blur(_foreground_fog, foreground_fog_blur)
 	if _distant_fog:
 		_distant_fog.modulate.a = fog_opacity
 	if _rain_overlay:
