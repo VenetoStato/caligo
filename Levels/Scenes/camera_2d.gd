@@ -200,6 +200,13 @@ func _apply_postfx_params() -> void:
 	_post_mat.set_shader_parameter("u_exposure", exposure)
 	_post_mat.set_shader_parameter("u_sharpen", sharpen)
 
+
+## Punto di ingresso per il pannello debug: applica subito i valori allo shader
+## senza aspettare il ciclo di camera successivo.
+func apply_postfx_tuning() -> void:
+	_postfx_dirty = true
+	_apply_postfx_params()
+
 func _process(delta: float) -> void:
 	if _target == null:
 		return

@@ -84,7 +84,7 @@ func _create_title():
 	center.add_child(title_group)
 
 	var eyebrow := Label.new()
-	eyebrow.text = "UNA STORIA DI PESCA NELLA NEBBIA"
+	eyebrow.text = "UNA STORIA NELLA NEBBIA"
 	eyebrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	eyebrow.add_theme_font_override("font", BODY_FONT)
 	eyebrow.add_theme_font_size_override("font_size", 13)

@@ -1,3 +1,4 @@
+@tool
 extends Node2D
 ## Spine da pontile. L'arte è sostituibile dalla disegnatrice: hitbox restano qui.
 
@@ -84,6 +85,8 @@ func _build_hurtboxes() -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	if Engine.is_editor_hint():
+		return
 	if _hazard == null:
 		return
 	for body in _hazard.get_overlapping_bodies():

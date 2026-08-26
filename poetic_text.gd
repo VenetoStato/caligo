@@ -154,7 +154,7 @@ func _create_text_display():
 
 	var poetic_text_english_normal = Label.new()
 	poetic_text_english_normal.name = "PoeticTextEnglishNormal"
-	poetic_text_english_normal.text = "From the fog of the swamp, a bundle began to move"
+	poetic_text_english_normal.text = "雾中的包裹开始苏醒"
 	poetic_text_english_normal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	poetic_text_english_normal.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	poetic_text_english_normal.add_theme_font_override("font", BODY_FONT)

@@ -1,4 +1,4 @@
-[gd_scene load_steps=41 format=3 uid="uid://3ccaqnqh276l"]
+[gd_scene load_steps=40 format=3 uid="uid://3ccaqnqh276l"]
 
 [ext_resource type="Script" uid="uid://b6j5qjydisr3v" path="res://Levels/Scenes/Dogana/dogana_level.gd" id="1_level"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/dogana_environment.tscn" id="2_environment"]
@@ -29,7 +29,6 @@
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/lore_lectern.tscn" id="32_lore_lectern"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/lore_reader.tscn" id="33_lore_reader"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/pogo_thorn.tscn" id="34_thorn"]
-[ext_resource type="PackedScene" path="res://UI/feel_debug_panel.tscn" id="35_feel"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/wooden_ledge.tscn" id="36_ledge"]
 
 [sub_resource type="RectangleShape2D" id="GroundArrivalWest"]
@@ -119,9 +118,6 @@ visible = false
 [node name="TutorialHints" parent="." instance=ExtResource("20_tutorial")]
 visible = false
 
-[node name="FeelDebugPanel" parent="." instance=ExtResource("35_feel")]
-visible = false
-
 [node name="ArrivalCutscene" parent="." instance=ExtResource("28_arrival")]
 
 [node name="Environment" parent="." instance=ExtResource("2_environment")]
@@ -201,6 +197,9 @@ collision_mask = 2
 shape = SubResource("BossArenaWall")
 disabled = true
 
+[node name="FishingWellMarker" type="Marker2D" parent="Gameplay" groups=["dogana_fishing_well"]]
+position = Vector2(330, 500)
+
 [node name="Breakables" type="Node2D" parent="Gameplay" groups=["dogana_breakable_route"]]
 
 [node name="ArrivalCache" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
@@ -225,7 +224,7 @@ hits_required = 2
 visual_variant = 2
 
 [node name="CustomsCrate" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
-position = Vector2(2140, 471)
+position = Vector2(2137, 492)
 hits_required = 2
 
 [node name="CanalCrate" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
@@ -243,8 +242,8 @@ visual_variant = 1
 [node name="GiudeccaBasin" type="Area2D" parent="Gameplay/WaterBasins" groups=["water"]]
 script = ExtResource("7_water")
 depth = 430.0
-fish_count = 0
-tutorial_fish_count = 0
+fish_count = 9
+tutorial_fish_count = 3
 tutorial_fish_center_ratio = 0.48
 
 [node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Gameplay/WaterBasins/GiudeccaBasin"]
@@ -404,12 +403,12 @@ disabled = true
 [node name="Interactions" type="Node2D" parent="Gameplay" groups=["dogana_interactions"]]
 
 [node name="RegistroMerci" parent="Gameplay/Interactions" instance=ExtResource("32_lore_lectern")]
-position = Vector2(2440, 485)
+position = Vector2(2430, 434)
 entry_title = "Registro delle merci sommerse"
 entry_text = "Anno 1631. Le navi in quarantena scaricarono sale, spezie e una cassa senza sigillo. Il doganiere che la aprì annotò soltanto: 'il mare era già dentro'. La riga successiva è stata cancellata con cera turchese."
 
 [node name="LibroLonghena" parent="Gameplay/Interactions" instance=ExtResource("32_lore_lectern")]
-position = Vector2(4050, 485)
+position = Vector2(4050, 435)
 scale = Vector2(0.92, 0.92)
 entry_title = "Taccuino di Baldassare"
 entry_text = "La Salute non guarda la Punta: la trattiene. Otto lati, otto spinte contro l'acqua. Fra i conti della fabbrica compare ogni mese una voce impossibile: 'una campana restituita dalla laguna'."
@@ -539,7 +538,7 @@ position = Vector2(5260, -500)
 [node name="Collectibles" type="Node2D" parent="Gameplay" groups=["dogana_collectibles"]]
 
 [node name="LeonePontile" parent="Gameplay/Collectibles" groups=["dogana_collectible_grounded"] instance=ExtResource("9_collectible")]
-position = Vector2(1050, 460)
+position = Vector2(1076, 401)
 prop_id = "dogana_leone_pontile"
 
 [node name="Player" parent="." instance=ExtResource("4_player")]

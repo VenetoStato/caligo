@@ -723,6 +723,7 @@ func _draw():
 
 func _on_nail_connect(target: Node) -> void:
 	var heavy := _current_attack_damage >= 2
+	_spawn_attack_impact_blur(target)
 	var freeze := 0.055 if heavy else 0.04
 	_hitstop_timer = maxf(_hitstop_timer, freeze)
 	if target.has_method("apply_hitstop"):
@@ -744,6 +745,17 @@ func _on_nail_connect(target: Node) -> void:
 	velocity.x = away * (192.0 if heavy else 174.0)
 	_knockback_timer = maxf(_knockback_timer, 0.1)
 	_request_shake(0.12)
+
+
+## Il blur e' applicato alle particelle generate quando la canna connette,
+## incluso il pogo. Corpo, hitbox e fisica del player restano invariati.
+func _spawn_attack_impact_blur(target: Node) -> void:
+	if not particles_on_attack or black_particle_scene == null:
+		return
+	var impact_pos := global_position + _attack_dir.normalized() * 26.0
+	if target is Node2D:
+		impact_pos = (target as Node2D).global_position
+	_spawn_particles(impact_pos, _attack_dir, 0.4, 8, true)
 
 
 func _apply_pogo() -> void:
@@ -807,6 +819,13 @@ func _draw_attack_slash() -> void:
 		a0 = 0.75
 		a1 = 2.35
 	var width := 4.2 if empowered else 3.4
+	# Tre impronte sfalsate danno al colpo una scia morbida e leggibile, non un
+	# contorno sterile. Restano solo per la finestra attiva del colpo.
+	var blur_dir := Vector2(-facing * (1.0 - t) * 11.0, 4.0 if _attack_dir.y > 0.5 else 0.0)
+	for blur_step in range(3, 0, -1):
+		var ghost_alpha := fade * 0.055 * float(4 - blur_step)
+		var ghost_origin := origin + blur_dir * float(blur_step) * 0.34
+		_draw_mirrored_arc(ghost_origin, reach, a0, a1, facing, Color(edge.r, edge.g, edge.b, ghost_alpha), width + float(blur_step) * 1.3)
 	_draw_mirrored_arc(origin, reach, a0, a1, facing, edge, width)
 	_draw_mirrored_arc(origin, reach * 0.9, a0 + 0.05, a1 - 0.05, facing, core, 1.5)
 	var tip_local := Vector2(
@@ -814,8 +833,6 @@ func _draw_attack_slash() -> void:
 		origin.y + sin(lerpf(a0, a1, 0.82)) * reach
 	)
 	draw_circle(Vector2(tip_local.x * facing, tip_local.y), 1.5 + fade * 1.3, core)
-
-
 func _draw_mirrored_arc(
 	origin: Vector2,
 	reach: float,
@@ -2775,12 +2792,12 @@ func _update_line_visual():
 	for p in points:
 		fishing_line.add_point(p)
 
-func _spawn_particles(pos: Vector2, direction: Vector2, _duration: float = 0.3, amount_override: int = -1):
+func _spawn_particles(pos: Vector2, direction: Vector2, _duration: float = 0.3, amount_override: int = -1, attack_impact: bool = false) -> Node2D:
 	if black_particle_scene == null:
-		return
+		return null
 	var p = black_particle_scene.instantiate()
 	if p == null:
-		return
+		return null
 	p.use_player_layer = true
 	if amount_override > 0 and p.has_method("set_amount"):
 		p.set_amount(amount_override)
@@ -2794,8 +2811,11 @@ func _spawn_particles(pos: Vector2, direction: Vector2, _duration: float = 0.3, 
 	p.global_position = pos
 	if p.has_method("set_direction"):
 		p.call("set_direction", direction)
+	if attack_impact and p.has_method("set_attack_impact_blur"):
+		p.call("set_attack_impact_blur", direction)
 	if p.has_method("play"):
 		p.call("play")
+	return p as Node2D
 
 func _spawn_trail(pos: Vector2, direction: Vector2):
 	"""Scia ambient particle solo su salto/dash"""

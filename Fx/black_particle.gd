@@ -1,5 +1,7 @@
 extends Node2D
 
+const ATTACK_IMPACT_BLUR := preload("res://Fx/attack_impact_blur.gdshader")
+
 # ===========================================
 # BLACK PARTICLE EFFECT - Stile Hollow Knight
 # ===========================================
@@ -108,6 +110,36 @@ func set_direction(_dir: Vector2):
 	cpu_particles.radial_accel_max = 60.0
 	cpu_particles.orbit_velocity_min = -0.4
 	cpu_particles.orbit_velocity_max = 0.4
+
+
+func set_attack_impact_blur(impact_direction: Vector2) -> void:
+	if cpu_particles == null:
+		return
+	var direction := impact_direction.normalized()
+	if direction.length_squared() < 0.01:
+		direction = Vector2.RIGHT
+	# Un ventaglio nella direzione del colpo: l'impatto legge come materia
+	# trascinata dalla canna, non come coriandoli casuali.
+	cpu_particles.direction = direction
+	cpu_particles.spread = 38.0
+	# La texture sorgente e' grande: una scala oltre 0.2 trasforma il pogo in
+	# sprite giganti. Otto frammenti piccoli mantengono il colpo leggibile.
+	cpu_particles.amount = 8
+	cpu_particles.initial_velocity_min = 26.0
+	cpu_particles.initial_velocity_max = 82.0
+	cpu_particles.lifetime = 0.36
+	cpu_particles.lifetime_randomness = 0.22
+	cpu_particles.gravity = direction * 14.0 + Vector2(0.0, 28.0)
+	cpu_particles.damping_min = 22.0
+	cpu_particles.damping_max = 48.0
+	cpu_particles.scale_amount_min = 0.065
+	cpu_particles.scale_amount_max = 0.15
+	cpu_particles.color = Color(0.66, 0.88, 0.94, 0.9)
+	var material := ShaderMaterial.new()
+	material.shader = ATTACK_IMPACT_BLUR
+	material.set_shader_parameter("motion_direction", direction)
+	material.set_shader_parameter("smear_texels", 48.0)
+	cpu_particles.material = material
 
 func set_amount(amount: int):
 	"""Override numero particelle (es. dash con meno particelle). Chiamare prima di play()."""

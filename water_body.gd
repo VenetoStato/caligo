@@ -516,10 +516,12 @@ func spawn_fish_in_water() -> void:
 		var fish := fish_scene.instantiate()
 		if fish == null:
 			continue
-		var use_variant := not _fish_textures.is_empty() and randf() < 0.5 and fish.has_method("set_fish_texture")
+		# Composizione stabile: le specie alternative non devono sparire per una
+		# serie casuale sfortunata, soprattutto nel branco iniziale della Dogana.
+		var use_variant := not _fish_textures.is_empty() and (i % 3 != 0) and fish.has_method("set_fish_texture")
 		var fish_scale := 0.06 if use_variant else 0.1
 		if use_variant:
-			fish.call("set_fish_texture", _fish_textures[randi() % _fish_textures.size()], fish_scale)
+			fish.call("set_fish_texture", _fish_textures[i % _fish_textures.size()], fish_scale)
 
 		# Il corpo resta a scala 1: scalare il root riduceva anche l'Area di
 		# abboccata fino a circa un pixel, rendendo la pesca quasi impossibile.

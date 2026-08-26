@@ -15,6 +15,19 @@ const DISTANT_FOG_DOGANA := preload("res://Landscape/Dogana/Generated/Parallax/d
 const DISTANT_SHIP_SHEET := preload("res://Landscape/Dogana/Generated/Parallax/distant_velieri_sheet_v1.png")
 const DISTANT_LAGOON_FOG := preload("res://Landscape/Dogana/Generated/Parallax/distant_lagoon_fog_v1.png")
 const DISTANT_SOFT_FOCUS := preload("res://Levels/Scenes/Dogana/background_softfocus.gdshader")
+const CITY_RAIN_SHADER := preload("res://Levels/Scenes/Dogana/city_rain.gdshader")
+
+@export_category("Distant atmosphere")
+@export_range(0.0, 40.0, 0.5) var distant_dogana_blur := 18.0
+@export_range(0.0, 40.0, 0.5) var distant_ships_blur := 22.0
+@export_range(0.0, 40.0, 0.5) var distant_fog_blur := 28.0
+@export_range(0.0, 1.0, 0.01) var fog_opacity := 1.0
+@export_range(0.0, 0.5, 0.01) var fog_opacity_pulse := 0.07
+@export_range(0.0, 30.0, 0.5) var fog_vertical_drift := 9.0
+@export var rain_enabled := false
+@export_range(0.0, 1.0, 0.01) var rain_intensity := 0.62
+@export_range(0.1, 3.0, 0.05) var rain_speed := 1.0
+@export_range(-1.0, 1.0, 0.01) var rain_wind := 0.16
 
 var _camera: Camera2D
 var _origin := Vector2.ZERO
@@ -30,6 +43,7 @@ var _fore_close: Node2D
 var _distant_dogana: Node2D
 var _distant_ships: Node2D
 var _distant_fog: Node2D
+var _rain_overlay: ColorRect
 var _fore_motes: CPUParticles2D
 var _moon: Node2D
 var _interior_overlay: Polygon2D
@@ -51,6 +65,8 @@ func _ready() -> void:
 	_distant_dogana = _build_distant_dogana()
 	_distant_ships = _build_distant_ships()
 	_distant_fog = _build_distant_fog()
+	_rain_overlay = _build_rain_effect()
+	apply_atmosphere_tuning()
 	_mid = _build_mid_reflections()
 	_mid_near = _build_empty_layer("MidNearRooftops", -5, "dogana_parallax_mid_near")
 	_near = _build_empty_layer("NearAtmosphericFrames", 12, "dogana_parallax_near")
@@ -108,8 +124,8 @@ func _process(delta: float) -> void:
 				ship.position.x = -900.0
 	if _distant_fog:
 		_distant_fog.position.x += sin(t * 0.11) * delta * 5.0
-		_distant_fog.position.y = sin(t * 0.17 + 0.8) * 9.0
-		_distant_fog.modulate.a = 0.24 + sin(t * 0.13) * 0.07
+		_distant_fog.position.y = sin(t * 0.17 + 0.8) * fog_vertical_drift
+		_distant_fog.modulate.a = clampf(fog_opacity + sin(t * 0.13) * fog_opacity_pulse, 0.0, 1.0)
 	var inside := camera_pos.y < -100.0
 	_interior_overlay.modulate.a = move_toward(_interior_overlay.modulate.a, 0.5 if inside else 0.0, delta * 0.7)
 	if _moon:
@@ -211,7 +227,7 @@ func _build_distant_dogana() -> Node2D:
 		# +30% rispetto al primo passaggio: deve leggere come città lontana,
 		# non come una striscia sul fondo.
 		sprite.scale = Vector2(0.936, 0.936)
-		sprite.material = _make_distant_soft_focus(18.0, 0.10)
+		sprite.material = _make_distant_soft_focus(distant_dogana_blur, 0.10)
 		sprite.modulate = Color(0.72, 0.86, 1.0, 1.0)
 		sprite.z_index = 0
 		layer.add_child(sprite)
@@ -252,7 +268,7 @@ func _make_distant_ship(scale_mul: float, sheet_index: int) -> Node2D:
 	var frame_width := float(DISTANT_SHIP_SHEET.get_width()) / 4.0
 	sprite.region_rect = Rect2(frame_width * sheet_index, 0.0, frame_width, float(DISTANT_SHIP_SHEET.get_height()))
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	sprite.material = _make_distant_soft_focus(22.0, 0.12)
+	sprite.material = _make_distant_soft_focus(distant_ships_blur, 0.12)
 	sprite.modulate = Color(0.66, 0.82, 0.95, 1.0)
 	ship.add_child(sprite)
 	return ship
@@ -271,7 +287,7 @@ func _build_distant_fog() -> Node2D:
 		var sprite := Sprite2D.new()
 		sprite.texture = DISTANT_LAGOON_FOG
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		sprite.material = _make_distant_soft_focus(28.0, 0.08)
+		sprite.material = _make_distant_soft_focus(distant_fog_blur, 0.08)
 		sprite.position = Vector2(360.0 + index * 1420.0, 430.0)
 		sprite.scale = Vector2(0.78, 0.78)
 		layer.add_child(sprite)
@@ -289,6 +305,46 @@ func _make_distant_soft_focus(blur_radius: float, tint_strength: float) -> Shade
 	material.set_shader_parameter("atmosphere_tint", Color(0.58, 0.76, 0.9, 1.0))
 	material.set_shader_parameter("tint_strength", tint_strength)
 	return material
+
+
+func apply_atmosphere_tuning() -> void:
+	_set_layer_blur(_distant_dogana, distant_dogana_blur)
+	_set_layer_blur(_distant_ships, distant_ships_blur)
+	_set_layer_blur(_distant_fog, distant_fog_blur)
+	if _distant_fog:
+		_distant_fog.modulate.a = fog_opacity
+	if _rain_overlay:
+		_rain_overlay.visible = rain_enabled
+		var rain_material := _rain_overlay.material as ShaderMaterial
+		if rain_material:
+			rain_material.set_shader_parameter("intensity", rain_intensity)
+			rain_material.set_shader_parameter("fall_speed", rain_speed)
+			rain_material.set_shader_parameter("wind", rain_wind)
+
+
+func _set_layer_blur(layer: Node2D, blur_radius: float) -> void:
+	if layer == null:
+		return
+	for child in layer.find_children("*", "Sprite2D", true, false):
+		if child.material is ShaderMaterial:
+			(child.material as ShaderMaterial).set_shader_parameter("blur_radius", blur_radius)
+
+
+func _build_rain_effect() -> ColorRect:
+	var layer := CanvasLayer.new()
+	layer.name = "CityRain"
+	layer.layer = 5
+	add_child(layer)
+	var rain := ColorRect.new()
+	rain.name = "RainOverlay"
+	rain.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rain.visible = rain_enabled
+	rain.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var material := ShaderMaterial.new()
+	material.shader = CITY_RAIN_SHADER
+	rain.material = material
+	layer.add_child(rain)
+	return rain
 
 
 ## Piano frontale: pali d'ormeggio in massa piena che passano davanti al

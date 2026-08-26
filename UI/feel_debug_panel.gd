@@ -30,17 +30,34 @@ const GRAPHICS_TUNING := [
 	{"key": "sharpen", "label": "Nitidezza contorni", "min": 0.0, "max": 0.3, "step": 0.01},
 ]
 
+const ATMOSPHERE_TUNING := [
+	{"key": "distant_dogana_blur", "label": "Blur Dogana lontana", "min": 0.0, "max": 40.0, "step": 0.5},
+	{"key": "distant_ships_blur", "label": "Blur velieri", "min": 0.0, "max": 40.0, "step": 0.5},
+	{"key": "distant_fog_blur", "label": "Blur nebbia", "min": 0.0, "max": 40.0, "step": 0.5},
+	{"key": "fog_opacity", "label": "Opacita nebbia", "min": 0.0, "max": 1.0, "step": 0.01},
+	{"key": "fog_opacity_pulse", "label": "Respiro nebbia", "min": 0.0, "max": 0.5, "step": 0.01},
+	{"key": "fog_vertical_drift", "label": "Deriva nebbia", "min": 0.0, "max": 30.0, "step": 0.5},
+	{"key": "rain_intensity", "label": "Intensita pioggia", "min": 0.0, "max": 1.0, "step": 0.01},
+	{"key": "rain_speed", "label": "Velocita pioggia", "min": 0.1, "max": 3.0, "step": 0.05},
+	{"key": "rain_wind", "label": "Vento pioggia", "min": -1.0, "max": 1.0, "step": 0.01},
+]
+
 var _player: CharacterBody2D
 var _camera: Camera2D
-var _window: Window
+var _depth: Node2D
+var _window: PanelContainer
 var _open_btn: Button
 var _status: Label
 var _labels: Dictionary = {}
 var _sliders: Dictionary = {}
 var _defaults: Dictionary = {}
 var _graphics_defaults: Dictionary = {}
+var _atmosphere_defaults: Dictionary = {}
 var _dirty := false
 var _bind_retry_left := 0.0
+var _dragging := false
+var _drag_offset := Vector2.ZERO
+var _rain_check: CheckButton
 
 
 func _ready() -> void:
@@ -73,14 +90,21 @@ func _bind_targets() -> void:
 				var key: String = setting["key"]
 				if key in _camera:
 					_graphics_defaults[key] = _camera.get(key)
-	if _player or _camera:
+	if _depth == null:
+		_depth = get_tree().get_first_node_in_group("dogana_depth_system") as Node2D
+		if _depth:
+			for setting in ATMOSPHERE_TUNING:
+				var key: String = setting["key"]
+				if key in _depth:
+					_atmosphere_defaults[key] = _depth.get(key)
+	if _player or _camera or _depth:
 		_load_tuning()
 		_sync_sliders()
 		_set_status("Regola movimento e grafica in tempo reale. Premi Salva per conservarli.")
 
 
 func _process(delta: float) -> void:
-	if _player != null and _camera != null:
+	if _player != null and _camera != null and _depth != null:
 		return
 	_bind_retry_left -= delta
 	if _bind_retry_left <= 0.0:
@@ -95,6 +119,7 @@ func _build_open_button() -> void:
 	add_child(host)
 	_open_btn = Button.new()
 	_open_btn.text = "Feel"
+	_open_btn.focus_mode = Control.FOCUS_NONE
 	_open_btn.tooltip_text = "Apri parametri di movimento e grafica (F3)"
 	_open_btn.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_open_btn.position = Vector2(12, 12)
@@ -104,15 +129,18 @@ func _build_open_button() -> void:
 
 
 func _build_window() -> void:
-	_window = Window.new()
-	_window.title = "Movimento e grafica"
-	_window.size = Vector2i(340, 560)
-	_window.min_size = Vector2i(280, 420)
-	_window.unresizable = false
-	_window.always_on_top = true
-	_window.initial_position = Window.WINDOW_INITIAL_POSITION_ABSOLUTE
-	_window.position = Vector2i(40, 70)
-	_window.close_requested.connect(func() -> void: _show_window(false))
+	_window = PanelContainer.new()
+	_window.name = "FeelDebugOverlay"
+	_window.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_window.position = Vector2(12, 48)
+	_window.size = Vector2(300, 470)
+	_window.custom_minimum_size = Vector2(260, 360)
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.008, 0.02, 0.03, 0.96)
+	panel_style.border_color = Color(0.35, 0.82, 0.76, 0.9)
+	panel_style.set_border_width_all(1)
+	panel_style.set_corner_radius_all(8)
+	_window.add_theme_stylebox_override("panel", panel_style)
 	add_child(_window)
 
 	var margin := MarginContainer.new()
@@ -127,8 +155,18 @@ func _build_window() -> void:
 	vbox.add_theme_constant_override("separation", 4)
 	margin.add_child(vbox)
 
+	var drag_handle := Label.new()
+	drag_handle.text = "FEEL  ·  trascina qui"
+	drag_handle.custom_minimum_size.y = 24
+	drag_handle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	drag_handle.mouse_filter = Control.MOUSE_FILTER_STOP
+	drag_handle.add_theme_font_size_override("font_size", 12)
+	drag_handle.add_theme_color_override("font_color", Color(0.58, 0.9, 0.84, 1.0))
+	drag_handle.gui_input.connect(_on_drag_handle_gui_input)
+	vbox.add_child(drag_handle)
+
 	var hint := Label.new()
-	hint.text = "Chiudi la finestra con la X o F3. I numeri si tengono solo se premi Salva."
+	hint.text = "F3 o Chiudi nascondono il pannello. I numeri si tengono solo se premi Salva."
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.add_theme_font_size_override("font_size", 11)
 	vbox.add_child(hint)
@@ -154,6 +192,19 @@ func _build_window() -> void:
 	for setting in GRAPHICS_TUNING:
 		_add_slider(box, setting, true)
 
+	var atmosphere_title := Label.new()
+	atmosphere_title.text = "ATMOSFERA — nebbia e sfocatura lontana"
+	atmosphere_title.add_theme_font_size_override("font_size", 13)
+	atmosphere_title.add_theme_color_override("font_color", Color(0.55, 0.82, 1.0, 1.0))
+	box.add_child(atmosphere_title)
+	_rain_check = CheckButton.new()
+	_rain_check.text = "Pioggia — City of Tears"
+	_rain_check.focus_mode = Control.FOCUS_NONE
+	_rain_check.toggled.connect(_on_rain_toggled)
+	box.add_child(_rain_check)
+	for setting in ATMOSPHERE_TUNING:
+		_add_atmosphere_slider(box, setting)
+
 	_status = Label.new()
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_status.add_theme_font_size_override("font_size", 11)
@@ -165,16 +216,19 @@ func _build_window() -> void:
 
 	var save_btn := Button.new()
 	save_btn.text = "Salva"
+	save_btn.focus_mode = Control.FOCUS_NONE
 	save_btn.pressed.connect(_save_tuning)
 	buttons.add_child(save_btn)
 
 	var reset_btn := Button.new()
 	reset_btn.text = "Reset"
+	reset_btn.focus_mode = Control.FOCUS_NONE
 	reset_btn.pressed.connect(_reset_defaults)
 	buttons.add_child(reset_btn)
 
 	var close_btn := Button.new()
 	close_btn.text = "Chiudi"
+	close_btn.focus_mode = Control.FOCUS_NONE
 	close_btn.pressed.connect(func() -> void: _show_window(false))
 	buttons.add_child(close_btn)
 
@@ -190,10 +244,40 @@ func _add_slider(box: VBoxContainer, setting: Dictionary, graphics: bool) -> voi
 	slider.min_value = setting["min"]
 	slider.max_value = setting["max"]
 	slider.step = setting["step"]
+	slider.focus_mode = Control.FOCUS_NONE
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slider.value_changed.connect(_on_slider.bind(key, setting["label"], graphics))
 	box.add_child(slider)
 	_sliders[key] = slider
+
+
+func _add_atmosphere_slider(box: VBoxContainer, setting: Dictionary) -> void:
+	var key: String = setting["key"]
+	var label := Label.new()
+	label.text = "%s: —" % setting["label"]
+	label.add_theme_font_size_override("font_size", 12)
+	box.add_child(label)
+	_labels[key] = label
+	var slider := HSlider.new()
+	slider.min_value = setting["min"]
+	slider.max_value = setting["max"]
+	slider.step = setting["step"]
+	slider.focus_mode = Control.FOCUS_NONE
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.value_changed.connect(_on_atmosphere_slider.bind(key, setting["label"]))
+	box.add_child(slider)
+	_sliders[key] = slider
+
+
+func _on_drag_handle_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_dragging = event.pressed
+		if _dragging:
+			_drag_offset = event.global_position - _window.global_position
+		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseMotion and _dragging:
+		_window.global_position = event.global_position - _drag_offset
+		get_viewport().set_input_as_handled()
 
 
 func _show_window(open: bool) -> void:
@@ -208,6 +292,8 @@ func _on_slider(value: float, key: String, label_text: String, graphics: bool) -
 	var target: Object = _camera if graphics else _player
 	if target and key in target:
 		target.set(key, value)
+		if graphics and _camera:
+			_camera.call("apply_postfx_tuning")
 	var label := _labels.get(key) as Label
 	if label:
 		label.text = "%s: %s" % [label_text, _fmt(value)]
@@ -215,9 +301,31 @@ func _on_slider(value: float, key: String, label_text: String, graphics: bool) -
 	_set_status("Modificato, non salvato. Premi Salva per tenerlo.")
 
 
+func _on_atmosphere_slider(value: float, key: String, label_text: String) -> void:
+	if _depth and key in _depth:
+		_depth.set(key, value)
+		_depth.call("apply_atmosphere_tuning")
+	var label := _labels.get(key) as Label
+	if label:
+		label.text = "%s: %s" % [label_text, _fmt(value)]
+	_dirty = true
+	_set_status("Atmosfera modificata, non salvata. Premi Salva per tenerla.")
+
+
+func _on_rain_toggled(enabled: bool) -> void:
+	if _depth:
+		_depth.set("rain_enabled", enabled)
+		_depth.call("apply_atmosphere_tuning")
+	_dirty = true
+	_set_status("Pioggia modificata, non salvata. Premi Salva per tenerla.")
+
+
 func _sync_sliders() -> void:
 	_sync_slider_group(TUNING, _player)
 	_sync_slider_group(GRAPHICS_TUNING, _camera)
+	_sync_slider_group(ATMOSPHERE_TUNING, _depth)
+	if _rain_check and _depth and "rain_enabled" in _depth:
+		_rain_check.set_pressed_no_signal(bool(_depth.get("rain_enabled")))
 
 
 func _sync_slider_group(settings: Array, target: Object) -> void:
@@ -243,6 +351,11 @@ func _reset_defaults() -> void:
 		_player.set(key, _defaults[key])
 	for key in _graphics_defaults.keys():
 		_camera.set(key, _graphics_defaults[key])
+	for key in _atmosphere_defaults.keys():
+		_depth.set(key, _atmosphere_defaults[key])
+	if _depth:
+		_depth.set("rain_enabled", false)
+		_depth.call("apply_atmosphere_tuning")
 	_sync_sliders()
 	_dirty = true
 	_set_status("Ripristinati i parametri precedenti. Premi Salva per tenerli.")
@@ -260,6 +373,12 @@ func _save_tuning() -> void:
 		var key: String = setting["key"]
 		if _camera and key in _camera:
 			cfg.set_value("graphics", key, _camera.get(key))
+	for setting in ATMOSPHERE_TUNING:
+		var key: String = setting["key"]
+		if _depth and key in _depth:
+			cfg.set_value("atmosphere", key, _depth.get(key))
+	if _depth:
+		cfg.set_value("atmosphere", "rain_enabled", _depth.get("rain_enabled"))
 	cfg.save(USER_SAVE)
 	cfg.save(PROJECT_SAVE)
 	_dirty = false
@@ -283,6 +402,16 @@ func _load_tuning() -> void:
 		var key: String = setting["key"]
 		if _camera and key in _camera and cfg.has_section_key("graphics", key):
 			_camera.set(key, cfg.get_value("graphics", key))
+	if _camera:
+		_camera.call("apply_postfx_tuning")
+	for setting in ATMOSPHERE_TUNING:
+		var key: String = setting["key"]
+		if _depth and key in _depth and cfg.has_section_key("atmosphere", key):
+			_depth.set(key, cfg.get_value("atmosphere", key))
+	if _depth and cfg.has_section_key("atmosphere", "rain_enabled"):
+		_depth.set("rain_enabled", cfg.get_value("atmosphere", "rain_enabled"))
+	if _depth:
+		_depth.call("apply_atmosphere_tuning")
 
 
 func _set_status(text: String) -> void:

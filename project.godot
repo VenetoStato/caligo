@@ -23,6 +23,7 @@ autoload_transition="*res://TransitionManager.gd"
 AchievementManager="*res://AchievementManager.gd"
 MobileControlsManager="*res://MobileControlsManager.gd"
 AsyncSceneLoader="*res://AsyncSceneLoader.gd"
+FeelDebug="*res://UI/feel_debug_panel.gd"
 
 [display]
 
