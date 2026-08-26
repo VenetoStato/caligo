@@ -475,6 +475,11 @@ func _update_attack_hitbox_position():
 		col.position = Vector2(38 if facing_right else -46, -30)
 
 func _enable_attack_hitbox(damage: int = 1):
+	# Un colpo può partire anche con l'enemy agganciato: l'attacco interrompe
+	# il reel per tutta la sua finestra, ma non sgancia la lenza.
+	if enemy_hooked:
+		is_reeling = false
+		reel_pulse_timer = 0.0
 	# Dopo il reel il bersaglio può essere rimasto dall'altro lato del player:
 	# orienta automaticamente il colpo orizzontale verso di lui, così gli
 	# offset sinistro/destri della hitbox restano realmente simmetrici.
@@ -1391,7 +1396,7 @@ func flip_logic():
 	_update_attack_hitbox_position()
 
 func set_animation():
-	var can_nail := _attack_cooldown <= 0.0 and not line_extended
+	var can_nail := _attack_cooldown <= 0.0 and (not line_extended or enemy_hooked)
 	if Input.is_action_just_pressed("ui_attack_strong") and can_nail:
 		if anim.has_animation("Attack_strong"):
 			anim.play("Attack_strong", -1.0, 2.05)
