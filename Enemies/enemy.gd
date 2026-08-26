@@ -81,6 +81,8 @@ enum AttackPattern {
 @export var combat_hook_power_launch_speed := 760.0
 @export_range(0.2, 1.5, 0.05) var combat_hook_escape_ratio := 0.95
 @export_range(0.2, 1.2, 0.05) var combat_hook_heavy_escape_ratio := 0.62
+@export var combat_hook_max_lift := 120.0
+@export var combat_hook_max_upward_speed := 210.0
 
 @export_category("Visual")
 @export var sprite_node: Node2D = null
@@ -1209,6 +1211,8 @@ func _update_combat_hook_escape(delta: float) -> void:
 		release_combat_hook()
 		return
 	var away := global_position - _combat_hook_owner.global_position
+	var lift_from_owner := _combat_hook_owner.global_position.y - global_position.y
+	var can_reel_up := lift_from_owner < combat_hook_max_lift
 	var escape_sign := signf(away.x)
 	if is_zero_approx(escape_sign):
 		escape_sign = 1.0 if facing_right else -1.0
@@ -1226,24 +1230,28 @@ func _update_combat_hook_escape(delta: float) -> void:
 		if _combat_hook_reel_active and not combat_hook_heavy:
 			# I volanti devono seguire davvero la lenza, non solo oscillare:
 			# la componente del reel prevale sul semplice hover.
-			var can_reel_up := _combat_hook_owner == null or global_position.y >= _combat_hook_owner.global_position.y - 24.0
 			if can_reel_up:
-				target_y = clampf(target_y + _combat_hook_pull_velocity.y * 1.35, -260.0, 260.0)
+				var vertical_pull := clampf(_combat_hook_pull_velocity.y * 1.35, -combat_hook_max_upward_speed, combat_hook_max_upward_speed)
+				target_y = clampf(target_y + vertical_pull, -combat_hook_max_upward_speed, combat_hook_max_upward_speed)
 			else:
 				target_y = maxf(target_y, 0.0)
 		velocity.y = move_toward(velocity.y, target_y, move_acceleration * 1.2 * delta)
+		# Anche un volante agganciato ricade: il reel non diventa una levitazione.
+		velocity.y += gravity * delta
 	else:
-		var can_reel_up := _combat_hook_owner == null or global_position.y >= _combat_hook_owner.global_position.y - 24.0
 		if _combat_hook_reel_active and not combat_hook_heavy and can_reel_up and _combat_hook_pull_velocity.y < -1.0:
 			# Anche un nemico leggero a terra può essere schiodato: il reel
 			# applica una trazione verticale, poi la gravità lo fa ricadere.
 			velocity.y = move_toward(
 				velocity.y,
-				_combat_hook_pull_velocity.y * 1.15,
+				maxf(_combat_hook_pull_velocity.y * 1.15, -combat_hook_max_upward_speed),
 				move_acceleration * 1.25 * delta
 			)
-		else:
-			velocity.y += gravity * 0.72 * delta
+		# La gravità resta sempre attiva anche mentre la lenza tira.
+		velocity.y += gravity * delta
+	if lift_from_owner >= combat_hook_max_lift and velocity.y < 0.0:
+		velocity.y = 0.0
+	velocity.y = clampf(velocity.y, -combat_hook_max_upward_speed, 580.0)
 	facing_right = velocity.x >= 0.0
 	if sprite_node:
 		sprite_node.flip_h = not facing_right

@@ -7,6 +7,10 @@ var hooked_to_player := false
 var _bait_registered := false
 var player_ref: Node = null
 
+const PLAYER_WATER_GRAVITY := 0.3
+const MAX_REEL_LIFT := 120.0
+const MAX_REEL_UPWARD_SPEED := 185.0
+
 func _ready() -> void:
 	add_to_group("fish")
 	add_to_group("dogana_bait")
@@ -24,7 +28,8 @@ func set_player_reference(player: Node) -> void:
 	player_ref = player
 	hooked_to_player = true
 	freeze = false
-	gravity_scale = 0.15
+	# Il cadavere resta un corpo fisico: il reel non annulla la gravità.
+	gravity_scale = PLAYER_WATER_GRAVITY if in_water else 1.0
 
 func set_line_tether(_anchor: Vector2, _length: float) -> void:
 	pass
@@ -52,7 +57,15 @@ func apply_struggle_force(force: Vector2) -> void:
 	apply_central_force(force * 0.35)
 
 func apply_reel_force(force: Vector2) -> void:
-	apply_central_force(force * 1.15)
+	var limited := force
+	if hooked_to_player and player_ref is Node2D:
+		var lift := (player_ref as Node2D).global_position.y - global_position.y
+		if lift >= MAX_REEL_LIFT:
+			limited.y = maxf(limited.y, 0.0)
+		elif lift > MAX_REEL_LIFT * 0.55 and limited.y < 0.0:
+			var remaining := inverse_lerp(MAX_REEL_LIFT, MAX_REEL_LIFT * 0.55, lift)
+			limited.y *= clampf(remaining, 0.0, 1.0)
+	apply_central_force(limited * 1.15)
 
 func pull_along_line(anchor: Vector2, haul: float, _allow_exit := false) -> void:
 	var to_anchor := anchor - global_position
@@ -66,12 +79,20 @@ func pull_along_line(anchor: Vector2, haul: float, _allow_exit := false) -> void
 				linear_velocity.y = move_toward(linear_velocity.y, 0.0, haul * 0.08)
 			else:
 				direction = direction.normalized()
+		if hooked_to_player and player_ref is Node2D:
+			var lift := (player_ref as Node2D).global_position.y - global_position.y
+			if lift >= MAX_REEL_LIFT:
+				direction.y = maxf(direction.y, 0.0)
+			elif lift > MAX_REEL_LIFT * 0.55 and direction.y < 0.0:
+				direction.y *= clampf(inverse_lerp(MAX_REEL_LIFT, MAX_REEL_LIFT * 0.55, lift), 0.0, 1.0)
+			if direction.length_squared() > 0.01:
+				direction = direction.normalized()
 		apply_central_force(direction * haul * 0.9)
 
 func release_from_hook() -> void:
 	hooked_to_player = false
 	player_ref = null
-	gravity_scale = 0.15 if in_water else 1.0
+	gravity_scale = PLAYER_WATER_GRAVITY if in_water else 1.0
 
 func _on_hook_detected(hook: Node) -> void:
 	if hooked_to_player or hook == null:
@@ -80,22 +101,28 @@ func _on_hook_detected(hook: Node) -> void:
 		hook.call("_hook_fish", self)
 
 func _physics_process(_delta: float) -> void:
-	if hooked_to_player and player_ref is Node2D and global_position.y < (player_ref as Node2D).global_position.y - 150.0:
-		linear_velocity.y = minf(linear_velocity.y, 20.0)
+	if hooked_to_player and player_ref is Node2D:
+		var lift := (player_ref as Node2D).global_position.y - global_position.y
+		if lift >= MAX_REEL_LIFT:
+			# Oltre il limite il reel può muovere solo lateralmente; la gravità
+			# deve riportare il peso verso il basso.
+			linear_velocity.y = maxf(linear_velocity.y, 0.0)
+		else:
+			linear_velocity.y = maxf(linear_velocity.y, -MAX_REEL_UPWARD_SPEED)
 	var water := get_tree().get_first_node_in_group("water")
 	if water != null and water.has_method("get_surface_height"):
 		var surface := float(water.call("get_surface_height", global_position.x))
 		var now_in_water := global_position.y >= surface - 4.0
 		if now_in_water and not in_water:
 			in_water = true
-			gravity_scale = 0.08
+			gravity_scale = PLAYER_WATER_GRAVITY
 			linear_damp = 3.2
 			if not _bait_registered and water.has_method("register_carcass_bait"):
 				_bait_registered = true
 				water.call_deferred("register_carcass_bait", global_position)
 		elif not now_in_water and in_water:
 			in_water = false
-			gravity_scale = 1.0 if not hooked_to_player else 0.15
+			gravity_scale = 1.0
 			linear_damp = 0.0
 		if in_water:
 			# L'esca galleggia come una pastura pesante: scende lentamente ma non
