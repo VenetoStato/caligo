@@ -469,10 +469,20 @@ func _update_attack_hitbox_position():
 	else:
 		# Il colpo orizzontale copre anche il bordo superiore del nemico:
 		# stare un poco sopra non deve far passare la lenza a vuoto.
-		shape.size = Vector2(94, 76)
-		col.position = Vector2(38 if facing_right else -38, -30)
+		shape.size = Vector2(108, 78)
+		col.position = Vector2(46 if facing_right else -46, -30)
 
 func _enable_attack_hitbox(damage: int = 1):
+	# Dopo il reel il bersaglio può essere rimasto dall'altro lato del player:
+	# orienta automaticamente il colpo orizzontale verso di lui, così gli
+	# offset sinistro/destri della hitbox restano realmente simmetrici.
+	var attack_target: Node2D = null
+	if is_instance_valid(current_hooked_enemy):
+		attack_target = current_hooked_enemy
+	elif _power_strike_left > 0.0 and is_instance_valid(_power_strike_target):
+		attack_target = _power_strike_target
+	if attack_target != null and absf(_resolve_nail_direction().y) < 0.5:
+		_face_toward_aim(attack_target.global_position.x - global_position.x)
 	_attack_dir = _resolve_nail_direction()
 	_update_attack_hitbox_position()
 	_attack_hit_enemies.clear()
