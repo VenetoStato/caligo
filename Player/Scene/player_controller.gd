@@ -305,6 +305,7 @@ var _enemy_power_window_left := 0.0
 var _power_strike_target: CharacterBody2D = null
 var _power_strike_hit := false
 var _power_strike_fail_applied := false
+var _power_strike_fail_armed := false
 var _enemy_hook_feedback_timer := 0.0
 var _power_strike_left := 0.0
 var _power_tint_active := false
@@ -2469,6 +2470,7 @@ func _open_enemy_power_window(enemy: CharacterBody2D) -> void:
 	_power_strike_target = enemy
 	_power_strike_hit = false
 	_power_strike_fail_applied = false
+	_power_strike_fail_armed = false
 	PARTICLE_BURST.spawn(
 		get_tree().current_scene, impact_position,
 		Color(1.0, 0.72, 0.3, 0.84), 9, Vector2.UP, 24.0, 74.0, 0.52
@@ -2491,7 +2493,14 @@ func _check_power_strike_miss() -> void:
 		return
 	if _power_strike_target == null or not is_instance_valid(_power_strike_target):
 		return
-	if global_position.distance_to(_power_strike_target.global_position) > enemy_power_fail_distance:
+	var distance := global_position.distance_to(_power_strike_target.global_position)
+	# L'enemy viene già portato vicino quando si apre la finestra: non è un
+	# fallimento istantaneo. Il contraccolpo si arma solo dopo che il player si
+	# è allontanato e rientra troppo vicino senza colpire.
+	if distance > enemy_power_fail_distance:
+		_power_strike_fail_armed = true
+		return
+	if not _power_strike_fail_armed:
 		return
 	_power_strike_fail_applied = true
 	var away := (global_position - _power_strike_target.global_position).normalized()
