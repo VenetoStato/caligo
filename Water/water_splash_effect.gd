@@ -10,7 +10,7 @@ var _color := Color(0.8, 0.96, 1.0, 0.9)
 func setup(impulse: float, color: Color) -> void:
 	_color = color
 	var strength := clampf(absf(impulse) / 300.0, 0.35, 1.4)
-	var count := clampi(roundi(9.0 + strength * 9.0), 10, 22)
+	var count := clampi(roundi(7.0 + strength * 6.0), 8, 16)
 	for index in count:
 		var spread := lerpf(-1.0, 1.0, float(index) / float(maxi(count - 1, 1)))
 		_droplets.append({
@@ -19,7 +19,7 @@ func setup(impulse: float, color: Color) -> void:
 				spread * randf_range(75.0, 185.0) * strength,
 				-randf_range(130.0, 285.0) * strength
 			),
-			"radius": randf_range(1.7, 3.8) * strength,
+			"radius": randf_range(1.0, 2.4) * strength,
 		})
 	queue_redraw()
 
@@ -41,19 +41,27 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	var alpha := clampf(1.0 - _age / _lifetime, 0.0, 1.0)
-	var draw_color := Color(_color.r, _color.g, _color.b, _color.a * alpha)
+	var draw_color := Color(_color.r, _color.g, _color.b, _color.a * alpha * 0.68)
 	for droplet in _droplets:
 		draw_circle(droplet["position"], droplet["radius"], draw_color)
-	draw_arc(Vector2.ZERO, _ring_radius, PI * 1.08, PI * 1.92, 26, draw_color, 2.6)
-	_draw_surface_ellipse(_ring_radius * 1.15, maxf(2.0, _ring_radius * 0.16), draw_color, 2.2)
-	var wake_color := Color(draw_color.r, draw_color.g, draw_color.b, draw_color.a * 0.52)
-	_draw_surface_ellipse(_ring_radius * 1.75, maxf(2.0, _ring_radius * 0.12), wake_color, 1.5)
-	draw_line(Vector2(-38.0, 1.0), Vector2(38.0, 1.0), draw_color, 3.2)
+	draw_arc(Vector2.ZERO, _ring_radius, PI * 1.12, PI * 1.88, 22, draw_color, 1.45)
+	var wake_color := Color(draw_color.r, draw_color.g, draw_color.b, draw_color.a * 0.48)
+	_draw_surface_arc(_ring_radius * 1.35, maxf(1.0, _ring_radius * 0.1), PI * 1.03, PI * 1.38, wake_color, 1.0)
+	_draw_surface_arc(_ring_radius * 1.35, maxf(1.0, _ring_radius * 0.1), PI * 1.62, PI * 1.97, wake_color, 1.0)
+	draw_line(Vector2(-25.0, 1.0), Vector2(-7.0, 1.0), wake_color, 1.2)
+	draw_line(Vector2(7.0, 1.0), Vector2(25.0, 1.0), wake_color, 1.2)
 
 
-func _draw_surface_ellipse(radius_x: float, radius_y: float, color: Color, width: float) -> void:
+func _draw_surface_arc(
+	radius_x: float,
+	radius_y: float,
+	start_angle: float,
+	end_angle: float,
+	color: Color,
+	width: float
+) -> void:
 	var points := PackedVector2Array()
-	for index in 41:
-		var angle := TAU * float(index) / 40.0
+	for index in 13:
+		var angle := lerpf(start_angle, end_angle, float(index) / 12.0)
 		points.append(Vector2(cos(angle) * radius_x, sin(angle) * radius_y))
 	draw_polyline(points, color, width, true)

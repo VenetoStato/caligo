@@ -439,18 +439,18 @@ func _spawn_rain_impact(at: Vector2, normal: Vector2, collider: Object = null) -
 	var particles := CPUParticles2D.new()
 	particles.name = "SurfaceSplash"
 	particles.one_shot = true
-	particles.amount = 4 if not OS.has_feature("mobile") else 2
-	particles.lifetime = 0.3
+	particles.amount = 3 if not OS.has_feature("mobile") else 2
+	particles.lifetime = 0.24
 	particles.explosiveness = 0.96
 	particles.randomness = 0.72
 	particles.direction = normal.normalized()
 	particles.spread = 76.0
 	particles.gravity = Vector2(0, 190)
-	particles.initial_velocity_min = 24.0
-	particles.initial_velocity_max = 58.0
-	particles.scale_amount_min = 0.12
-	particles.scale_amount_max = 0.36
-	particles.color = Color(0.54, 0.78, 0.82, 0.58)
+	particles.initial_velocity_min = 18.0
+	particles.initial_velocity_max = 42.0
+	particles.scale_amount_min = 0.07
+	particles.scale_amount_max = 0.18
+	particles.color = Color(0.54, 0.78, 0.82, 0.38)
 	particles.texture = _make_rain_splash_texture()
 	_rain_surface_fx.add_child(particles)
 	particles.global_position = at + normal * 2.0
@@ -467,13 +467,13 @@ func _make_rain_splash_texture() -> GradientTexture2D:
 	var gradient := Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.0, 0.22, 0.5, 0.78, 1.0])
 	gradient.colors = PackedColorArray([
-		Color(1, 1, 1, 0), Color(1, 1, 1, 0.24),
-		Color(1, 1, 1, 1), Color(1, 1, 1, 0.24), Color(1, 1, 1, 0),
+		Color(1, 1, 1, 0), Color(1, 1, 1, 0.12),
+		Color(1, 1, 1, 0.72), Color(1, 1, 1, 0.12), Color(1, 1, 1, 0),
 	])
 	var texture := GradientTexture2D.new()
 	texture.gradient = gradient
-	texture.width = 56
-	texture.height = 8
+	texture.width = 32
+	texture.height = 4
 	texture.fill = GradientTexture2D.FILL_LINEAR
 	texture.fill_from = Vector2(0, 0.5)
 	texture.fill_to = Vector2(1, 0.5)
