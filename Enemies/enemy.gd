@@ -380,11 +380,6 @@ func _physics_process(delta: float) -> void:
 			sprite_node.rotation = move_toward(sprite_node.rotation, 0.0, delta * 3.0)
 		if not sprite_node.modulate.is_equal_approx(_original_modulate) and _hit_flash_timer <= 0.0:
 			sprite_node.modulate = sprite_node.modulate.lerp(_original_modulate, delta * 6.0)
-	if _combat_hooked:
-		_update_combat_hook_escape(delta)
-		move_and_slide()
-		queue_redraw()
-		return
 	if _clip_lock_timer > 0.0:
 		_clip_lock_timer = maxf(0.0, _clip_lock_timer - delta)
 		if _clip_lock_timer <= 0.0:
@@ -424,6 +419,8 @@ func _physics_process(delta: float) -> void:
 			velocity.y = clampf((hover_target - global_position.y) * 3.2, -45.0, 45.0)
 		else:
 			velocity.y += gravity * delta
+		if _combat_hooked:
+			_update_combat_hook_escape(delta)
 		move_and_slide()
 		if is_on_wall():
 			_turn_patrol()
@@ -438,6 +435,8 @@ func _physics_process(delta: float) -> void:
 		_knockback_timer -= delta
 		velocity.y += gravity * 1.55 * delta
 		velocity.x = move_toward(velocity.x, 0.0, 640.0 * delta)
+		if _combat_hooked:
+			_update_combat_hook_escape(delta)
 		move_and_slide()
 		queue_redraw()
 		return
@@ -449,12 +448,12 @@ func _physics_process(delta: float) -> void:
 			state = State.IDLE
 			play_idle()
 			return
-	if _is_player_sanctuary_safe(player):
+	if not _combat_hooked and _is_player_sanctuary_safe(player):
 		_disengage()
 		return
 
 	var to_player: Vector2 = player.global_position - global_position
-	if to_player.length() > disengage_range or global_position.distance_to(_home_position) > leash_distance:
+	if not _combat_hooked and (to_player.length() > disengage_range or global_position.distance_to(_home_position) > leash_distance):
 		_disengage()
 		return
 	var wanted_chase_dir := signf(to_player.x)
@@ -578,6 +577,8 @@ func _physics_process(delta: float) -> void:
 	_update_special_attack(delta, to_player)
 	_update_leap_slam(delta)
 	_update_melee_attack(delta, dist)
+	if _combat_hooked:
+		_update_combat_hook_escape(delta)
 
 	move_and_slide()
 
@@ -1161,12 +1162,10 @@ func begin_combat_hook(owner: Node2D) -> bool:
 	_combat_hook_owner = owner
 	_combat_hook_pull_velocity = Vector2.ZERO
 	_combat_hook_reel_active = false
+	# L'aggancio provoca aggro ma non cancella windup, hitbox o attacco in
+	# corso: la lenza e' un vincolo fisico, non uno stun gratuito.
 	state = State.AGGRO
 	player = owner
-	_special_windup_remaining = 0.0
-	_melee_windup_remaining = 0.0
-	if _attack_hitbox:
-		_attack_hitbox.set_deferred("monitoring", false)
 	_hit_flash_timer = maxf(_hit_flash_timer, 0.16)
 	if sprite_node:
 		sprite_node.modulate = Color(0.62, 1.08, 1.02, 1.0)
@@ -1176,7 +1175,6 @@ func begin_combat_hook(owner: Node2D) -> bool:
 		Color(0.44, 0.92, 0.84, 0.78),
 		7, Vector2.UP, 18.0, 58.0, 0.42
 	)
-	_play_clip("hurt", true)
 	queue_redraw()
 	return true
 
@@ -1210,52 +1208,29 @@ func _update_combat_hook_escape(delta: float) -> void:
 	if _combat_hook_owner == null or not is_instance_valid(_combat_hook_owner):
 		release_combat_hook()
 		return
-	var away := global_position - _combat_hook_owner.global_position
 	var lift_from_owner := _combat_hook_owner.global_position.y - global_position.y
 	var can_reel_up := lift_from_owner < combat_hook_max_lift
-	var escape_sign := signf(away.x)
-	if is_zero_approx(escape_sign):
-		escape_sign = 1.0 if facing_right else -1.0
-	var escape_ratio := combat_hook_heavy_escape_ratio if combat_hook_heavy else combat_hook_escape_ratio
-	var escape_x := escape_sign * move_speed * escape_ratio
-	var target_x := escape_x
+	# L'AI ha gia' calcolato inseguimento, fuga, salto e attacco in questo frame.
+	# Sovrapponiamo soltanto la forza del reel, senza sostituire la velocity con
+	# un comportamento speciale che impedirebbe agli attacchi di aggiornarsi.
 	if _combat_hook_reel_active and not combat_hook_heavy:
-		# The enemy still pushes against the reel; the player's pull wins only
-		# when its force exceeds this escape intent.
-		target_x += _combat_hook_pull_velocity.x
-	velocity.x = move_toward(velocity.x, target_x, move_acceleration * 1.45 * delta)
-	if hovering:
-		var hover_target := _home_position.y + sin(Time.get_ticks_msec() * 0.0032) * 7.0
-		var target_y := clampf((hover_target - global_position.y) * 3.2, -45.0, 45.0)
-		if _combat_hook_reel_active and not combat_hook_heavy:
-			# I volanti devono seguire davvero la lenza, non solo oscillare:
-			# la componente del reel prevale sul semplice hover.
-			if can_reel_up:
-				var vertical_pull := clampf(_combat_hook_pull_velocity.y * 1.35, -combat_hook_max_upward_speed, combat_hook_max_upward_speed)
-				target_y = clampf(target_y + vertical_pull, -combat_hook_max_upward_speed, combat_hook_max_upward_speed)
-			else:
-				target_y = maxf(target_y, 0.0)
-		velocity.y = move_toward(velocity.y, target_y, move_acceleration * 1.2 * delta)
-		# Anche un volante agganciato ricade: il reel non diventa una levitazione.
-		velocity.y += gravity * delta
-	else:
-		if _combat_hook_reel_active and not combat_hook_heavy and can_reel_up and _combat_hook_pull_velocity.y < -1.0:
-			# Anche un nemico leggero a terra può essere schiodato: il reel
-			# applica una trazione verticale, poi la gravità lo fa ricadere.
+		var ai_momentum_x := velocity.x * 0.32
+		velocity.x = move_toward(
+			velocity.x,
+			_combat_hook_pull_velocity.x + ai_momentum_x,
+			move_acceleration * 1.45 * delta
+		)
+		if can_reel_up and _combat_hook_pull_velocity.y < -1.0:
 			velocity.y = move_toward(
 				velocity.y,
-				maxf(_combat_hook_pull_velocity.y * 1.15, -combat_hook_max_upward_speed),
-				move_acceleration * 1.25 * delta
+				maxf(_combat_hook_pull_velocity.y * (1.25 if hovering else 1.05), -combat_hook_max_upward_speed),
+				move_acceleration * 1.2 * delta
 			)
-		# La gravità resta sempre attiva anche mentre la lenza tira.
-		velocity.y += gravity * delta
+		elif not can_reel_up and velocity.y < 0.0:
+			velocity.y = 0.0
 	if lift_from_owner >= combat_hook_max_lift and velocity.y < 0.0:
 		velocity.y = 0.0
 	velocity.y = clampf(velocity.y, -combat_hook_max_upward_speed, 580.0)
-	facing_right = velocity.x >= 0.0
-	if sprite_node:
-		sprite_node.flip_h = not facing_right
-	_sync_locomotion_clip()
 
 
 func release_combat_hook(launch_direction := Vector2.ZERO, powered := false) -> void:
@@ -1267,23 +1242,15 @@ func release_combat_hook(launch_direction := Vector2.ZERO, powered := false) -> 
 	_combat_hook_reel_active = false
 	if state == State.DEAD:
 		return
-	# Un rilascio manuale chiude il duello e restituisce il nemico al suo
-	# pattugliamento, invece di lasciare l'AGGRO congelato dal trascinamento.
-	state = State.IDLE
-	player = null
-	_wake_timer = maxf(_wake_timer, 0.75)
-	# Riparti dal ciclo AI normale: il trascinamento può aver lasciato windup,
-	# strafe o salto a metà. Non cambiamo lo stato precedente, ma eliminiamo
-	# solo i residui temporanei dell'aggancio.
-	jump_timer = 0.0
-	attack_timer = 0.0
-	_strafe_timer = 0.0
-	_melee_windup_remaining = 0.0
-	_special_windup_remaining = 0.0
-	_charge_timer = 0.0
+	# Torna esattamente all'attivita' precedente. I timer d'attacco non vengono
+	# azzerati: mentre era legato l'enemy ha continuato a combattere normalmente.
+	state = _combat_hook_previous_state
+	player = _combat_hook_previous_player
+	if state == State.IDLE:
+		_wake_timer = maxf(_wake_timer, 0.75)
 	if state == State.IDLE:
 		play_idle()
-	facing_right = _combat_hook_previous_facing
+		facing_right = _combat_hook_previous_facing
 	if powered and not combat_hook_heavy and launch_direction.length_squared() > 0.01:
 		var direction := launch_direction.normalized()
 		direction.y = minf(direction.y, -0.28)
