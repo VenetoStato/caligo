@@ -2,6 +2,8 @@
 extends Node2D
 ## Spine da pontile. L'arte è sostituibile dalla disegnatrice: hitbox restano qui.
 
+const ParticleBurst := preload("res://Fx/particle_burst.gd")
+
 enum Kind { CLUSTER, BED }
 
 @export var kind := Kind.CLUSTER
@@ -63,6 +65,7 @@ func _process(delta: float) -> void:
 
 func on_pogo_hit() -> void:
 	_flash = 1.0
+	_spawn_contact_fx(Color(0.54, 0.9, 0.96, 0.92), 13)
 
 
 func _build_hurtboxes() -> void:
@@ -123,6 +126,7 @@ func _try_hurt(body: Node) -> void:
 	if _hurt_cd <= 0.0 and body.has_method("take_damage"):
 		body.call("take_damage", damage, Vector2.ZERO)
 		_hurt_cd = 0.55
+		_spawn_contact_fx(Color(0.22, 0.48, 0.52, 0.9), 10)
 	_launch_player(body)
 
 
@@ -199,6 +203,7 @@ func _sync_serialized_visual() -> void:
 	if _sprite == null or texture == null:
 		return
 	_sprite.texture = texture
+	_sprite.self_modulate = Color(1.08, 1.1, 1.12, 1.0)
 	if kind == Kind.BED:
 		var target_h := art_profile.thorn_bed_height if art_profile else 40.0
 		_sprite.scale = Vector2(
@@ -210,6 +215,15 @@ func _sync_serialized_visual() -> void:
 		var fitted := target_h / float(texture.get_height())
 		_sprite.scale = Vector2(fitted, fitted)
 	_seat_visual_on_anchor()
+	_add_cartoon_outline()
+
+
+func _spawn_contact_fx(tint: Color, amount: int) -> void:
+	if Engine.is_editor_hint() or not is_inside_tree():
+		return
+	var origin := global_position + Vector2(0.0, -maxf(18.0, _pogo_size().y * 0.45))
+	ParticleBurst.spawn(get_tree().current_scene, origin, Color(0.025, 0.04, 0.055, 0.88), amount, Vector2.UP, 38.0, 105.0, 0.48)
+	ParticleBurst.spawn(get_tree().current_scene, origin, tint, maxi(5, amount / 2), Vector2.UP, 22.0, 72.0, 0.34)
 
 
 func _sync_editor_guide(guide: CanvasItem) -> void:

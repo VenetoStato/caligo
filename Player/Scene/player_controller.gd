@@ -496,14 +496,21 @@ func _try_hit_enemy(target: Node) -> void:
 		return
 	if not target.is_in_group("enemy"):
 		if _is_pogo_target(target):
-			if target in _attack_hit_enemies:
+			# Le spine espongono una Area2D figlia per il pogo: l'effetto visivo
+			# appartiene alla radice del thorn, non alla sola hitbox.
+			var effect_target := target
+			if not effect_target.has_method("on_pogo_hit"):
+				var target_parent := target.get_parent()
+				if target_parent and target_parent.has_method("on_pogo_hit"):
+					effect_target = target_parent
+			if effect_target in _attack_hit_enemies:
 				return
-			_attack_hit_enemies.append(target)
-			if target.has_method("on_pogo_hit"):
-				target.call("on_pogo_hit")
-			if target.has_method("_on_hit"):
-				target.call("_on_hit")
-			_on_nail_connect(target)
+			_attack_hit_enemies.append(effect_target)
+			if effect_target.has_method("on_pogo_hit"):
+				effect_target.call("on_pogo_hit")
+			if effect_target.has_method("_on_hit"):
+				effect_target.call("_on_hit")
+			_on_nail_connect(effect_target)
 		return
 	if target in _attack_hit_enemies:
 		return

@@ -44,6 +44,7 @@ var _distant_dogana: Node2D
 var _distant_ships: Node2D
 var _distant_fog: Node2D
 var _rain_overlay: ColorRect
+var _rain_surface_fx: Node2D
 var _fore_motes: CPUParticles2D
 var _moon: Node2D
 var _interior_overlay: Polygon2D
@@ -66,6 +67,7 @@ func _ready() -> void:
 	_distant_ships = _build_distant_ships()
 	_distant_fog = _build_distant_fog()
 	_rain_overlay = _build_rain_effect()
+	_rain_surface_fx = _build_rain_surface_fx()
 	apply_atmosphere_tuning()
 	_mid = _build_mid_reflections()
 	_mid_near = _build_empty_layer("MidNearRooftops", -5, "dogana_parallax_mid_near")
@@ -320,6 +322,14 @@ func apply_atmosphere_tuning() -> void:
 			rain_material.set_shader_parameter("intensity", rain_intensity)
 			rain_material.set_shader_parameter("fall_speed", rain_speed)
 			rain_material.set_shader_parameter("wind", rain_wind)
+	if _rain_surface_fx:
+		_rain_surface_fx.visible = rain_enabled
+		for child in _rain_surface_fx.get_children():
+			if child is CPUParticles2D:
+				var particles := child as CPUParticles2D
+				particles.emitting = rain_enabled
+				var base_amount := int(particles.get_meta("base_amount", particles.amount))
+				particles.amount = maxi(1, int(round(base_amount * clampf(rain_intensity, 0.12, 1.0))))
 
 
 func _set_layer_blur(layer: Node2D, blur_radius: float) -> void:
@@ -337,14 +347,96 @@ func _build_rain_effect() -> ColorRect:
 	add_child(layer)
 	var rain := ColorRect.new()
 	rain.name = "RainOverlay"
-	rain.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rain.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	rain.visible = rain_enabled
 	rain.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rain.color = Color(0, 0, 0, 0)
 	var material := ShaderMaterial.new()
 	material.shader = CITY_RAIN_SHADER
 	rain.material = material
 	layer.add_child(rain)
 	return rain
+
+
+func _build_rain_surface_fx() -> Node2D:
+	var root := Node2D.new()
+	root.name = "RainSurfaceImpacts"
+	root.z_as_relative = false
+	root.z_index = 13
+	root.visible = rain_enabled
+	add_child(root)
+	# Impatti diffusi sulla pietra del pontile: corti schizzi orizzontali,
+	# non bolle bianche o una nebbia che copre il gameplay.
+	root.add_child(_make_rain_splash_band(
+		"QuaySplashes", Vector2(3000, 478), Vector2(3400, 10),
+		92 if not OS.has_feature("mobile") else 42, 0.42, Color(0.5, 0.75, 0.79, 0.48)
+	))
+	# Una seconda fascia più tenue sui cornicioni fa leggere la pioggia anche
+	# sopra la Dogana, anziché soltanto davanti alla telecamera.
+	root.add_child(_make_rain_splash_band(
+		"RoofSplashes", Vector2(3100, 300), Vector2(3000, 34),
+		58 if not OS.has_feature("mobile") else 24, 0.34, Color(0.58, 0.78, 0.82, 0.3)
+	))
+	return root
+
+
+func _make_rain_splash_band(
+	particle_name: String,
+	origin: Vector2,
+	extents: Vector2,
+	count: int,
+	life: float,
+	tint: Color
+) -> CPUParticles2D:
+	var particles := CPUParticles2D.new()
+	particles.name = particle_name
+	particles.position = origin
+	particles.amount = count
+	particles.set_meta("base_amount", count)
+	particles.lifetime = life
+	particles.preprocess = life * 2.0
+	particles.randomness = 0.94
+	particles.emitting = rain_enabled
+	particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	particles.emission_rect_extents = extents
+	particles.direction = Vector2.UP
+	particles.spread = 78.0
+	particles.gravity = Vector2(0, 165)
+	particles.initial_velocity_min = 28.0
+	particles.initial_velocity_max = 66.0
+	particles.damping_min = 4.0
+	particles.damping_max = 16.0
+	particles.scale_amount_min = 0.16
+	particles.scale_amount_max = 0.52
+	particles.angle_min = -18.0
+	particles.angle_max = 18.0
+	particles.color = tint
+	particles.texture = _make_rain_splash_texture()
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.12, 0.58, 1.0])
+	fade.colors = PackedColorArray([
+		Color(1, 1, 1, 0), Color(1, 1, 1, 0.9),
+		Color(1, 1, 1, 0.32), Color(1, 1, 1, 0),
+	])
+	particles.color_ramp = fade
+	return particles
+
+
+func _make_rain_splash_texture() -> GradientTexture2D:
+	var gradient := Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 0.22, 0.5, 0.78, 1.0])
+	gradient.colors = PackedColorArray([
+		Color(1, 1, 1, 0), Color(1, 1, 1, 0.24),
+		Color(1, 1, 1, 1), Color(1, 1, 1, 0.24), Color(1, 1, 1, 0),
+	])
+	var texture := GradientTexture2D.new()
+	texture.gradient = gradient
+	texture.width = 56
+	texture.height = 8
+	texture.fill = GradientTexture2D.FILL_LINEAR
+	texture.fill_from = Vector2(0, 0.5)
+	texture.fill_to = Vector2(1, 0.5)
+	return texture
 
 
 ## Piano frontale: pali d'ormeggio in massa piena che passano davanti al

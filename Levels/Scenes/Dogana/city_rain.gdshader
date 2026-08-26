@@ -1,38 +1,41 @@
 shader_type canvas_item;
-render_mode blend_mix;
+render_mode unshaded, blend_mix;
 
 uniform float intensity : hint_range(0.0, 1.0) = 0.62;
 uniform float fall_speed : hint_range(0.1, 3.0) = 1.0;
 uniform float wind : hint_range(-1.0, 1.0) = 0.16;
 
 float hash21(vec2 p) {
-	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+	p = fract(p * vec2(123.34, 456.21));
+	p += dot(p, p + 45.32);
+	return fract(p.x * p.y);
 }
 
-// Versione compatibile anche con il renderer Compatibility: solo UV e TIME,
-// nessun builtin screen-only che possa lasciare visibile il ColorRect bianco.
-float rain_layer(vec2 uv, float density, float speed, float phase) {
-	vec2 grid = vec2(density, density * 0.58);
-	vec2 cell_uv = uv * grid;
-	vec2 cell = floor(cell_uv);
-	vec2 local = fract(cell_uv);
-	float seed = hash21(cell + phase * 19.7);
-	float vertical = fract(local.y + TIME * fall_speed * speed + seed);
-	// Pioggia quasi verticale, leggermente spinta dal vento.
-	float slant = wind * 0.19 + (seed - 0.5) * 0.04;
-	float center_x = 0.5 + (vertical - 0.5) * slant;
-	float body = 1.0 - smoothstep(0.012, 0.036, abs(local.x - center_x));
-	float head = smoothstep(0.04, 0.15, vertical);
-	float tail = 1.0 - smoothstep(0.58, 0.94, vertical);
-	return body * head * tail * smoothstep(0.22, 0.68, seed);
+float streak_layer(vec2 uv, float columns, float speed, float phase, float width) {
+	float aspect = SCREEN_PIXEL_SIZE.y / max(SCREEN_PIXEL_SIZE.x, 0.000001);
+	vec2 p = vec2(uv.x * aspect, uv.y);
+	p.x -= p.y * (wind * 0.16);
+	p.y += TIME * fall_speed * speed;
+	vec2 grid = vec2(columns * aspect, columns * 0.54);
+	vec2 id = floor(p * grid);
+	vec2 q = fract(p * grid) - 0.5;
+	float seed = hash21(id + phase * 31.7);
+	q.x += (seed - 0.5) * 0.58;
+	q.x += q.y * (wind * 0.42);
+	float line = 1.0 - smoothstep(width, width * 2.5, abs(q.x));
+	float segment = smoothstep(-0.49, -0.18, q.y) * (1.0 - smoothstep(0.08, 0.49, q.y));
+	float active = smoothstep(0.54, 0.86, seed);
+	return line * segment * active;
 }
 
 void fragment() {
 	vec2 uv = SCREEN_UV;
-	float far_rain = rain_layer(uv, 78.0, 0.64, 0.13);
-	float middle_rain = rain_layer(uv + vec2(0.071, 0.0), 49.0, 0.96, 0.47);
-	float near_rain = rain_layer(uv + vec2(0.139, 0.0), 29.0, 1.32, 0.81);
-	float rain = far_rain * 0.24 + middle_rain * 0.46 + near_rain * 0.72;
-	vec3 rain_color = mix(vec3(0.22, 0.39, 0.49), vec3(0.71, 0.86, 0.90), near_rain);
-	COLOR = vec4(rain_color, min(rain * intensity * 0.36, 0.32));
+	float far_rain = streak_layer(uv, 92.0, 0.44, 0.13, 0.035);
+	float mid_rain = streak_layer(uv + vec2(0.073, 0.0), 58.0, 0.76, 0.47, 0.045);
+	float near_rain = streak_layer(uv + vec2(0.151, 0.0), 34.0, 1.06, 0.81, 0.052);
+	float rain = far_rain * 0.16 + mid_rain * 0.34 + near_rain * 0.58;
+	float shimmer = 0.76 + hash21(floor(FRAGCOORD.xy * 0.5)) * 0.24;
+	vec3 rain_color = mix(vec3(0.28, 0.46, 0.55), vec3(0.68, 0.84, 0.88), near_rain * 0.7);
+	float alpha = clamp(rain * intensity * shimmer, 0.0, 0.24);
+	COLOR = vec4(rain_color, alpha);
 }
