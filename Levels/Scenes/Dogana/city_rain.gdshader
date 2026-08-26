@@ -32,21 +32,30 @@ float streak_layer(vec2 uv, float columns, float speed, float phase, float width
 	// Apply slant after the animated Y. Previously X used the original screen Y,
 	// so streaks travelled inside almost fixed vertical columns. Each depth now
 	// has a slightly different natural drift even with zero wind.
-	float layer_slant = wind * 0.16 + (phase - 0.5) * 0.038;
-	p.x -= p.y * layer_slant;
-	p.x += sin(TIME * (0.31 + speed * 0.17) + phase * 11.0) * 0.012;
 	vec2 grid = vec2(columns * aspect, columns * 0.54);
 	vec2 id = floor(p * grid);
 	vec2 q = fract(p * grid) - 0.5;
 	float seed = hash21(id + phase * 31.7);
+	// Ogni goccia ha una deriva leggermente diversa: evita l'effetto di colonne
+	// verticali ripetute, mantenendo però una caduta leggibile e morbida.
+	float drift_seed = hash21(id + phase * 17.3 + 4.1);
+	float layer_slant = wind * 0.34 + (phase - 0.5) * 0.10 + (drift_seed - 0.5) * 0.12;
+	// La posizione laterale viene animata prima del calcolo della cella: il
+	// movimento resta coerente senza introdurre righe statiche.
+	p.x -= p.y * layer_slant;
+	p.x += sin(TIME * (0.31 + speed * 0.17) + drift_seed * 18.0 + phase * 11.0) * 0.018;
+	id = floor(p * grid);
+	q = fract(p * grid) - 0.5;
+	seed = hash21(id + phase * 31.7);
 	q.x += (seed - 0.5) * 0.58;
 	q.x += q.y * (wind * 0.42);
 	float line = 1.0 - smoothstep(width, width * 2.5, abs(q.x));
 	float segment = smoothstep(-0.49, -0.18, q.y) * (1.0 - smoothstep(0.08, 0.49, q.y));
 	// Fewer decorative streaks: the world-space drops below are now the main
 	// readable rain and almost every one produces a real surface contact.
-	float active = smoothstep(0.68, 0.93, seed);
-	return line * segment * active;
+	float active = smoothstep(0.73, 0.96, seed);
+	float depth_fade = mix(0.72, 1.0, drift_seed);
+	return line * segment * active * depth_fade;
 }
 
 void fragment() {
@@ -54,9 +63,9 @@ void fragment() {
 	float far_rain = streak_layer(uv, 92.0, 0.44, 0.13, 0.035);
 	float mid_rain = streak_layer(uv + vec2(0.073, 0.0), 58.0, 0.76, 0.47, 0.045);
 	float near_rain = streak_layer(uv + vec2(0.151, 0.0), 34.0, 1.06, 0.81, 0.052);
-	float rain = far_rain * 0.16 + mid_rain * 0.34 + near_rain * 0.58;
+	float rain = far_rain * 0.12 + mid_rain * 0.26 + near_rain * 0.44;
 	float shimmer = 0.76 + hash21(floor(FRAGCOORD.xy * 0.5)) * 0.24;
-	vec3 rain_color = mix(vec3(0.28, 0.46, 0.55), vec3(0.68, 0.84, 0.88), near_rain * 0.7);
+	vec3 rain_color = mix(vec3(0.20, 0.35, 0.46), vec3(0.52, 0.72, 0.78), near_rain * 0.7);
 	// The screen overlay used to continue under the water even though the
 	// physical drops stopped there. Fade every streak exactly at the dynamic
 	// world-space waterline supplied by dogana_depth_layers.gd.
@@ -78,6 +87,6 @@ void fragment() {
 		local_waterline - 0.006,
 		uv.y
 	);
-	float alpha = clamp(rain * intensity * shimmer, 0.0, 0.24) * above_water * contact_clearance;
+	float alpha = clamp(rain * intensity * shimmer, 0.0, 0.15) * above_water * contact_clearance;
 	COLOR = vec4(rain_color, alpha);
 }

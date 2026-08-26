@@ -475,8 +475,10 @@ func _spawn_collision_rain_drop() -> void:
 	var coverage := fposmod(float(_rain_spawn_sequence) * 0.61803398875, 1.0)
 	_rain_spawn_sequence += 1
 	var coverage_x := lerpf(-half_width, half_width, coverage)
-	var jitter := randf_range(-half_width * 0.045, half_width * 0.045)
-	var start_y := _camera.global_position.y - half_height
+	# Mantiene una copertura uniforme nel tempo, ma senza la griglia evidente
+	# delle vecchie file: ogni goccia ha una deriva laterale e verticale propria.
+	var jitter := randf_range(-half_width * 0.14, half_width * 0.14)
+	var start_y := _camera.global_position.y - half_height + randf_range(-84.0, 84.0)
 	if is_finite(water_surface_y):
 		# An underwater camera used to spawn rain from below the surface. Always
 		# begin above the real waterline so the ray crosses docks and water.
@@ -517,9 +519,15 @@ func _spawn_collision_rain_drop() -> void:
 
 	var drop := Line2D.new()
 	drop.name = "RainDrop"
-	drop.width = randf_range(0.9, 1.45)
-	drop.default_color = Color(0.58, 0.82, 0.86, randf_range(0.34, 0.6))
-	drop.points = PackedVector2Array([Vector2(-rain_wind * 8.0, -randf_range(20.0, 34.0)), Vector2.ZERO])
+	drop.width = randf_range(0.65, 1.1)
+	drop.default_color = Color(0.48, 0.72, 0.78, randf_range(0.22, 0.46))
+	var drop_length := randf_range(20.0, 34.0)
+	var bend := randf_range(-2.0, 2.0)
+	drop.points = PackedVector2Array([
+		Vector2(-rain_wind * 8.0 - bend, -drop_length),
+		Vector2(-rain_wind * 4.0 + bend * 0.45, -drop_length * 0.48),
+		Vector2.ZERO,
+	])
 	drop.global_position = start
 	_rain_surface_fx.add_child(drop)
 	var base_fall_speed := maxf(760.0, 1040.0 * rain_speed)
