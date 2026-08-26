@@ -2099,10 +2099,6 @@ func _process_fishing(delta: float):
 	_update_power_strike_tint()
 	if enemy_hooked and not is_instance_valid(current_hooked_enemy):
 		_release_hooked_enemy(false)
-	elif enemy_hooked and not is_reeling:
-		# Anche senza tenere premuto, la lenza trascina: agganciare un nemico
-		# deve vedersi subito, altrimenti sembra che non sia successo nulla.
-		_reel_enemy_to_player(delta, idle_hook_pull_ratio)
 	if line_extended and hook_instance:
 		_update_line_length(delta)
 		_sync_hook_to_rope(delta)

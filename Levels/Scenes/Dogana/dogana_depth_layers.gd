@@ -28,6 +28,7 @@ const CITY_RAIN_SHADER := preload("res://Levels/Scenes/Dogana/city_rain.gdshader
 @export_range(0.0, 1.0, 0.01) var rain_intensity := 0.62
 @export_range(0.1, 3.0, 0.05) var rain_speed := 1.0
 @export_range(-1.0, 1.0, 0.01) var rain_wind := 0.16
+@export_range(2.0, 40.0, 1.0) var rain_collision_rate := 18.0
 
 var _camera: Camera2D
 var _origin := Vector2.ZERO
@@ -45,6 +46,7 @@ var _distant_ships: Node2D
 var _distant_fog: Node2D
 var _rain_overlay: ColorRect
 var _rain_surface_fx: Node2D
+var _rain_collision_accumulator := 0.0
 var _fore_motes: CPUParticles2D
 var _moon: Node2D
 var _interior_overlay: Polygon2D
@@ -128,6 +130,8 @@ func _process(delta: float) -> void:
 		_distant_fog.position.x += sin(t * 0.11) * delta * 5.0
 		_distant_fog.position.y = sin(t * 0.17 + 0.8) * fog_vertical_drift
 		_distant_fog.modulate.a = clampf(fog_opacity + sin(t * 0.13) * fog_opacity_pulse, 0.0, 1.0)
+	if rain_enabled:
+		_update_rain_collision_fx(delta)
 	var inside := camera_pos.y < -100.0
 	_interior_overlay.modulate.a = move_toward(_interior_overlay.modulate.a, 0.5 if inside else 0.0, delta * 0.7)
 	if _moon:
@@ -327,12 +331,8 @@ func apply_atmosphere_tuning() -> void:
 				rain_material.set_shader_parameter("aspect_ratio", viewport_size.x / viewport_size.y)
 	if _rain_surface_fx:
 		_rain_surface_fx.visible = rain_enabled
-		for child in _rain_surface_fx.get_children():
-			if child is CPUParticles2D:
-				var particles := child as CPUParticles2D
-				particles.emitting = rain_enabled
-				var base_amount := int(particles.get_meta("base_amount", particles.amount))
-				particles.amount = maxi(1, int(round(base_amount * clampf(rain_intensity, 0.12, 1.0))))
+		if not rain_enabled:
+			_rain_collision_accumulator = 0.0
 
 
 func _set_layer_blur(layer: Node2D, blur_radius: float) -> void:
@@ -363,66 +363,95 @@ func _build_rain_effect() -> ColorRect:
 
 func _build_rain_surface_fx() -> Node2D:
 	var root := Node2D.new()
-	root.name = "RainSurfaceImpacts"
+	root.name = "RainCollisionImpacts"
 	root.z_as_relative = false
 	root.z_index = 13
 	root.visible = rain_enabled
 	add_child(root)
-	# Impatti diffusi sulla pietra del pontile: corti schizzi orizzontali,
-	# non bolle bianche o una nebbia che copre il gameplay.
-	root.add_child(_make_rain_splash_band(
-		"QuaySplashes", Vector2(3000, 478), Vector2(3400, 10),
-		92 if not OS.has_feature("mobile") else 42, 0.42, Color(0.5, 0.75, 0.79, 0.48)
-	))
-	# Una seconda fascia più tenue sui cornicioni fa leggere la pioggia anche
-	# sopra la Dogana, anziché soltanto davanti alla telecamera.
-	root.add_child(_make_rain_splash_band(
-		"RoofSplashes", Vector2(3100, 300), Vector2(3000, 34),
-		58 if not OS.has_feature("mobile") else 24, 0.34, Color(0.58, 0.78, 0.82, 0.3)
-	))
 	return root
 
 
-func _make_rain_splash_band(
-	particle_name: String,
-	origin: Vector2,
-	extents: Vector2,
-	count: int,
-	life: float,
-	tint: Color
-) -> CPUParticles2D:
+func _update_rain_collision_fx(delta: float) -> void:
+	if _camera == null or _rain_surface_fx == null:
+		return
+	var mobile_ratio := 0.48 if OS.has_feature("mobile") else 1.0
+	_rain_collision_accumulator += delta * rain_collision_rate * rain_intensity * mobile_ratio
+	var spawned := 0
+	while _rain_collision_accumulator >= 1.0 and spawned < 4:
+		_rain_collision_accumulator -= 1.0
+		_spawn_collision_rain_drop()
+		spawned += 1
+
+
+func _spawn_collision_rain_drop() -> void:
+	var viewport_size := get_viewport_rect().size
+	var zoom := maxf(absf(_camera.zoom.x), 0.01)
+	var half_width := viewport_size.x / zoom * 0.62
+	var half_height := viewport_size.y / zoom * 0.66
+	var start := Vector2(
+		_camera.global_position.x + randf_range(-half_width, half_width),
+		_camera.global_position.y - half_height
+	)
+	var fall_vector := Vector2(rain_wind * 150.0, half_height * 2.05)
+	var finish := start + fall_vector
+	var space := get_world_2d().direct_space_state
+	if space == null:
+		return
+	var query := PhysicsRayQueryParameters2D.create(start, finish)
+	query.collision_mask = 1
+	query.collide_with_areas = false
+	query.collide_with_bodies = true
+	var hit := space.intersect_ray(query)
+	var target := finish
+	var did_hit := not hit.is_empty()
+	var normal := Vector2.UP
+	if did_hit:
+		target = hit.position as Vector2
+		normal = hit.normal as Vector2
+
+	var drop := Line2D.new()
+	drop.name = "RainDrop"
+	drop.width = randf_range(1.0, 1.8)
+	drop.default_color = Color(0.58, 0.82, 0.86, randf_range(0.22, 0.48))
+	drop.points = PackedVector2Array([Vector2(-rain_wind * 8.0, -randf_range(20.0, 34.0)), Vector2.ZERO])
+	drop.global_position = start
+	_rain_surface_fx.add_child(drop)
+	var travel_time := start.distance_to(target) / maxf(760.0, 1040.0 * rain_speed)
+	var tween := create_tween()
+	tween.tween_property(drop, "global_position", target, maxf(0.05, travel_time))
+	if did_hit:
+		tween.tween_callback(_spawn_rain_impact.bind(target, normal))
+	tween.tween_callback(drop.queue_free)
+
+
+func _spawn_rain_impact(at: Vector2, normal: Vector2) -> void:
+	if _rain_surface_fx == null or not rain_enabled:
+		return
 	var particles := CPUParticles2D.new()
-	particles.name = particle_name
-	particles.position = origin
-	particles.amount = count
-	particles.set_meta("base_amount", count)
-	particles.lifetime = life
-	particles.preprocess = life * 2.0
-	particles.randomness = 0.94
-	particles.emitting = rain_enabled
-	particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	particles.emission_rect_extents = extents
-	particles.direction = Vector2.UP
-	particles.spread = 78.0
-	particles.gravity = Vector2(0, 165)
-	particles.initial_velocity_min = 28.0
-	particles.initial_velocity_max = 66.0
-	particles.damping_min = 4.0
-	particles.damping_max = 16.0
-	particles.scale_amount_min = 0.16
-	particles.scale_amount_max = 0.52
-	particles.angle_min = -18.0
-	particles.angle_max = 18.0
-	particles.color = tint
+	particles.name = "SurfaceSplash"
+	particles.one_shot = true
+	particles.amount = 4 if not OS.has_feature("mobile") else 2
+	particles.lifetime = 0.3
+	particles.explosiveness = 0.96
+	particles.randomness = 0.72
+	particles.direction = normal.normalized()
+	particles.spread = 76.0
+	particles.gravity = Vector2(0, 190)
+	particles.initial_velocity_min = 24.0
+	particles.initial_velocity_max = 58.0
+	particles.scale_amount_min = 0.12
+	particles.scale_amount_max = 0.36
+	particles.color = Color(0.54, 0.78, 0.82, 0.58)
 	particles.texture = _make_rain_splash_texture()
-	var fade := Gradient.new()
-	fade.offsets = PackedFloat32Array([0.0, 0.12, 0.58, 1.0])
-	fade.colors = PackedColorArray([
-		Color(1, 1, 1, 0), Color(1, 1, 1, 0.9),
-		Color(1, 1, 1, 0.32), Color(1, 1, 1, 0),
-	])
-	particles.color_ramp = fade
-	return particles
+	_rain_surface_fx.add_child(particles)
+	particles.global_position = at + normal * 2.0
+	particles.emitting = true
+	var cleanup := Timer.new()
+	cleanup.one_shot = true
+	cleanup.wait_time = 0.55
+	cleanup.autostart = true
+	cleanup.timeout.connect(particles.queue_free)
+	particles.add_child(cleanup)
 
 
 func _make_rain_splash_texture() -> GradientTexture2D:

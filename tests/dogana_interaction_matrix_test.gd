@@ -243,10 +243,17 @@ func _check_timed_power_attack() -> void:
 	light.set_physics_process(false)
 	light.call("reset_to_home")
 	light.set_physics_process(false)
-	_player.global_position = light.global_position + Vector2(-50, 0)
+	_player.global_position = light.global_position + Vector2(-150, 0)
 	_player.velocity = Vector2.ZERO
 	var health_before := int(light.get("current_health"))
 	_player.call("on_enemy_hooked", light, null)
+	_player.set("is_reeling", false)
+	_player.call("_process_fishing", 0.1)
+	if (light.get("_combat_hook_pull_velocity") as Vector2).length() > 1.0:
+		_fail("light enemy moved before the player pressed reel")
+		return
+	_player.global_position = light.global_position + Vector2(-50, 0)
+	_player.set("is_reeling", true)
 	_player.call("_reel_enemy_to_player", 0.016)
 	if float(_player.get("_power_strike_left")) <= 0.0:
 		_fail("reel finish did not open highlighted power window")

@@ -16,7 +16,9 @@ float streak_layer(vec2 uv, float columns, float speed, float phase, float width
 	float aspect = aspect_ratio;
 	vec2 p = vec2(uv.x * aspect, uv.y);
 	p.x -= p.y * (wind * 0.16);
-	p.y += TIME * fall_speed * speed;
+	// Le UV canvas crescono verso il basso; sottrarre il tempo fa scorrere
+	// visivamente le celle dall'alto verso il basso.
+	p.y -= TIME * fall_speed * speed;
 	vec2 grid = vec2(columns * aspect, columns * 0.54);
 	vec2 id = floor(p * grid);
 	vec2 q = fract(p * grid) - 0.5;
