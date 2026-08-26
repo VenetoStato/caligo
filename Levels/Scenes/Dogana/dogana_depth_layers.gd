@@ -320,13 +320,13 @@ func _build_distant_fog() -> Node2D:
 
 
 ## Velo vicino alla scena giocabile: stessa nebbia raster specchiata, davanti a
-## Dogana/player (z=9) ma dietro alle briccole del primissimo piano (z=15). Il
+## Dogana/player (z=14) ma dietro alle briccole del primissimo piano (z=15). Il
 ## moto è opposto a quello del piano lontano per separare la profondità.
 func _build_foreground_fog() -> Node2D:
 	var layer := Node2D.new()
 	layer.name = "ForegroundMirroredFog"
 	layer.z_as_relative = false
-	layer.z_index = 9
+	layer.z_index = 14
 	layer.modulate = Color(0.68, 0.82, 0.96, fog_opacity * foreground_fog_opacity)
 	layer.add_to_group("dogana_parallax_foreground_fog")
 	for index in 5:
