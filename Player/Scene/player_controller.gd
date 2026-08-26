@@ -469,8 +469,10 @@ func _update_attack_hitbox_position():
 	else:
 		# Il colpo orizzontale copre anche il bordo superiore del nemico:
 		# stare un poco sopra non deve far passare la lenza a vuoto.
-		shape.size = Vector2(108, 78)
-		col.position = Vector2(46 if facing_right else -46, -30)
+		# Il lato destro resta sul reach storico; a sinistra serve qualche pixel
+		# in più perché l'offset della posa e il bordo dell'hurtbox non coincidono.
+		shape.size = Vector2(94 if facing_right else 108, 78)
+		col.position = Vector2(38 if facing_right else -46, -30)
 
 func _enable_attack_hitbox(damage: int = 1):
 	# Dopo il reel il bersaglio può essere rimasto dall'altro lato del player:
@@ -613,7 +615,27 @@ func _resolve_attack_overlaps() -> void:
 	for body in _attack_hitbox.get_overlapping_bodies():
 		_try_hit_enemy(body)
 		_on_attack_hitbox_body_entered(body)
+	_probe_reeled_enemy_attack()
 	_probe_pogo_targets()
+
+
+func _probe_reeled_enemy_attack() -> void:
+	# Il reel può lasciare l'enemy a contatto mentre il suo Hurtbox sta
+	# cambiando posizione nello stesso frame. Il probe evita che un colpo
+	# ravvicinato venga perso solo per l'ordine dei segnali fisici.
+	if absf(_attack_dir.y) > 0.5:
+		return
+	var target: Node2D = null
+	if is_instance_valid(current_hooked_enemy):
+		target = current_hooked_enemy
+	elif _power_strike_left > 0.0 and is_instance_valid(_power_strike_target):
+		target = _power_strike_target
+	if target == null:
+		return
+	var delta := target.global_position - global_position
+	var forward := 1.0 if facing_right else -1.0
+	if delta.length_squared() <= 112.0 * 112.0 and delta.x * forward >= -14.0:
+		_try_hit_enemy(target)
 
 func _on_attack_hitbox_body_entered(body: Node2D) -> void:
 	if _is_pogo_target(body) and not body.is_in_group("enemy"):
