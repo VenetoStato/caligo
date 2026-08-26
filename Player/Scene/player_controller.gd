@@ -2861,11 +2861,15 @@ func _reel_fish_to_player(delta: float = 0.016) -> void:
 			pull = reel_pull_force * 0.48
 			haul_mul = 0.42
 
-	if current_fish.has_method("apply_reel_force"):
-		current_fish.call("apply_reel_force", dir * pull)
-	var haul := reel_in_speed * delta * haul_mul
-	if current_fish.has_method("pull_along_line"):
-		current_fish.call("pull_along_line", rod, haul, allow_exit_pull)
+	var corpse_bait := current_fish.has_method("is_bait_carcass") and bool(current_fish.call("is_bait_carcass"))
+	if corpse_bait and current_fish.has_method("reel_toward"):
+		current_fish.call("reel_toward", rod, delta, reel_in_speed * haul_mul)
+	else:
+		if current_fish.has_method("apply_reel_force"):
+			current_fish.call("apply_reel_force", dir * pull)
+		var haul := reel_in_speed * delta * haul_mul
+		if current_fish.has_method("pull_along_line"):
+			current_fish.call("pull_along_line", rod, haul, allow_exit_pull)
 
 
 func _sync_line_length_for_hang() -> void:

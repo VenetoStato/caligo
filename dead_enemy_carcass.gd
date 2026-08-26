@@ -10,6 +10,7 @@ var player_ref: Node = null
 const PLAYER_WATER_GRAVITY := 0.3
 const MAX_REEL_LIFT := 120.0
 const MAX_REEL_UPWARD_SPEED := 185.0
+const REEL_ACCELERATION := 1050.0
 
 func _ready() -> void:
 	add_to_group("fish")
@@ -17,6 +18,10 @@ func _ready() -> void:
 	contact_monitor = true
 	max_contacts_reported = 4
 	gravity_scale = 1.0
+	var drag_material := PhysicsMaterial.new()
+	drag_material.friction = 0.18
+	drag_material.bounce = 0.0
+	physics_material_override = drag_material
 
 func is_fish() -> bool:
 	return true
@@ -28,6 +33,8 @@ func set_player_reference(player: Node) -> void:
 	player_ref = player
 	hooked_to_player = true
 	freeze = false
+	can_sleep = false
+	sleeping = false
 	# Il cadavere resta un corpo fisico: il reel non annulla la gravità.
 	gravity_scale = PLAYER_WATER_GRAVITY if in_water else 1.0
 
@@ -69,6 +76,44 @@ func apply_reel_force(force: Vector2) -> void:
 	# gravità ridotta dell'acqua quando il giocatore la reel-a.
 	apply_central_force(limited * 1.45)
 
+
+func reel_toward(anchor: Vector2, delta: float, reel_speed: float) -> void:
+	# Il cadavere è un RigidBody e, quando appoggiato al pontile, la sola forza
+	# continua veniva assorbita da gravità, attrito e damping. Qui il reel agisce
+	# come trazione controllata sulla velocità: resta pesante, ma si muove sempre.
+	if not hooked_to_player:
+		return
+	can_sleep = false
+	sleeping = false
+	var offset := anchor - global_position
+	if offset.length_squared() <= 1.0:
+		return
+	var direction := offset.normalized()
+	var lift := 0.0
+	if player_ref is Node2D:
+		lift = (player_ref as Node2D).global_position.y - global_position.y
+	if direction.y < 0.0:
+		if lift >= MAX_REEL_LIFT:
+			direction.y = 0.0
+		elif lift > MAX_REEL_LIFT * 0.55:
+			direction.y *= clampf(
+				inverse_lerp(MAX_REEL_LIFT, MAX_REEL_LIFT * 0.55, lift),
+				0.0,
+				1.0
+			)
+	if direction.length_squared() > 0.01:
+		direction = direction.normalized()
+	var target_speed := clampf(reel_speed * 0.92, 105.0, 205.0)
+	var target_velocity := direction * target_speed
+	target_velocity.y = maxf(target_velocity.y, -MAX_REEL_UPWARD_SPEED)
+	linear_velocity.x = move_toward(linear_velocity.x, target_velocity.x, REEL_ACCELERATION * delta)
+	if direction.y < -0.01:
+		linear_velocity.y = move_toward(
+			linear_velocity.y,
+			target_velocity.y,
+			REEL_ACCELERATION * 1.15 * delta
+		)
+
 func pull_along_line(anchor: Vector2, haul: float, _allow_exit := false) -> void:
 	var to_anchor := anchor - global_position
 	if to_anchor.length_squared() > 1.0:
@@ -94,6 +139,7 @@ func pull_along_line(anchor: Vector2, haul: float, _allow_exit := false) -> void
 func release_from_hook() -> void:
 	hooked_to_player = false
 	player_ref = null
+	can_sleep = true
 	gravity_scale = PLAYER_WATER_GRAVITY if in_water else 1.0
 
 func _on_hook_detected(hook: Node) -> void:
