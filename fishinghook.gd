@@ -50,6 +50,7 @@ var fish_detection_area: Area2D = null
 var _fish_scan_timer := 0.0
 var _enemy_scan_timer := 0.0
 var _enemy_contact_grace := 0.0
+var _grapple_target: Node2D = null
 
 func _ready():
 	original_gravity_scale = gravity_scale
@@ -162,6 +163,8 @@ func _physics_process(delta: float):
 	if is_instance_valid(hooked_enemy):
 		global_position = hooked_enemy.global_position + Vector2(0.0, -14.0)
 		linear_velocity = Vector2.ZERO
+	if is_anchored and is_instance_valid(_grapple_target):
+		global_position = _grapple_target.global_position
 	if not is_anchored and hooked_fish == null and hooked_enemy == null:
 		_scan_grapples()
 		_enemy_scan_timer -= delta
@@ -294,6 +297,7 @@ func _latch_grapple(target: Node2D) -> void:
 	if is_anchored:
 		return
 	is_anchored = true
+	_grapple_target = target
 	freeze = true
 	linear_velocity = Vector2.ZERO
 	angular_velocity = 0.0
@@ -303,6 +307,16 @@ func _latch_grapple(target: Node2D) -> void:
 		global_position = target.global_position
 	if player_ref:
 		player_ref.call("on_grapple_latched", self)
+
+
+func get_grapple_owner() -> Node:
+	if not is_instance_valid(_grapple_target):
+		return null
+	var owner: Variant = _grapple_target.get_meta("grapple_owner", null)
+	if owner is Node and is_instance_valid(owner):
+		return owner as Node
+	var parent := _grapple_target.get_parent()
+	return parent if parent and parent.has_method("reel_grapple") else null
 
 
 func _on_fish_body_entered(body: Node2D):

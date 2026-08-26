@@ -45,6 +45,7 @@ var in_water: bool = false
 var hook_type: String = "fishing"  # "fishing" o "grab"
 var is_anchored: bool = false
 var original_gravity_scale: float = 1.0
+var _grapple_target: Node2D = null
 
 func _ready():
 	original_gravity_scale = gravity_scale
@@ -75,6 +76,8 @@ func _on_body_entered(body: Node2D) -> void:
 	# L'amo da trascino morde la pietra dove tocca. Prima restava sospeso a
 	# mezz'aria finche' non premevi G, e l'appiglio sembrava finto.
 	if hook_type == "grab" and not is_anchored and _is_grabbable(body):
+		if body.is_in_group("dogana_grapple_point"):
+			_grapple_target = body
 		_bite_surface()
 		return
 	# Hook (grab) fa danno ai nemici e spinge il dead gamberetto
@@ -153,11 +156,23 @@ func _find_point_light():
 				print("Hook: Usando sprite position come offset: ", line_attach_offset)
 
 func _physics_process(delta: float):
+	if is_anchored and is_instance_valid(_grapple_target):
+		global_position = _grapple_target.global_position
 	if in_water and not is_anchored:
 		linear_velocity *= (1.0 - water_drag * delta)
 	
 	# Ruota lo sprite in base alla velocità o alla direzione della lenza
 	_update_sprite_rotation()
+
+
+func get_grapple_owner() -> Node:
+	if not is_instance_valid(_grapple_target):
+		return null
+	var owner: Variant = _grapple_target.get_meta("grapple_owner", null)
+	if owner is Node and is_instance_valid(owner):
+		return owner as Node
+	var parent := _grapple_target.get_parent()
+	return parent if parent and parent.has_method("reel_grapple") else null
 
 func _update_sprite_rotation():
 	if sprite == null:

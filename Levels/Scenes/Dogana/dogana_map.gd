@@ -23,16 +23,18 @@ var _player_world_position := Vector2(330, 425)
 ## La carta si apre con M. Il pulsante e' la stessa icona della carta, non un
 ## rombo unicode che sembrava un misuratore.
 func _style_map_glyph() -> void:
-	_map_button.text = ""
+	_map_button.text = "      MAPPA  [M]"
 	_map_button.flat = true
 	_map_button.focus_mode = Control.FOCUS_NONE
-	_map_button.custom_minimum_size = Vector2(52, 52)
+	_map_button.custom_minimum_size = Vector2(150, 52)
 	_map_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	_map_button.offset_left = -72.0
+	_map_button.offset_left = -170.0
 	_map_button.offset_right = -20.0
 	_map_button.offset_top = -72.0
 	_map_button.offset_bottom = -20.0
-	_map_button.modulate = Color(1, 1, 1, 0.42)
+	_map_button.modulate = Color(0.9, 1.0, 0.96, 0.76)
+	_map_button.add_theme_font_size_override("font_size", 15)
+	_map_button.add_theme_color_override("font_color", Color(0.78, 0.94, 0.88, 1.0))
 	_map_button.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
 	_map_button.add_theme_stylebox_override("hover", StyleBoxEmpty.new())
 	_map_button.add_theme_stylebox_override("pressed", StyleBoxEmpty.new())
@@ -41,11 +43,8 @@ func _style_map_glyph() -> void:
 	if _map_button.get_node_or_null("MapGlyph") == null:
 		var glyph := HintMark.new()
 		glyph.name = "MapGlyph"
-		glyph.set_anchors_preset(Control.PRESET_FULL_RECT)
-		glyph.offset_left = 0
-		glyph.offset_top = 0
-		glyph.offset_right = 0
-		glyph.offset_bottom = 0
+		glyph.position = Vector2(2.0, 2.0)
+		glyph.size = Vector2(48.0, 48.0)
 		glyph.show_mark(HintMark.Mark.MAP, "")
 		_map_button.add_child(glyph)
 

@@ -669,7 +669,7 @@ func _apply_grab_hook_unlock() -> void:
 
 
 func _on_locked_skill_requested() -> void:
-	_show_message("AMO DEL TRASCINAMENTO SIGILLATO  •  SCONFIGGI IL CUSTODE")
+	_show_message("GLI APPIGLI USANO LO STESSO AMO  •  PUNTA E LANCIA CON [F]")
 
 
 func _get_player_region(world_position: Vector2) -> String:

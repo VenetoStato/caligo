@@ -2012,9 +2012,33 @@ func _update_swing(delta: float) -> void:
 	if distance < 0.01:
 		return
 	var direction := to_anchor / distance
+	var grapple_owner: Node = null
+	if hook_instance.has_method("get_grapple_owner"):
+		grapple_owner = hook_instance.call("get_grapple_owner") as Node
+	if (
+		grapple_owner != null
+		and is_instance_valid(grapple_owner)
+		and grapple_owner.has_method("apply_grapple_tension")
+	):
+		grapple_owner.call("apply_grapple_tension", self, delta, Input.is_action_pressed("reel"))
+	var pulling_droppable_lamp := (
+		Input.is_action_pressed("reel")
+		and grapple_owner != null
+		and is_instance_valid(grapple_owner)
+		and grapple_owner.has_method("can_be_pulled_down")
+		and bool(grapple_owner.call("can_be_pulled_down"))
+	)
+	if pulling_droppable_lamp:
+		# Sui due lampadari fragili R mette in tensione il giunto: sugli altri
+		# appigli continua invece ad accorciare normalmente la lenza.
+		var dropped := bool(grapple_owner.call("reel_grapple", self, delta))
+		if dropped:
+			_request_shake(0.32)
+			_destroy_hook()
+			return
 
 	var climb := Input.get_axis("ui_up", "ui_down")
-	if Input.is_action_pressed("reel"):
+	if Input.is_action_pressed("reel") and not pulling_droppable_lamp:
 		climb = -1.0
 	if absf(climb) > 0.1:
 		current_line_length = clampf(

@@ -67,6 +67,9 @@ func _build_ceiling_rings() -> void:
 		lamp.name = "CeilingLamp_%d" % index
 		lamp.position = Vector2(4560.0 + index * 290.0, FLOOR_Y + float(heights[index]))
 		lamp.set("chain_length", 64.0 + float(index % 3) * 8.0)
+		# Solo due lampadari sono armi ambientali. Gli altri restano appigli
+		# affidabili per evitare la marea e gli attacchi a pavimento.
+		lamp.set("droppable", index in [1, 3])
 		add_child(lamp)
 
 
