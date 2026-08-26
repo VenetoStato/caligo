@@ -1,4 +1,4 @@
-[gd_scene load_steps=47 format=3 uid="uid://3ccaqnqh276l"]
+[gd_scene load_steps=49 format=3 uid="uid://3ccaqnqh276l"]
 
 [ext_resource type="Script" uid="uid://b6j5qjydisr3v" path="res://Levels/Scenes/Dogana/dogana_level.gd" id="1_level"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/dogana_environment.tscn" id="2_environment"]
@@ -32,6 +32,10 @@
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/wooden_ledge.tscn" id="36_ledge"]
 [ext_resource type="Script" uid="uid://0lrabfmcg2dr" path="res://Levels/Scenes/Dogana/editable_platform.gd" id="37_editable_platform"]
 [ext_resource type="Texture2D" uid="uid://djs7txsxcmk4o" path="res://Landscape/Dogana/Generated/quay_platform.png" id="38_platform_texture"]
+[ext_resource type="Shader" path="res://Levels/Scenes/Dogana/boss_seal_fog.gdshader" id="39_boss_fog"]
+
+[sub_resource type="ShaderMaterial" id="BossSealFogMaterial"]
+shader = ExtResource("39_boss_fog")
 
 [sub_resource type="RectangleShape2D" id="GroundArrivalWest"]
 size = Vector2(700, 96)
@@ -211,6 +215,17 @@ collision_mask = 2
 shape = SubResource("BossArenaWall")
 disabled = true
 
+[node name="FogSealVisual" type="ColorRect" parent="Gameplay/Geometry/BossArena/EntranceSeal"]
+visible = false
+z_index = 30
+offset_left = -72.0
+offset_top = -330.0
+offset_right = 72.0
+offset_bottom = 330.0
+mouse_filter = 2
+material = SubResource("BossSealFogMaterial")
+color = Color(0.52, 0.9, 0.94, 0.82)
+
 [node name="ExitWall" type="StaticBody2D" parent="Gameplay/Geometry/BossArena" groups=["dogana_boss_seal"]]
 position = Vector2(5700, -620)
 collision_mask = 2
@@ -218,6 +233,17 @@ collision_mask = 2
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/BossArena/ExitWall"]
 shape = SubResource("BossArenaWall")
 disabled = true
+
+[node name="FogSealVisual" type="ColorRect" parent="Gameplay/Geometry/BossArena/ExitWall"]
+visible = false
+z_index = 30
+offset_left = -72.0
+offset_top = -330.0
+offset_right = 72.0
+offset_bottom = 330.0
+mouse_filter = 2
+material = SubResource("BossSealFogMaterial")
+color = Color(0.52, 0.9, 0.94, 0.82)
 
 [node name="EditablePlatforms" type="Node2D" parent="Gameplay" groups=["dogana_editable_platforms"]]
 

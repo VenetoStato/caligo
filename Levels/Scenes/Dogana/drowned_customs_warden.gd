@@ -11,6 +11,10 @@ const FOOTSTEP_DUST := preload("res://Fx/footstep_dust.gd")
 const FLOOD_SURGE_SCRIPT := preload("res://Levels/Scenes/Dogana/boss_flood_surge.gd")
 
 const MAX_BOSS_TRANSIENTS := 72
+const BASE_SPRITE_POSITION := Vector2(0.0, -166.0)
+const BASE_BODY_SHAPE_POSITION := Vector2(0.0, -59.2)
+const BASE_HURTBOX_POSITION := Vector2(0.0, -97.4)
+const BASE_ATTACK_HITBOX_POSITION := Vector2(0.0, -79.2)
 
 @export var max_health := 28
 @export var move_speed := 78.0
@@ -83,6 +87,15 @@ var _using_frames := false
 func _ready() -> void:
 	add_to_group("enemy")
 	add_to_group("dogana_boss")
+	# La scena principale conservava un override locale a (0, 0) sul figlio
+	# Sprite2D dell'istanza: il Custode risultava enorme dentro il pavimento anche
+	# se la sottoscena era corretta. L'allineamento runtime e' qui autoritativo.
+	_sprite.position = BASE_SPRITE_POSITION
+	var body_shape := get_node_or_null("CollisionShape2D") as CollisionShape2D
+	if body_shape:
+		body_shape.position = BASE_BODY_SHAPE_POSITION
+	_hurtbox.position = BASE_HURTBOX_POSITION
+	_attack_hitbox.position = BASE_ATTACK_HITBOX_POSITION
 	current_health = max_health
 	_base_scale = _sprite.scale
 	_base_sprite_position = _sprite.position

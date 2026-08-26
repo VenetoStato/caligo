@@ -106,6 +106,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not _player or not is_instance_valid(_player):
 		return
+	_refresh_nearby_interactable()
 	_update_grace_charge(delta)
 	_encounter_update_timer -= delta
 	if _encounter_update_timer <= 0.0:
@@ -336,6 +337,50 @@ func _on_interactable_exited(body: Node2D, interactable: Area2D) -> void:
 		_nearby_interactable = null
 
 
+## Fallback autoritativo per gli oggetti spostabili in editor. In alcune
+## configurazioni l'Area2D dei leggii non emette body_entered dopo un cambio di
+## regione/teletrasporto, nonostante layer e forme siano corretti. La distanza
+## dalla vera CollisionShape mantiene E affidabile senza dipendere dal segnale.
+func _refresh_nearby_interactable() -> void:
+	if _player == null or not is_instance_valid(_player):
+		return
+	var best: Area2D = null
+	var best_distance := INF
+	for candidate in get_tree().get_nodes_in_group("dogana_interactable"):
+		if not (candidate is Area2D) or not is_instance_valid(candidate):
+			continue
+		var area := candidate as Area2D
+		if not area.monitoring:
+			continue
+		var enabled_region := str(area.get_meta("enabled_region", ""))
+		if enabled_region == "surface" and _player.global_position.y < -100.0:
+			continue
+		if enabled_region == "interior" and _player.global_position.y >= -100.0:
+			continue
+		var center := area.global_position
+		var reach := 92.0
+		var collision := area.get_node_or_null("CollisionShape2D") as CollisionShape2D
+		if collision and not collision.disabled and collision.shape:
+			center = collision.global_position
+			var shape_scale := maxf(absf(collision.global_scale.x), absf(collision.global_scale.y))
+			if collision.shape is CircleShape2D:
+				reach = (collision.shape as CircleShape2D).radius * shape_scale + 24.0
+			elif collision.shape is RectangleShape2D:
+				var rect_size := (collision.shape as RectangleShape2D).size * collision.global_scale.abs()
+				reach = maxf(rect_size.x, rect_size.y) * 0.5 + 24.0
+		var distance := _player.global_position.distance_to(center)
+		if distance <= reach and distance < best_distance:
+			best = area
+			best_distance = distance
+	if best == _nearby_interactable:
+		return
+	if _nearby_interactable and is_instance_valid(_nearby_interactable):
+		_set_interactable_aura(_nearby_interactable, false)
+	_nearby_interactable = best
+	if _nearby_interactable:
+		_set_interactable_aura(_nearby_interactable, true)
+
+
 func _activate_interactable(interactable: Area2D) -> void:
 	var action := str(interactable.get_meta("action", "lore"))
 	var origin := interactable.global_position + Vector2(0, -24)
@@ -434,6 +479,9 @@ func _set_boss_arena_sealed(sealed: bool) -> void:
 			collision.set_deferred("disabled", not sealed)
 		if seal is CanvasItem:
 			(seal as CanvasItem).modulate.a = 1.0
+		var fog_visual := (seal as Node).get_node_or_null("FogSealVisual") as CanvasItem
+		if fog_visual:
+			fog_visual.visible = sealed
 	_update_passage_availability(_player_is_inside_nave())
 
 
