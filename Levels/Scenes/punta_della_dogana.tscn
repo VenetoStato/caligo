@@ -1,4 +1,4 @@
-[gd_scene load_steps=47 format=3 uid="uid://3ccaqnqh276l"]
+[gd_scene load_steps=48 format=3 uid="uid://3ccaqnqh276l"]
 
 [ext_resource type="Script" uid="uid://b6j5qjydisr3v" path="res://Levels/Scenes/Dogana/dogana_level.gd" id="1_level"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/dogana_environment.tscn" id="2_environment"]
@@ -31,6 +31,7 @@
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/pogo_thorn.tscn" id="34_thorn"]
 [ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/wooden_ledge.tscn" id="36_ledge"]
 [ext_resource type="Script" path="res://Levels/Scenes/Dogana/editable_platform.gd" id="37_editable_platform"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/quay_platform.png" id="38_platform_texture"]
 
 [sub_resource type="RectangleShape2D" id="GroundArrivalWest"]
 size = Vector2(700, 96)
@@ -169,6 +170,12 @@ position = Vector2(-435, 460)
 script = ExtResource("37_editable_platform")
 platform_size = Vector2(700, 96)
 
+[node name="PlatformArt" type="Sprite2D" parent="Gameplay/EditablePlatforms/PontileWest"]
+centered = false
+texture_filter = 2
+scale = Vector2(0.683594, 0.25876)
+texture = ExtResource("38_platform_texture")
+
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/PontileWest"]
 position = Vector2(350, 48)
 shape = SubResource("GroundArrivalWest")
@@ -177,6 +184,12 @@ shape = SubResource("GroundArrivalWest")
 position = Vector2(395, 460)
 script = ExtResource("37_editable_platform")
 platform_size = Vector2(630, 96)
+
+[node name="PlatformArt" type="Sprite2D" parent="Gameplay/EditablePlatforms/PontileEast"]
+centered = false
+texture_filter = 2
+scale = Vector2(0.615234, 0.25876)
+texture = ExtResource("38_platform_texture")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/PontileEast"]
 position = Vector2(315, 48)
@@ -187,6 +200,12 @@ position = Vector2(1190, 485)
 script = ExtResource("37_editable_platform")
 platform_size = Vector2(915, 110)
 
+[node name="PlatformArt" type="Sprite2D" parent="Gameplay/EditablePlatforms/DoganaQuay"]
+centered = false
+texture_filter = 2
+scale = Vector2(0.893555, 0.296496)
+texture = ExtResource("38_platform_texture")
+
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/DoganaQuay"]
 position = Vector2(457.5, 55)
 shape = SubResource("EditableQuayA")
@@ -195,6 +214,12 @@ shape = SubResource("EditableQuayA")
 position = Vector2(2060, 485)
 script = ExtResource("37_editable_platform")
 platform_size = Vector2(1200, 110)
+
+[node name="PlatformArt" type="Sprite2D" parent="Gameplay/EditablePlatforms/CustomsFront"]
+centered = false
+texture_filter = 2
+scale = Vector2(1.171875, 0.296496)
+texture = ExtResource("38_platform_texture")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/CustomsFront"]
 position = Vector2(600, 55)
@@ -205,6 +230,12 @@ position = Vector2(3260, 485)
 script = ExtResource("37_editable_platform")
 platform_size = Vector2(850, 110)
 
+[node name="PlatformArt" type="Sprite2D" parent="Gameplay/EditablePlatforms/CanalFront"]
+centered = false
+texture_filter = 2
+scale = Vector2(0.830078, 0.296496)
+texture = ExtResource("38_platform_texture")
+
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/CanalFront"]
 position = Vector2(425, 55)
 shape = SubResource("EditableQuayC")
@@ -214,6 +245,12 @@ position = Vector2(4110, 485)
 script = ExtResource("37_editable_platform")
 platform_size = Vector2(510, 110)
 
+[node name="PlatformArt" type="Sprite2D" parent="Gameplay/EditablePlatforms/FortunaFront"]
+centered = false
+texture_filter = 2
+scale = Vector2(0.498047, 0.296496)
+texture = ExtResource("38_platform_texture")
+
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/FortunaFront"]
 position = Vector2(255, 55)
 shape = SubResource("EditableQuayD")
@@ -222,6 +259,12 @@ shape = SubResource("EditableQuayD")
 position = Vector2(4620, 485)
 script = ExtResource("37_editable_platform")
 platform_size = Vector2(1120, 110)
+
+[node name="PlatformArt" type="Sprite2D" parent="Gameplay/EditablePlatforms/SaluteFront"]
+centered = false
+texture_filter = 2
+scale = Vector2(1.09375, 0.296496)
+texture = ExtResource("38_platform_texture")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/SaluteFront"]
 position = Vector2(560, 55)

@@ -24,7 +24,9 @@ const LAGOON_FOG := preload("res://Landscape/Dogana/Generated/Parallax/distant_l
 
 
 func _ready() -> void:
-	z_index = 35 if Engine.is_editor_hint() else -100
+	# Tra fondale (-20) e Dogana principale (-17): il preview rispetta la
+	# profondita' reale e non passa mai davanti all'architettura giocabile.
+	z_index = -18 if Engine.is_editor_hint() else -100
 	queue_redraw()
 
 
