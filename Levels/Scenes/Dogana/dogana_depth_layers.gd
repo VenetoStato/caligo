@@ -28,7 +28,7 @@ const CITY_RAIN_SHADER := preload("res://Levels/Scenes/Dogana/city_rain.gdshader
 @export_range(0.0, 1.0, 0.01) var rain_intensity := 0.62
 @export_range(0.1, 3.0, 0.05) var rain_speed := 1.0
 @export_range(-1.0, 1.0, 0.01) var rain_wind := 0.16
-@export_range(2.0, 60.0, 1.0) var rain_collision_rate := 32.0
+@export_range(2.0, 72.0, 1.0) var rain_collision_rate := 44.0
 
 var _camera: Camera2D
 var _origin := Vector2.ZERO
@@ -399,7 +399,7 @@ func _update_rain_water_clip() -> void:
 func _update_rain_collision_fx(delta: float) -> void:
 	if _camera == null or _rain_surface_fx == null:
 		return
-	var mobile_ratio := 0.62 if OS.has_feature("mobile") else 1.0
+	var mobile_ratio := 0.68 if OS.has_feature("mobile") else 1.0
 	_rain_collision_accumulator += delta * rain_collision_rate * rain_intensity * mobile_ratio
 	var spawned := 0
 	while _rain_collision_accumulator >= 1.0 and spawned < 4:
@@ -437,6 +437,10 @@ func _spawn_collision_rain_drop() -> void:
 		target = hit.position as Vector2
 		normal = hit.normal as Vector2
 		collider = hit.get("collider") as Object
+		if collider != null and collider is Node and (collider as Node).is_in_group("water"):
+			# Each streak penetrates the surface by a slightly different amount.
+			# The ripple itself remains anchored to WaterBody's physical surface.
+			target.y += randf_range(4.0, 13.0)
 
 	var drop := Line2D.new()
 	drop.name = "RainDrop"

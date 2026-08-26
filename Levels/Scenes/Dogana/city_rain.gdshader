@@ -14,6 +14,15 @@ float hash21(vec2 p) {
 	return fract(p.x * p.y);
 }
 
+float waterline_noise(float x) {
+	float cell = floor(x);
+	float amount = fract(x);
+	amount = amount * amount * (3.0 - 2.0 * amount);
+	float left = hash21(vec2(cell, 19.73));
+	float right = hash21(vec2(cell + 1.0, 19.73));
+	return mix(left, right, amount);
+}
+
 float streak_layer(vec2 uv, float columns, float speed, float phase, float width) {
 	float aspect = aspect_ratio;
 	vec2 p = vec2(uv.x * aspect, uv.y);
@@ -44,9 +53,13 @@ void fragment() {
 	// The screen overlay used to continue under the water even though the
 	// physical drops stopped there. Fade every streak exactly at the dynamic
 	// world-space waterline supplied by dogana_depth_layers.gd.
+	// A shallow, smoothly varying penetration avoids revealing the water mask
+	// as one perfectly straight cutoff line.
+	float waterline_variation = (waterline_noise(uv.x * 38.0) - 0.5) * 0.012;
+	float local_waterline = waterline_uv + 0.009 + waterline_variation;
 	float above_water = 1.0 - smoothstep(
-		waterline_uv - waterline_softness,
-		waterline_uv + waterline_softness,
+		local_waterline - waterline_softness,
+		local_waterline + waterline_softness,
 		uv.y
 	);
 	float alpha = clamp(rain * intensity * shimmer, 0.0, 0.24) * above_water;
