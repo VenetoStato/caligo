@@ -1224,10 +1224,21 @@ func _update_combat_hook_escape(delta: float) -> void:
 		var hover_target := _home_position.y + sin(Time.get_ticks_msec() * 0.0032) * 7.0
 		var target_y := clampf((hover_target - global_position.y) * 3.2, -45.0, 45.0)
 		if _combat_hook_reel_active and not combat_hook_heavy:
-			target_y += _combat_hook_pull_velocity.y
+			# I volanti devono seguire davvero la lenza, non solo oscillare:
+			# la componente del reel prevale sul semplice hover.
+			target_y = clampf(target_y + _combat_hook_pull_velocity.y * 1.35, -260.0, 260.0)
 		velocity.y = move_toward(velocity.y, target_y, move_acceleration * 1.2 * delta)
 	else:
-		velocity.y += gravity * 0.72 * delta
+		if _combat_hook_reel_active and not combat_hook_heavy and _combat_hook_pull_velocity.y < -1.0:
+			# Anche un nemico leggero a terra può essere schiodato: il reel
+			# applica una trazione verticale, poi la gravità lo fa ricadere.
+			velocity.y = move_toward(
+				velocity.y,
+				_combat_hook_pull_velocity.y * 1.15,
+				move_acceleration * 1.25 * delta
+			)
+		else:
+			velocity.y += gravity * 0.72 * delta
 	facing_right = velocity.x >= 0.0
 	if sprite_node:
 		sprite_node.flip_h = not facing_right
@@ -1266,6 +1277,10 @@ func release_combat_hook(launch_direction := Vector2.ZERO, powered := false) -> 
 		velocity = direction.normalized() * combat_hook_power_launch_speed
 		_knockback_timer = 0.42
 	elif _stagger_timer > 0.0:
+		velocity = Vector2.ZERO
+	elif state == State.IDLE:
+		# Non trascinare nel patrol la velocità di fuga accumulata durante il
+		# gancio: al rilascio il gamberetto riparte dalla sua attività normale.
 		velocity = Vector2.ZERO
 	else:
 		velocity = _combat_hook_previous_velocity
