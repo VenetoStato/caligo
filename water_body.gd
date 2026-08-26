@@ -613,6 +613,7 @@ func register_carcass_bait(world_position: Vector2) -> void:
 	if fish == null:
 		return
 	fish.set_meta("bait_giant", true)
+	fish.set_meta("bait_target_position", world_position)
 	if fish.has_method("set_fish_texture") and not _fish_textures.is_empty():
 		fish.call("set_fish_texture", _fish_textures[(_carcass_bait_count - 1) % _fish_textures.size()], 0.2)
 	fish.scale = Vector2.ONE
@@ -627,7 +628,14 @@ func register_carcass_bait(world_position: Vector2) -> void:
 	var collision := fish.get_node_or_null("CollisionShape2D") as CollisionShape2D
 	if collision != null:
 		collision.scale = Vector2.ONE * 0.9
-	var spawn_position := world_position + Vector2(randf_range(-110.0, 110.0), randf_range(64.0, 118.0))
+	var bounds := get_water_bounds_global_rect()
+	var spawn_side := -1.0 if world_position.x > bounds.get_center().x else 1.0
+	# Spawn fuori dall'inquadratura laterale e sotto il pelo: il predatore
+	# entra rapidamente verso la carcassa invece di apparire già addosso.
+	var spawn_position := Vector2(
+		(bounds.position.x - 280.0) if spawn_side < 0.0 else (bounds.end.x + 280.0),
+		world_position.y + randf_range(90.0, 150.0)
+	)
 	call_deferred("_add_fish_to_scene", fish, scene, spawn_position)
 
 

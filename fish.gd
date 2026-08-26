@@ -131,6 +131,8 @@ var _individual_speed_scale := 1.0
 var _next_swim_change := 1.8
 var _target_swim_direction := Vector2.RIGHT
 var _swim_animation_time := 0.0
+var _bait_target_active := false
+var _bait_target := Vector2.ZERO
 
 func _ready():
 	add_to_group("fish")
@@ -169,6 +171,8 @@ func _ready():
 	_individual_speed_scale = randf_range(0.78, 1.18)
 	if bool(get_meta("bait_giant", false)):
 		_setup_bait_predator_fx()
+		_bait_target = get_meta("bait_target_position", Vector2.ZERO) as Vector2
+		_bait_target_active = _bait_target != Vector2.ZERO
 	_next_swim_change = swim_change_interval * randf_range(0.72, 1.45)
 	_pick_new_swim_direction()
 	var animation_player := get_node_or_null("AnimationPlayer") as AnimationPlayer
@@ -453,6 +457,15 @@ func _process_swimming(delta: float):
 			else:
 				is_struggling = false
 
+	elif _bait_target_active:
+		# Il predatore entra dalla profondità/fuori campo e punta rapidamente alla
+		# carcassa, senza richiedere un amo per restare in inseguimento.
+		var bait_dir := (_bait_target - global_position).normalized()
+		desired = bait_dir * attraction_speed * 2.4
+		if global_position.distance_to(_bait_target) < 42.0:
+			_bait_target_active = false
+			_pick_new_swim_direction()
+
 	elif is_attracted and attraction_target != Vector2.ZERO:
 		# Se l'amo/pastura è stata distrutta, torna a nuotare normale (così il pesce resta pescabile)
 		if target_hook == null or not is_instance_valid(target_hook):
@@ -520,6 +533,8 @@ func _get_water_bounds_rect() -> Rect2:
 	return Rect2(home_position.x - swim_bounds_x, home_position.y - swim_bounds_y, swim_bounds_x * 2, swim_bounds_y * 2)
 
 func _clamp_to_water_bounds():
+	if _bait_target_active:
+		return
 	var r := _get_water_bounds_rect()
 	var p := global_position
 	p.x = clampf(p.x, r.position.x, r.position.x + r.size.x)
