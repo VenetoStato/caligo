@@ -1,3 +1,4 @@
+@tool
 extends Node2D
 ## Spine da pontile. L'arte è sostituibile dalla disegnatrice: hitbox restano qui.
 
@@ -30,12 +31,21 @@ func _ready() -> void:
 	add_to_group("dogana_thorn")
 	z_as_relative = false
 	z_index = 12
-	_build_visual()
+	if get_node_or_null("Art") == null:
+		_build_visual()
+	# Mostra le spine nella viewport senza eseguire snap, danno o pogo mentre
+	# l'autore sta spostando gli elementi della scena.
+	if Engine.is_editor_hint():
+		set_process(false)
+		set_physics_process(false)
+		return
 	_build_hurtboxes()
 	call_deferred("_snap_to_ground")
 
 
 func _process(delta: float) -> void:
+	if Engine.is_editor_hint():
+		return
 	_hurt_cd = maxf(0.0, _hurt_cd - delta)
 	_bounce_cd = maxf(0.0, _bounce_cd - delta)
 	if _sprite and _flash > 0.0:

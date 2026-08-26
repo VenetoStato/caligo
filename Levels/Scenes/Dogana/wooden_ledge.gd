@@ -1,3 +1,4 @@
+@tool
 extends StaticBody2D
 ## Frammento di pontile: arte dipinta, alcune assi crollano se ci resti sopra.
 
@@ -27,13 +28,22 @@ func _ready() -> void:
 	collision_mask = 2
 	z_index = 5
 	_home_y = position.y
-	_build_collision()
-	_build_visual()
+	if get_node_or_null("Floor") == null:
+		_build_collision()
+	if get_node_or_null("Art") == null:
+		_build_visual()
+	# In editor servono arte e collisione reali per posizionare la pedana.
+	# La logica di crollo resta esclusivamente runtime.
+	if Engine.is_editor_hint():
+		set_physics_process(false)
+		return
 	if unstable:
 		_build_stand_zone()
 
 
 func _physics_process(delta: float) -> void:
+	if Engine.is_editor_hint():
+		return
 	if not unstable or _collapsed:
 		return
 	var standing := false
