@@ -414,23 +414,40 @@ func _spawn_collision_rain_drop() -> void:
 	var zoom := maxf(absf(_camera.zoom.x), 0.01)
 	var half_width := viewport_size.x / zoom * 0.62
 	var half_height := viewport_size.y / zoom * 0.66
+	var water_surface_y := INF
+	if (
+		_rain_water_body != null
+		and is_instance_valid(_rain_water_body)
+		and _rain_water_body.has_method("get_surface_height")
+	):
+		water_surface_y = float(_rain_water_body.call("get_surface_height", _camera.global_position.x))
 	# Golden-ratio spacing covers the whole visible waterline over consecutive
 	# drops. A small jitter keeps it natural without allowing long dry gaps.
 	var coverage := fposmod(float(_rain_spawn_sequence) * 0.61803398875, 1.0)
 	_rain_spawn_sequence += 1
 	var coverage_x := lerpf(-half_width, half_width, coverage)
 	var jitter := randf_range(-half_width * 0.045, half_width * 0.045)
+	var start_y := _camera.global_position.y - half_height
+	if is_finite(water_surface_y):
+		# An underwater camera used to spawn rain from below the surface. Always
+		# begin above the real waterline so the ray crosses docks and water.
+		start_y = minf(start_y, water_surface_y - maxf(150.0, half_height * 0.42))
 	var start := Vector2(
 		_camera.global_position.x + clampf(coverage_x + jitter, -half_width, half_width),
-		_camera.global_position.y - half_height
+		start_y
 	)
-	var fall_vector := Vector2(rain_wind * 150.0, half_height * 2.05)
+	var finish_y := start.y + half_height * 2.05
+	if is_finite(water_surface_y):
+		finish_y = maxf(finish_y, water_surface_y + 34.0)
+	var fall_vector := Vector2(rain_wind * 150.0, finish_y - start.y)
 	var finish := start + fall_vector
 	var space := get_world_2d().direct_space_state
 	if space == null:
 		return
 	var query := PhysicsRayQueryParameters2D.create(start, finish)
-	query.collision_mask = 1
+	# Docks and runtime props do not all share layer 1. Rain is cosmetic and may
+	# safely contact any physics layer, while layer-0 editor guides remain ignored.
+	query.collision_mask = 0xFFFFFFFF
 	# WaterBody is an Area2D. Including areas lets rain hit its true dynamic
 	# surface instead of disappearing through the basin.
 	query.collide_with_areas = true
@@ -451,8 +468,8 @@ func _spawn_collision_rain_drop() -> void:
 
 	var drop := Line2D.new()
 	drop.name = "RainDrop"
-	drop.width = randf_range(1.0, 1.8)
-	drop.default_color = Color(0.58, 0.82, 0.86, randf_range(0.22, 0.48))
+	drop.width = randf_range(0.9, 1.45)
+	drop.default_color = Color(0.58, 0.82, 0.86, randf_range(0.34, 0.6))
 	drop.points = PackedVector2Array([Vector2(-rain_wind * 8.0, -randf_range(20.0, 34.0)), Vector2.ZERO])
 	drop.global_position = start
 	_rain_surface_fx.add_child(drop)
@@ -475,7 +492,7 @@ func _spawn_rain_impact(at: Vector2, normal: Vector2, collider: Object = null) -
 	var particles := CPUParticles2D.new()
 	particles.name = "SurfaceSplash"
 	particles.one_shot = true
-	particles.amount = 3 if not OS.has_feature("mobile") else 2
+	particles.amount = 4 if not OS.has_feature("mobile") else 2
 	particles.lifetime = 0.24
 	particles.explosiveness = 0.96
 	particles.randomness = 0.72
@@ -484,9 +501,9 @@ func _spawn_rain_impact(at: Vector2, normal: Vector2, collider: Object = null) -
 	particles.gravity = Vector2(0, 190)
 	particles.initial_velocity_min = 18.0
 	particles.initial_velocity_max = 42.0
-	particles.scale_amount_min = 0.07
-	particles.scale_amount_max = 0.18
-	particles.color = Color(0.54, 0.78, 0.82, 0.38)
+	particles.scale_amount_min = 0.09
+	particles.scale_amount_max = 0.24
+	particles.color = Color(0.54, 0.78, 0.82, 0.5)
 	particles.texture = _make_rain_splash_texture()
 	_rain_surface_fx.add_child(particles)
 	particles.global_position = at + normal * 2.0
