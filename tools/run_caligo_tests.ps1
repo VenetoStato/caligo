@@ -5,8 +5,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$root = "C:\Users\user\caligo"
-$godot = "C:\Users\user\tools\godot-4.5\Godot_v4.5-stable_win64_console.exe"
+$root = "C:\Users\Utente\Documents\caligo"
+$godot = "C:\Users\Utente\AppData\Local\Microsoft\WinGet\Packages\GodotEngine.GodotEngine_Microsoft.Winget.Source_8wekyb3d8bbwe\Godot_v4.5.2-stable_win64_console.exe"
 Set-Location $root
 
 # Isola i log/cache del runner dall'editor Godot aperto: su Windows due processi
