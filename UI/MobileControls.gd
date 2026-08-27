@@ -2,6 +2,8 @@ extends CanvasLayer
 ## HUD touch compatto: movimento a sinistra, azioni a destra, pesca contestuale.
 
 const MOBILE_ACTION_BUTTON := preload("res://UI/MobileActionButton.gd")
+const MOVE_DORMANT_ALPHA := 0.34
+const MOVE_ACTIVE_ALPHA := 1.0
 const MOVE_SIZE := 82.0
 const ACTION_SIZE := 78.0
 const SMALL_SIZE := 58.0
@@ -44,6 +46,7 @@ func _process(_delta: float) -> void:
 	if _player == null or not is_instance_valid(_player):
 		_player = get_tree().get_first_node_in_group("player")
 	_update_context()
+	_update_movement_wake(_delta)
 
 
 func _build_controls() -> void:
@@ -174,3 +177,20 @@ func _release_action(action: String) -> void:
 func _release_all_actions() -> void:
 	for action in BUTTON_LABELS:
 		_release_action(str(action))
+
+
+func _update_movement_wake(delta: float) -> void:
+	var moving := Input.is_action_pressed("ui_left") or Input.is_action_pressed("ui_right")
+	var locked := false
+	if _player != null and is_instance_valid(_player):
+		locked = bool(_player.get_meta("arrival_locked", false))
+	for action in ["ui_left", "ui_right"]:
+		var button := _buttons.get(action) as Control
+		if button == null:
+			continue
+		var target := MOVE_DORMANT_ALPHA
+		if moving:
+			target = MOVE_ACTIVE_ALPHA
+		if locked:
+			target = 0.22
+		button.modulate.a = lerpf(button.modulate.a, target, minf(1.0, delta * 12.0))

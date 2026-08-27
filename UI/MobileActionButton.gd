@@ -71,14 +71,14 @@ func _release() -> void:
 func _draw() -> void:
 	var radius := minf(size.x, size.y) * 0.5 - 2.0
 	var center := size * 0.5
-	var fill_alpha := 0.16 if subdued else 0.24
-	var border_alpha := 0.34 if subdued else 0.5
+	var fill_alpha := 0.09 if subdued else 0.13
+	var border_alpha := 0.20 if subdued else 0.30
 	if _pressed:
-		fill_alpha = 0.62
+		fill_alpha = 0.66
 		border_alpha = 0.95
 	if locked:
-		fill_alpha = 0.08
-		border_alpha = 0.14
+		fill_alpha = 0.05
+		border_alpha = 0.10
 	draw_circle(center, radius, Color(0.025, 0.085, 0.1, fill_alpha))
 	draw_arc(center, radius, 0.0, TAU, 40, Color(0.7, 0.9, 0.84, border_alpha), 3.0 if _pressed else 1.5, true)
 	var font := ThemeDB.fallback_font
