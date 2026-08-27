@@ -1,5 +1,7 @@
 extends Node2D
 
+const PARTICLE_MOTIF := preload("res://Art/Editable/VFX/warden_ink_spray.png")
+
 ## Effetto breve, disegnato sopra il combattimento: non sostituisce le
 ## collisioni, ma rende leggibile il momento esatto di carica, rilascio e hit.
 var direction := Vector2.RIGHT
@@ -20,7 +22,31 @@ func setup(facing: Vector2, effect_tint: Color, is_heavy := false, effect_mode :
 
 func _ready() -> void:
 	z_index = 10
-	queue_redraw()
+	set_process(false)
+	var particles := CPUParticles2D.new()
+	particles.texture = PARTICLE_MOTIF
+	particles.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	particles.amount = 18 if heavy else 11
+	particles.lifetime = 0.62 if mode == 2 else 0.44
+	particles.one_shot = true
+	particles.explosiveness = 0.92
+	particles.randomness = 0.42
+	particles.direction = direction
+	particles.spread = 38.0 if mode == 1 else 19.0
+	particles.gravity = Vector2(0.0, 42.0 if mode == 1 else -12.0)
+	particles.initial_velocity_min = 38.0 if mode == 2 else 72.0
+	particles.initial_velocity_max = 86.0 if mode == 2 else 154.0
+	particles.angular_velocity_min = -85.0
+	particles.angular_velocity_max = 85.0
+	particles.scale_amount_min = 0.018
+	particles.scale_amount_max = 0.052 if heavy else 0.038
+	particles.color = Color(tint.r, tint.g, tint.b, 0.74)
+	var additive := CanvasItemMaterial.new()
+	additive.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	particles.material = additive
+	add_child(particles)
+	particles.emitting = true
+	get_tree().create_timer(particles.lifetime + 0.2).timeout.connect(queue_free)
 
 
 func _process(delta: float) -> void:
@@ -45,34 +71,22 @@ func _draw() -> void:
 
 
 func _draw_release(progress: float, fade: float, side: Vector2) -> void:
-	var reach := lerpf(18.0, 76.0 if heavy else 54.0, progress)
-	var spread := 24.0 if heavy else 16.0
-	var wedge := PackedVector2Array([
-		Vector2.ZERO,
-		direction * reach + side * spread,
-		direction * (reach * 1.12),
-		direction * reach - side * spread,
-	])
-	draw_colored_polygon(wedge, Color(tint.r, tint.g, tint.b, (0.3 if heavy else 0.22) * fade))
-	draw_arc(Vector2.ZERO, reach * 0.78, direction.angle() - 0.58, direction.angle() + 0.58, 16, Color(tint.r, tint.g, tint.b, 0.9 * fade), 2.8 if heavy else 2.0, true)
-	for index in 3:
-		var offset := (float(index) - 1.0) * (10.0 if heavy else 7.0)
-		draw_line(side * offset, direction * reach + side * offset * 1.4, Color(1.0, 0.92, 0.74, 0.7 * fade), 1.4, true)
+	for index in 7:
+		var drift := direction * lerpf(10.0, 62.0, progress) + side * sin(float(index) * 2.1) * 15.0
+		draw_circle(drift, (5.0 if heavy else 3.5) * fade, Color(tint.r, tint.g, tint.b, 0.34 * fade))
 
 
 func _draw_impact(progress: float, fade: float, side: Vector2) -> void:
 	var radius := lerpf(8.0, 38.0 if heavy else 26.0, progress)
 	draw_circle(Vector2.ZERO, radius * 0.42, Color(tint.r, tint.g, tint.b, 0.26 * fade))
-	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 24, Color(tint.r, tint.g, tint.b, 0.92 * fade), 2.8 if heavy else 1.8, true)
 	for index in 6:
 		var ray := Vector2.from_angle(TAU * float(index) / 6.0 + _age * 3.2)
-		draw_line(ray * radius * 0.45, ray * radius * (1.15 if heavy else 0.92), Color(1.0, 0.82, 0.58, 0.78 * fade), 1.5, true)
+		draw_circle(ray * radius, 4.0 * fade, Color(1.0, 0.82, 0.58, 0.56 * fade))
 
 
 func _draw_charge(progress: float, fade: float, side: Vector2) -> void:
 	var radius := lerpf(12.0, 34.0 if heavy else 25.0, progress)
 	var alpha := 0.24 + sin(_age * 30.0) * 0.12
-	draw_arc(Vector2.ZERO, radius, direction.angle() - PI * 0.72, direction.angle() + PI * 0.72, 22, Color(tint.r, tint.g, tint.b, alpha * fade), 2.2, true)
 	for index in 4:
 		var offset := (float(index) - 1.5) * 0.32
 		var point := direction.rotated(offset) * radius

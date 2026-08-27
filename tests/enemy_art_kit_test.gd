@@ -11,7 +11,7 @@ func _run() -> void:
 	var probe = KitScript.new()
 	var clip_names: Array = probe.CLIP_NAMES
 	if clip_names.size() != 8:
-		_fail("Enemy art kit is missing the Hollow Knight clip contract.")
+		_fail("Enemy art kit is missing the gameplay clip hooks.")
 		return
 	var layout_eight: Dictionary = probe.default_layout(8)
 	for clip_name in clip_names:
@@ -20,7 +20,7 @@ func _run() -> void:
 			return
 
 	var kit = KitScript.new()
-	kit.still = load("res://Landscape/Dogana/Generated/tide_bloater.png")
+	kit.still = load("res://Art/Editable/Characters/Enemies/tide_bloater.png")
 	if kit.still == null:
 		_fail("Tide bloater still art is missing.")
 		return

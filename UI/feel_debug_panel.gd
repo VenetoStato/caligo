@@ -52,6 +52,7 @@ const ATMOSPHERE_TUNING := [
 var _player: CharacterBody2D
 var _camera: Camera2D
 var _depth: Node2D
+var _boss: Node2D
 var _window: PanelContainer
 var _open_btn: Button
 var _debug_flag: CheckButton
@@ -66,6 +67,8 @@ var _bind_retry_left := 0.0
 var _dragging := false
 var _drag_offset := Vector2.ZERO
 var _rain_check: CheckButton
+var _boss_health_label: Label
+var _boss_health_slider: HSlider
 
 
 func _ready() -> void:
@@ -86,6 +89,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _bind_targets() -> void:
+	if _boss != null and not is_instance_valid(_boss):
+		_boss = null
 	if _player == null:
 		_player = get_tree().get_first_node_in_group("player") as CharacterBody2D
 		if _player:
@@ -107,14 +112,18 @@ func _bind_targets() -> void:
 				var key: String = setting["key"]
 				if key in _depth:
 					_atmosphere_defaults[key] = _depth.get(key)
-	if _player or _camera or _depth:
+	if _boss == null:
+		_boss = get_tree().get_first_node_in_group("dogana_boss") as Node2D
+	if _player or _camera or _depth or _boss:
 		_load_tuning()
 		_sync_sliders()
+		_sync_boss_health()
 		_set_status("Regola movimento e grafica in tempo reale. Premi Salva per conservarli.")
 
 
 func _process(delta: float) -> void:
-	if _player != null and _camera != null and _depth != null:
+	if _player != null and _camera != null and _depth != null and _boss != null and is_instance_valid(_boss):
+		_sync_boss_health()
 		return
 	_bind_retry_left -= delta
 	if _bind_retry_left <= 0.0:
@@ -191,6 +200,37 @@ func _build_window() -> void:
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.add_theme_font_size_override("font_size", 11)
 	vbox.add_child(hint)
+
+	# Resta fissa sopra lo scroll: la vita del boss deve essere visibile subito,
+	# non dopo tutti i cursori di movement/grafica/atmosfera.
+	var boss_box := VBoxContainer.new()
+	boss_box.add_theme_constant_override("separation", 1)
+	vbox.add_child(boss_box)
+	var boss_title := Label.new()
+	boss_title.text = "BOSS — CUSTODE"
+	boss_title.add_theme_font_size_override("font_size", 13)
+	boss_title.add_theme_color_override("font_color", Color(0.8, 0.72, 0.44, 1.0))
+	boss_box.add_child(boss_title)
+	_boss_health_label = Label.new()
+	_boss_health_label.text = "Vita Custode: —"
+	_boss_health_label.add_theme_font_size_override("font_size", 12)
+	boss_box.add_child(_boss_health_label)
+	_boss_health_slider = HSlider.new()
+	_boss_health_slider.min_value = 1.0
+	_boss_health_slider.max_value = 28.0
+	_boss_health_slider.step = 1.0
+	_boss_health_slider.focus_mode = Control.FOCUS_NONE
+	_boss_health_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_boss_health_slider.value_changed.connect(_on_boss_health_changed)
+	boss_box.add_child(_boss_health_slider)
+	var boss_buttons := HBoxContainer.new()
+	boss_buttons.add_theme_constant_override("separation", 6)
+	boss_box.add_child(boss_buttons)
+	var reset_boss_btn := Button.new()
+	reset_boss_btn.text = "Reset boss"
+	reset_boss_btn.focus_mode = Control.FOCUS_NONE
+	reset_boss_btn.pressed.connect(_reset_boss_debug)
+	boss_buttons.add_child(reset_boss_btn)
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -377,6 +417,33 @@ func _sync_slider_group(settings: Array, target: Object) -> void:
 		var label := _labels.get(key) as Label
 		if label:
 			label.text = "%s: %s" % [setting["label"], _fmt(value)]
+
+
+func _sync_boss_health() -> void:
+	if _boss == null or not is_instance_valid(_boss) or not ("current_health" in _boss) or not ("max_health" in _boss):
+		if _boss_health_label:
+			_boss_health_label.text = "Vita Custode: non presente"
+		return
+	var health := int(_boss.get("current_health"))
+	var maximum := maxi(1, int(_boss.get("max_health")))
+	if _boss_health_label:
+		_boss_health_label.text = "Vita Custode: %d / %d" % [health, maximum]
+	if _boss_health_slider:
+		_boss_health_slider.max_value = maximum
+		_boss_health_slider.set_value_no_signal(clampf(float(health), 1.0, float(maximum)))
+
+
+func _on_boss_health_changed(value: float) -> void:
+	if _boss == null or not is_instance_valid(_boss) or not _boss.has_method("debug_set_health"):
+		return
+	_boss.call("debug_set_health", int(value))
+	_sync_boss_health()
+
+
+func _reset_boss_debug() -> void:
+	if _boss and is_instance_valid(_boss) and _boss.has_method("reset_encounter"):
+		_boss.call("reset_encounter")
+	_sync_boss_health()
 
 
 func _reset_defaults() -> void:

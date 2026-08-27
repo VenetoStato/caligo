@@ -1,7 +1,7 @@
 extends Node2D
 ## Lampada gotica appesa: fisica a pendolo, l'amo della canna ci si agganci.
 
-const ART := preload("res://Landscape/Dogana/Generated/gothic_hanging_lamp.png")
+const ART := preload("res://Art/Editable/Props/gothic_hanging_lamp.png")
 const DoganaFx := preload("res://Levels/Scenes/Dogana/dogana_fx.gd")
 
 @export var chain_length := 104.0
@@ -17,6 +17,8 @@ var _joint: PinJoint2D
 var _reel_stress := 0.0
 var _dropped := false
 var _boss_hit := false
+var _lamp_sprite: Sprite2D
+var _weapon_glow: PointLight2D
 
 
 func _ready() -> void:
@@ -50,6 +52,31 @@ func is_dropped() -> bool:
 	return _dropped
 
 
+## Il reset del salvataggio deve restituire l'arena al suo stato iniziale:
+## un lampadario che e' gia' a terra non puo' lasciare il boss senza arma
+## ambientale alla partita successiva.
+func reset_to_hanging() -> void:
+	if not _dropped:
+		return
+	_reel_stress = 0.0
+	_dropped = false
+	_boss_hit = false
+	for node in [_joint, _chain, _body, _anchor]:
+		if node and is_instance_valid(node):
+			node.queue_free()
+	_joint = null
+	_chain = null
+	_body = null
+	_anchor = null
+	_weapon_glow = null
+	call_deferred("_rebuild_after_reset")
+
+
+func _rebuild_after_reset() -> void:
+	if _body == null:
+		_build()
+
+
 func can_be_pulled_down() -> bool:
 	return droppable and not _dropped
 
@@ -63,6 +90,21 @@ func apply_grapple_tension(player: Node2D, delta: float, reeling: bool) -> void:
 	# La componente laterale del peso del player mette davvero in moto il
 	# pendolo sul PinJoint, invece di lasciare il lampadario scenograficamente fermo.
 	_body.apply_torque(direction.x * 95.0 * delta * 60.0)
+
+
+## Il richiamo della marea agita tutti i lampadari prima dell'impatto. E' un
+## segnale ambientale: guarda in alto, agganciati qui, non tentare di saltare
+## attraverso l'acqua.
+func begin_flood_sway() -> void:
+	if _dropped or _body == null:
+		return
+	var side := -1.0 if randf() < 0.5 else 1.0
+	_body.apply_central_impulse(Vector2(side * 42.0, -8.0))
+	_body.apply_torque_impulse(side * 86.0)
+	if _chain:
+		_chain.default_color = Color(0.3, 0.78, 0.8, 0.95)
+		var tween := create_tween()
+		tween.tween_property(_chain, "default_color", Color(0.12, 0.1, 0.08, 0.95), 1.5)
 
 
 func _build() -> void:
@@ -95,26 +137,31 @@ func _build() -> void:
 	var body_col := CollisionShape2D.new()
 	body_col.shape = body_shape
 	_body.add_child(body_col)
-	var sprite := Sprite2D.new()
-	sprite.texture = ART
-	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_lamp_sprite = Sprite2D.new()
+	_lamp_sprite.texture = ART
+	_lamp_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	if ART:
 		var fitted := 104.0 / maxf(float(ART.get_height()), 1.0)
-		sprite.scale = Vector2(fitted, fitted)
-		sprite.position.y = 8.0
-	sprite.z_index = 1
-	_body.add_child(sprite)
+		_lamp_sprite.scale = Vector2(fitted, fitted)
+		_lamp_sprite.position.y = 8.0
+	_lamp_sprite.z_index = 1
+	_lamp_sprite.modulate = Color(1.22, 0.68, 0.28, 1.0) if droppable else Color(0.82, 0.9, 0.88, 1.0)
+	_body.add_child(_lamp_sprite)
 	var glow := PointLight2D.new()
 	glow.energy = 0.9
 	glow.texture_scale = 0.78
 	glow.color = Color(1.0, 0.82, 0.42, 1.0)
+	if droppable:
+		glow.energy = 2.15
+		glow.color = Color(1.0, 0.42, 0.12, 1.0)
+	_weapon_glow = glow
 	_body.add_child(glow)
 	add_child(_body)
 
 	_chain = Line2D.new()
 	_chain.name = "Chain"
 	_chain.width = 3.2
-	_chain.default_color = Color(0.16, 0.3, 0.31, 0.95) if droppable else Color(0.12, 0.1, 0.08, 0.95)
+	_chain.default_color = Color(0.72, 0.28, 0.1, 0.98) if droppable else Color(0.12, 0.1, 0.08, 0.95)
 	_chain.antialiased = true
 	_chain.z_index = 0
 	add_child(_chain)
@@ -131,6 +178,8 @@ func _drop_lamp(player_position: Vector2) -> void:
 	if _dropped or _body == null:
 		return
 	_dropped = true
+	if _weapon_glow:
+		_weapon_glow.color = Color(1.0, 0.62, 0.22, 1.0)
 	if _joint and is_instance_valid(_joint):
 		_joint.queue_free()
 	_chain.visible = false
@@ -153,6 +202,8 @@ func _process(_delta: float) -> void:
 		return
 	if not _dropped:
 		_chain.points = PackedVector2Array([Vector2.ZERO, to_local(_body.global_position)])
+		if droppable and _weapon_glow:
+			_weapon_glow.energy = 1.8 + sin(Time.get_ticks_msec() * 0.004) * 0.35
 	else:
 		_try_damage_boss()
 

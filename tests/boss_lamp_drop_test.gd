@@ -29,8 +29,8 @@ func _ready() -> void:
 			droppable_lamps.append(lamp)
 		else:
 			fixed_lamps.append(lamp)
-	if droppable_lamps.size() != 2 or fixed_lamps.size() != 3:
-		_fail("expected 2 falling and 3 fixed lamps, got %d/%d" % [droppable_lamps.size(), fixed_lamps.size()])
+	if droppable_lamps.size() != 4 or fixed_lamps.size() != 4:
+		_fail("expected 4 falling and 4 fixed lamps, got %d/%d" % [droppable_lamps.size(), fixed_lamps.size()])
 		return
 
 	# Lo stesso amo da pesca deve riconoscere direttamente il corpo pendolare.
@@ -68,7 +68,7 @@ func _ready() -> void:
 	if boss.current_health != 18:
 		_fail("falling lamp dealt %d damage instead of 10" % (28 - boss.current_health))
 		return
-	print("CALIGO_BOSS_LAMP_DROP_OK: standard hook, 2 fragile pendulums, 10 boss damage")
+	print("CALIGO_BOSS_LAMP_DROP_OK: standard hook, 4 fragile pendulums, 10 boss damage")
 	get_tree().quit(0)
 
 

@@ -36,18 +36,18 @@ const GRACE_CHARGE_TIME := 3.0
 func _ready() -> void:
 	if Engine.is_editor_hint():
 		# Keep the authoring viewport focused on the world/geometry. These
-		# CanvasLayers are still visible normally when the game is run.
+	# CanvasLayers are still visible normally when the game is run.
 		for ui_name in ["GameMenu", "DoganaMap", "LoreReader", "MetroidvaniaHUD", "TutorialHints", "FeelDebugPanel"]:
-			var ui := get_node_or_null(ui_name) as CanvasItem
-			if ui:
-				ui.visible = false
+			var ui := get_node_or_null(ui_name)
+			if ui and "visible" in ui:
+				ui.set("visible", false)
 		return
 	# The scene stores the authoring-only hidden state; restore every runtime UI
 	# layer when the game actually starts.
 	for ui_name in ["GameMenu", "DoganaMap", "LoreReader", "MetroidvaniaHUD", "TutorialHints", "FeelDebugPanel"]:
-		var runtime_ui := get_node_or_null(ui_name) as CanvasItem
-		if runtime_ui:
-			runtime_ui.visible = true
+		var runtime_ui := get_node_or_null(ui_name)
+		if runtime_ui and "visible" in runtime_ui:
+			runtime_ui.set("visible", true)
 	# Lo stato di pausa appartiene ai modal della scena corrente; non va ereditato
 	# da una lettura/mappa rimasta aperta durante un reload o un test.
 	get_tree().paused = false
@@ -106,6 +106,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not _player or not is_instance_valid(_player):
 		return
+	_refresh_nearby_grace()
 	_refresh_nearby_interactable()
 	_update_grace_charge(delta)
 	_encounter_update_timer -= delta
@@ -124,6 +125,18 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Un leggio (o altra interazione puntuale) ha precedenza sulla Grazia:
+	# senza questo ordine, E veniva sempre catturato dall'altare vicino e i
+	# registri risultavano impossibili da leggere.
+	if (
+		_nearby_interactable
+		and is_instance_valid(_nearby_interactable)
+		and event.is_action_pressed("interact")
+	):
+		_cancel_grace_charge()
+		_activate_interactable(_nearby_interactable)
+		get_viewport().set_input_as_handled()
+		return
 	if (
 		_nearby_grace
 		and is_instance_valid(_nearby_grace)
@@ -141,16 +154,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		_cancel_grace_charge()
 		get_viewport().set_input_as_handled()
 		return
-	if (
-		_nearby_interactable
-		and is_instance_valid(_nearby_interactable)
-		and event.is_action_pressed("interact")
-		and not _grace_charge_active
-	):
-		_activate_interactable(_nearby_interactable)
-		get_viewport().set_input_as_handled()
-
-
 func _update_grace_charge(delta: float) -> void:
 	if not _grace_charge_active:
 		return
@@ -513,7 +516,7 @@ func _on_boss_defeated() -> void:
 		if finish_collision:
 			finish_collision.set_deferred("disabled", false)
 		finish.set_deferred("monitoring", true)
-	_show_message("CUSTODE SCONFITTO  •  VITA IN PIU'  •  AMO DEL TRASCINAMENTO [C]")
+	_show_message("CUSTODE SCONFITTO  •  VITA IN PIU'  •  AMO: [C] CAMBIA  [F] LANCIA  [R] TRAINA")
 
 
 func _mark_access_open(access_id: String) -> void:
@@ -532,6 +535,37 @@ func _on_grace_exited(body: Node2D, grace: Area2D) -> void:
 	if body == _player and _nearby_grace == grace:
 		_cancel_grace_charge()
 		_nearby_grace = null
+
+
+## I viaggi debug spostano il player istantaneamente: Area2D non garantisce
+## body_exited per la Grazia lasciata alle spalle. Senza questa verifica la
+## vecchia Grazia catturava E ovunque e rendeva inaccessibili i leggii.
+func _refresh_nearby_grace() -> void:
+	if _player == null or not is_instance_valid(_player):
+		return
+	var best: Area2D = null
+	var best_distance := INF
+	for candidate in get_tree().get_nodes_in_group("dogana_grace"):
+		if not (candidate is Area2D) or not is_instance_valid(candidate):
+			continue
+		var grace := candidate as Area2D
+		var reach := 96.0
+		var collision := grace.get_node_or_null("CollisionShape2D") as CollisionShape2D
+		if collision and not collision.disabled and collision.shape:
+			if collision.shape is CircleShape2D:
+				reach = (collision.shape as CircleShape2D).radius * maxf(absf(collision.global_scale.x), absf(collision.global_scale.y)) + 20.0
+			elif collision.shape is RectangleShape2D:
+				var rect_size := (collision.shape as RectangleShape2D).size * collision.global_scale.abs()
+				reach = maxf(rect_size.x, rect_size.y) * 0.5 + 20.0
+		var distance := _player.global_position.distance_to(grace.global_position)
+		if distance <= reach and distance < best_distance:
+			best = grace
+			best_distance = distance
+	if best == _nearby_grace:
+		return
+	if _grace_charge_active:
+		_cancel_grace_charge()
+	_nearby_grace = best
 
 
 func _activate_grace(grace: Area2D, show_message := true) -> void:
@@ -597,24 +631,29 @@ func _sync_map() -> void:
 
 
 func _on_fast_travel_requested(site_id: String, debug_unlock := false) -> void:
-	if not bool(_activated_graces.get(site_id, false)) and not debug_unlock:
+	# Un booleano nel segnale non basta come autorizzazione: una chiamata da UI
+	# normale non puo' trasformarsi in debug travel e sbloccare un checkpoint.
+	if debug_unlock and not _debug_travel_allowed():
+		return
+	if site_id == "debug_boss" and debug_unlock:
+		_debug_travel_to_boss()
+		return
+	# Le Grazie seguono sempre lo stato salvato; nessun caller puo' saltare
+	# questo controllo passando un flag di comodo.
+	if not bool(_activated_graces.get(site_id, false)):
 		return
 	var grace := _grace_sites.get(site_id) as Area2D
 	if not grace:
 		return
 	var travel := func() -> void:
-		if debug_unlock:
-			_activated_graces[site_id] = true
-			grace.call("set_activated", true)
-			_save_graces()
-		_current_grace = site_id
 		_player.global_position = grace.call("get_respawn_position")
 		_player.velocity = Vector2.ZERO
 		if _player.has_method("_snap_respawn_to_floor"):
 			_player.call("_snap_respawn_to_floor")
+		_current_grace = site_id
 		_activate_grace(grace, false)
 		_sync_map()
-		_show_message("DEBUG - VIAGGIO ALLA GRAZIA - %s" % str(grace.get("display_name")).to_upper())
+		_show_message(("DEBUG - VIAGGIO DI PROVA - %s" if debug_unlock else "VIAGGIO - %s") % str(grace.get("display_name")).to_upper())
 	if debug_unlock:
 		# Il percorso debug deve essere immediato e deterministico anche con scena
 		# in pausa; evita che una dissolvenza editoriale trattenga il callback.
@@ -623,6 +662,24 @@ func _on_fast_travel_requested(site_id: String, debug_unlock := false) -> void:
 		autoload_transition.call("transition_with_callback", travel)
 	else:
 		travel.call()
+
+
+func _debug_travel_to_boss() -> void:
+	if _player == null:
+		return
+	# Destinazione di test nella navata, volutamente priva di Grazia e respawn.
+	_player.global_position = Vector2(5100.0, -545.0)
+	_player.velocity = Vector2.ZERO
+	_update_passage_availability(true)
+	_mark_region_discovered("salute")
+	_show_message("DEBUG - VIAGGIO DIRETTO AL CUSTODE")
+
+
+func _debug_travel_allowed() -> bool:
+	if not OS.is_debug_build():
+		return false
+	var debug_tools := get_tree().get_first_node_in_group("dogana_debug_tools")
+	return debug_tools != null and debug_tools.has_method("is_debug_enabled") and bool(debug_tools.call("is_debug_enabled"))
 
 
 func _load_graces() -> void:
@@ -666,6 +723,30 @@ func _restore_boss_progress() -> void:
 func _apply_grab_hook_unlock() -> void:
 	if _grab_hook_unlocked and _player and _player.has_method("unlock_grab_hook"):
 		_player.call("unlock_grab_hook")
+
+func reset_persistent_progress() -> void:
+	_activated_graces.clear()
+	_current_grace = ""
+	_discovered_regions = {"arrival": true}
+	_grab_hook_unlocked = false
+	_boss_is_defeated = false
+	if FileAccess.file_exists(GRACE_SAVE_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(GRACE_SAVE_PATH))
+	if _player:
+		if _player.has_method("lock_grab_hook"):
+			_player.call("lock_grab_hook")
+		elif "grab_hook_unlocked" in _player:
+			_player.set("grab_hook_unlocked", false)
+	_initialize_graces()
+	_sync_map()
+	_set_boss_arena_sealed(true)
+	for lamp in get_tree().get_nodes_in_group("dogana_hanging_lamp"):
+		if lamp.has_method("reset_to_hanging"):
+			lamp.call("reset_to_hanging")
+	for boss in get_tree().get_nodes_in_group("dogana_boss"):
+		if boss.has_method("reset_encounter"):
+			boss.call("reset_encounter")
+	_show_message("SALVATAGGIO RESETTATO  •  PROGRESSI AZZERATI")
 
 
 func _on_locked_skill_requested() -> void:

@@ -1,7 +1,7 @@
 [gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://Levels/Scenes/Dogana/drowned_customs_warden.gd" id="1_script"]
-[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/drowned_customs_warden-v2.png" id="2_texture"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Characters/Bosses/drowned_customs_warden.png" id="2_texture"]
 
 [sub_resource type="RectangleShape2D" id="BodyShape"]
 size = Vector2(89.6, 92.4)
@@ -10,7 +10,7 @@ size = Vector2(89.6, 92.4)
 size = Vector2(124.6, 145.6)
 
 [sub_resource type="RectangleShape2D" id="AttackShape"]
-size = Vector2(149.8, 103.6)
+size = Vector2(132.0, 92.0)
 
 [sub_resource type="RectangleShape2D" id="ContactShape"]
 size = Vector2(66, 68)

@@ -19,6 +19,7 @@ func set_preview(kind: int, direction: Vector2, progress: float, active := false
 func _draw() -> void:
 	if _kind < 0:
 		return
+	_draw_attack_name()
 	match _kind:
 		0: # LUNGE
 			_draw_melee_zone(176.0, 78.0, Color(1.0, 0.32, 0.18, 1.0))
@@ -28,10 +29,13 @@ func _draw() -> void:
 			draw_arc(Vector2(0, 0), radius, 0.0, TAU, 48, Color(1.0, 0.36, 0.2, 0.42 + _progress * 0.5), 3.0, true)
 			_draw_countdown_ticks(Vector2(0, 0), radius)
 		2: # WAVE
+			# Tre parabole discrete: anticipano esattamente le piastrelle senza
+			# coprire il pavimento con un laser vistoso.
 			for i in 3:
-				var ang := (-0.22 + 0.22 * float(i))
-				var tip2 := _dir.rotated(ang) * lerpf(50.0, 170.0, _progress)
-				draw_line(Vector2(0, -70), tip2 + Vector2(0, -70), Color(0.4, 0.9, 1.0, 0.28 + _progress * 0.45), 2.2, true)
+				var spread := (float(i) - 1.0) * 0.16
+				var tip2 := _dir.rotated(spread) * lerpf(52.0, 188.0, _progress)
+				var midpoint := Vector2(0, -70).lerp(tip2 + Vector2(0, -70), 0.5) + Vector2(0, -34.0 * _progress)
+				draw_arc(midpoint, midpoint.distance_to(Vector2(0, -70)), PI * 0.12, PI * 0.88, 16, Color(0.58, 0.78, 0.68, 0.2 + _progress * 0.42), 1.7, true)
 		3: # SWEEP
 			_draw_melee_zone(164.0, 94.0, Color(1.0, 0.62, 0.16, 1.0))
 		4: # SPIRAL
@@ -68,14 +72,39 @@ func _draw() -> void:
 		10: # FLOOD
 			var half_width := lerpf(90.0, 520.0, _progress)
 			var top := lerpf(34.0, -150.0, _progress)
-			var flood_rect := Rect2(-half_width, top, half_width * 2.0, 158.0 - top)
-			draw_rect(flood_rect, Color(0.16, 0.58, 1.0, 0.06 + _progress * 0.12), true)
-			draw_line(Vector2(-half_width, top), Vector2(half_width, top), Color(0.35, 0.78, 1.0, 0.45 + _progress * 0.45), 4.0, true)
+			var crest := PackedVector2Array()
+			for point_index in 15:
+				var t := float(point_index) / 14.0
+				crest.append(Vector2(lerpf(-half_width, half_width, t), top + sin(t * 17.0) * 3.0))
+			draw_polyline(crest, Color(0.35, 0.86, 0.94, 0.45 + _progress * 0.45), 3.0, true)
+
+
+func _draw_attack_name() -> void:
+	var names := {
+		0: "AFFONDO",
+		1: "SCHIANTO",
+		2: "PIASTRELLE",
+		10: "MAREA",
+	}
+	var attack_name := str(names.get(_kind, ""))
+	if attack_name.is_empty():
+		return
+	var alpha := 0.38 + _progress * 0.45
+	var tint := Color(0.72, 0.94, 0.88, alpha)
+	if _kind == 1:
+		tint = Color(1.0, 0.66, 0.42, alpha)
+	elif _kind == 10:
+		tint = Color(0.5, 0.9, 1.0, alpha)
+	var font := ThemeDB.fallback_font
+	var width := font.get_string_size(attack_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+	draw_string(font, Vector2(-width * 0.5, -152.0), attack_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, tint)
 
 
 func _draw_melee_zone(width: float, height: float, tint: Color) -> void:
 	var facing := signf(_dir.x) if absf(_dir.x) > 0.01 else 1.0
-	var shown_width := lerpf(width * 0.32, width, _progress)
+	# L'arco e' volutamente piu' stretto della vecchia versione e corrisponde
+	# alla collisione (nessun danno oltre il bordo mostrato).
+	var shown_width := lerpf(width * 0.32, width * 0.72, _progress)
 	var center := Vector2(0.0, -36.0)
 	var base_angle := 0.0 if facing > 0.0 else PI
 	var half_angle := 0.54 if height < 90.0 else 0.68

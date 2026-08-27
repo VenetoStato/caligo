@@ -1,7 +1,7 @@
 [gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://Levels/Scenes/Dogana/breakable_prop.gd" id="1_script"]
-[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/breakable_fishing_cache.png" id="2_texture"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Props/breakable_fishing_cache.png" id="2_texture"]
 
 [sub_resource type="RectangleShape2D" id="SolidShape"]
 size = Vector2(86, 64)

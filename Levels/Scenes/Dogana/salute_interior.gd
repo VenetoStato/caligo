@@ -1,6 +1,6 @@
 extends Node2D
 
-const ART := preload("res://Landscape/Dogana/Generated/salute_interior_v2.png")
+const ART := preload("res://Art/Editable/Environment/Salute/salute_interior.png")
 const LAMP_SCENE := preload("res://Levels/Scenes/Dogana/gothic_hanging_lamp.tscn")
 
 const FLOOR_Y := -500.0
@@ -61,17 +61,20 @@ func _build_room_collision() -> void:
 ## Lampade gotiche a pendolo: l'amo della canna ci si appende per uscire
 ## dagli attacchi che spazzano tutto il pavimento della navata.
 func _build_ceiling_rings() -> void:
-	# Più bassi e grandi: si leggono subito come appigli/armi ambientali,
-	# non come semplice decorazione del soffitto.
-	var heights := [-220.0, -250.0, -232.0, -258.0, -224.0]
+	# Rialzati sopra il volume della marea: il player appeso con lenza corta
+	# resta visibilmente fuori dall'acqua, senza avere lampade a pelo di testa.
+	var heights := [-318.0, -350.0, -326.0, -356.0, -324.0, -348.0, -316.0, -340.0]
 	for index in heights.size():
 		var lamp := LAMP_SCENE.instantiate() as Node2D
 		lamp.name = "CeilingLamp_%d" % index
-		lamp.position = Vector2(4510.0 + index * 275.0, FLOOR_Y + float(heights[index]))
+		lamp.position = Vector2(4370.0 + index * 250.0, FLOOR_Y + float(heights[index]))
 		lamp.set("chain_length", 96.0 + float(index % 3) * 10.0)
-		# Solo due lampadari sono armi ambientali. Gli altri restano appigli
+		# Quattro lampadari ambra sono armi ambientali, distribuiti sopra tutta l'arena.
 		# affidabili per evitare la marea e gli attacchi a pavimento.
-		lamp.set("droppable", index in [1, 3])
+		var weapon_lamp := index in [1, 3, 5, 7]
+		lamp.set("droppable", weapon_lamp)
+		if weapon_lamp:
+			lamp.set("reel_time_to_drop", 0.32)
 		add_child(lamp)
 
 

@@ -113,6 +113,8 @@ var _hurtbox: Area2D = null
 var _attack_hitbox: Area2D = null
 var _anim: AnimationPlayer = null
 var _animated: AnimatedSprite2D = null
+var _art_layers: Array[CanvasItem] = []
+var _art_layer_resources: Array[EnemyArtLayer] = []
 var _using_frames := false
 var _clip_lock := ""
 var _clip_lock_timer := 0.0
@@ -219,7 +221,7 @@ func apply_variant_art(texture: Texture2D) -> void:
 
 
 func apply_art_kit(kit: EnemyArtKit) -> void:
-	# Hollow Knight: il codice chiede un nome clip; l'artista cambia pixel/sheet.
+	# Il gameplay chiede clip per nome; direzione artistica e struttura restano libere.
 	if kit == null:
 		return
 	art_kit = kit
@@ -247,7 +249,69 @@ func apply_art_kit(kit: EnemyArtKit) -> void:
 		_original_sprite_scale = sprite_node.scale
 		_base_sprite_position = sprite_node.position
 		_apply_archetype_look()
+	_build_art_layers(kit)
 	_play_clip("idle")
+
+
+func _build_art_layers(kit: EnemyArtKit) -> void:
+	for layer_node in _art_layers:
+		if is_instance_valid(layer_node):
+			layer_node.queue_free()
+	_art_layers.clear()
+	_art_layer_resources.clear()
+	if kit == null or sprite_node == null:
+		return
+	for layer_resource in kit.layers:
+		if layer_resource == null:
+			continue
+		var visual: CanvasItem
+		if layer_resource.frames:
+			var animated_layer := AnimatedSprite2D.new()
+			animated_layer.sprite_frames = layer_resource.frames
+			animated_layer.centered = true
+			visual = animated_layer
+		elif layer_resource.still:
+			var still_layer := Sprite2D.new()
+			still_layer.texture = layer_resource.still
+			still_layer.centered = true
+			visual = still_layer
+		else:
+			continue
+		visual.name = "ArtLayer_%s" % layer_resource.layer_name
+		visual.position = sprite_node.position + layer_resource.offset
+		visual.scale = sprite_node.scale * layer_resource.scale_multiplier
+		visual.z_index = sprite_node.z_index + layer_resource.z_offset
+		visual.modulate = layer_resource.modulate
+		add_child(visual)
+		_art_layers.append(visual)
+		_art_layer_resources.append(layer_resource)
+	_sync_art_layers()
+
+
+func _sync_art_layers() -> void:
+	if sprite_node == null:
+		return
+	var flipped := bool(sprite_node.get("flip_h")) if "flip_h" in sprite_node else false
+	for index in _art_layers.size():
+		var visual := _art_layers[index]
+		if not is_instance_valid(visual):
+			continue
+		var layer_resource := _art_layer_resources[index]
+		visual.position = sprite_node.position + layer_resource.offset
+		visual.scale = sprite_node.scale * layer_resource.scale_multiplier
+		visual.rotation = sprite_node.rotation
+		visual.z_index = sprite_node.z_index + layer_resource.z_offset
+		if "flip_h" in visual:
+			visual.set("flip_h", flipped)
+
+
+func _process(_delta: float) -> void:
+	_sync_art_layers()
+
+
+func play_art_clip(clip_name: String, force := true) -> void:
+	## Consente a scene e comportamenti aggiuntivi di usare anche clip non standard.
+	_play_clip(clip_name, force)
 
 
 func _ensure_animated(sprite_frames: SpriteFrames) -> void:
@@ -277,6 +341,11 @@ func _play_clip(clip_name: String, force := false) -> void:
 				return
 		if _animated.animation != clip_name or force:
 			_animated.play(clip_name)
+		for visual in _art_layers:
+			if visual is AnimatedSprite2D:
+				var layer := visual as AnimatedSprite2D
+				if layer.sprite_frames and layer.sprite_frames.has_animation(clip_name):
+					layer.play(clip_name)
 		var looping := _animated.sprite_frames.get_animation_loop(clip_name)
 		if looping:
 			_clip_lock = ""

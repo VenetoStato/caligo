@@ -22,6 +22,10 @@ func _enter_tree():
 	add_tool_menu_item("Import PSD layers...", Callable(self, "_on_menu_import_psd"))
 	add_tool_menu_item("ArtistDrop: sincronizza disegni...", Callable(self, "_on_menu_sync_artist_drop"))
 	add_tool_menu_item("ArtistDrop: apri cartella...", Callable(self, "_on_menu_open_artist_drop"))
+	add_tool_menu_item("Artista: apri asset modificabili", Callable(self, "_on_open_editable_art"))
+	add_tool_menu_item("Artista: apri guida", Callable(self, "_on_open_artist_guide"))
+	add_tool_menu_item("Artista: apri player e animazioni", Callable(self, "_on_open_player_art"))
+	add_tool_menu_item("Artista: apri template nuovo nemico", Callable(self, "_on_open_enemy_template"))
 	call_deferred("_add_toolbar_buttons")
 	call_deferred("_deferred_init")
 
@@ -38,6 +42,10 @@ func _exit_tree():
 	remove_tool_menu_item("Import PSD layers...")
 	remove_tool_menu_item("ArtistDrop: sincronizza disegni...")
 	remove_tool_menu_item("ArtistDrop: apri cartella...")
+	remove_tool_menu_item("Artista: apri asset modificabili")
+	remove_tool_menu_item("Artista: apri guida")
+	remove_tool_menu_item("Artista: apri player e animazioni")
+	remove_tool_menu_item("Artista: apri template nuovo nemico")
 	if _psd_dialog and is_instance_valid(_psd_dialog):
 		_psd_dialog.queue_free()
 	if _external_dialog and is_instance_valid(_external_dialog):
@@ -54,6 +62,20 @@ func _deferred_init():
 func _add_toolbar_buttons():
 	_toolbar = HBoxContainer.new()
 	_toolbar.add_theme_constant_override("separation", 4)
+	var artist_menu := MenuButton.new()
+	artist_menu.text = "ARTISTA"
+	artist_menu.tooltip_text = "Asset, guida, animazioni e template pronti"
+	var artist_popup := artist_menu.get_popup()
+	artist_popup.add_item("1. Apri asset modificabili", 0)
+	artist_popup.add_item("2. Apri guida rapida", 1)
+	artist_popup.add_separator()
+	artist_popup.add_item("Player: sprite e AnimationTree", 2)
+	artist_popup.add_item("Nuovo nemico: apri template", 3)
+	artist_popup.add_separator()
+	artist_popup.add_item("Apri cartella ArtistDrop", 4)
+	artist_popup.add_item("Sincronizza ArtistDrop", 5)
+	artist_popup.id_pressed.connect(_on_artist_menu_pressed)
+	_toolbar.add_child(artist_menu)
 	var btn_ext := Button.new()
 	btn_ext.text = "PSD: Importa da file..."
 	btn_ext.tooltip_text = "Copia un .psd/.psb da fuori nel progetto"
@@ -147,6 +169,32 @@ func _on_menu_import_psd():
 func _on_menu_open_artist_drop() -> void:
 	var drop := ProjectSettings.globalize_path("res://Landscape/Dogana/ArtistDrop")
 	OS.shell_open(drop)
+
+
+func _on_artist_menu_pressed(item_id: int) -> void:
+	match item_id:
+		0: _on_open_editable_art()
+		1: _on_open_artist_guide()
+		2: _on_open_player_art()
+		3: _on_open_enemy_template()
+		4: _on_menu_open_artist_drop()
+		5: _on_menu_sync_artist_drop()
+
+
+func _on_open_editable_art() -> void:
+	OS.shell_open(ProjectSettings.globalize_path("res://Art/Editable"))
+
+
+func _on_open_artist_guide() -> void:
+	OS.shell_open(ProjectSettings.globalize_path("res://ARTIST_GUIDE.md"))
+
+
+func _on_open_player_art() -> void:
+	get_editor_interface().open_scene_from_path("res://Player/Scene/Player.tscn")
+
+
+func _on_open_enemy_template() -> void:
+	get_editor_interface().open_scene_from_path("res://Enemies/ArtistEnemyTemplate.tscn")
 
 
 func _on_menu_sync_artist_drop() -> void:

@@ -28,6 +28,9 @@ var _saved_water_tuning: Dictionary = {}
 var _water_expanded := false
 var _menu_tween: Tween
 var _menu_transitioning := false
+var _btn_reset_save: Button = null
+var _reset_armed := false
+var _escape_was_down := false
 
 const DOGANA_SCENE := "res://Levels/Scenes/punta_della_dogana.tscn"
 const ORIGINAL_SCENE := "res://Levels/Scenes/test_area.tscn"
@@ -46,7 +49,11 @@ func _ready():
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	if menu_btn:
 		menu_btn.pressed.connect(toggle)
-		_make_discreet_glyph(menu_btn, "\u2261")
+		menu_btn.text = "MENU"
+		menu_btn.custom_minimum_size = Vector2(112, 38)
+		menu_btn.size = Vector2(112, 38)
+		menu_btn.modulate = Color.WHITE
+		menu_btn.add_theme_font_size_override("font_size", 16)
 	if hook_indicator:
 		var current_path := get_tree().current_scene.scene_file_path if get_tree().current_scene else ""
 		hook_indicator.visible = current_path != DOGANA_SCENE
@@ -65,6 +72,7 @@ func _ready():
 	btn_controls.pressed.connect(_on_controls)
 	btn_camera.pressed.connect(_on_camera)
 	btn_quit.pressed.connect(_on_quit)
+	_create_reset_save_button()
 	_create_level_button()
 	_load_water_tuning()
 	_create_water_controls()
@@ -82,6 +90,35 @@ func _ready():
 	_apply_visual_theme()
 	get_viewport().size_changed.connect(_apply_responsive_layout)
 	_apply_responsive_layout()
+
+func _create_reset_save_button() -> void:
+	if vbox == null or _btn_reset_save != null:
+		return
+	_btn_reset_save = Button.new()
+	_btn_reset_save.name = "BtnResetSave"
+	_btn_reset_save.text = "Resetta salvataggio"
+	_btn_reset_save.tooltip_text = "Azzera Grazie, boss e sblocco dell'amo"
+	_btn_reset_save.pressed.connect(_on_reset_save)
+	vbox.add_child(_btn_reset_save)
+	vbox.move_child(_btn_reset_save, btn_quit.get_index())
+	_style_menu_button(_btn_reset_save)
+
+func _on_reset_save() -> void:
+	if not _reset_armed:
+		_reset_armed = true
+		_btn_reset_save.text = "Conferma reset salvataggio"
+		get_tree().create_timer(2.5).timeout.connect(func() -> void:
+			_reset_armed = false
+			if is_instance_valid(_btn_reset_save):
+				_btn_reset_save.text = "Resetta salvataggio"
+		)
+		return
+	_reset_armed = false
+	_btn_reset_save.text = "Resetta salvataggio"
+	var scene := get_tree().current_scene
+	if scene and scene.has_method("reset_persistent_progress"):
+		scene.call("reset_persistent_progress")
+	_update_hook_label()
 
 
 func _apply_visual_theme() -> void:
@@ -237,8 +274,11 @@ func _change_to_scene(target: String) -> void:
 	else:
 		push_error("Livello non trovato: " + target)
 
-func _unhandled_input(event):
-	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("pause_menu"):
+func _input(event: InputEvent) -> void:
+	# Gestione diretta oltre alle action: garantisce ESC anche quando un
+	# Control della scena consuma l'evento prima di _unhandled_input.
+	var escape := event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo and (event as InputEventKey).keycode == KEY_ESCAPE
+	if escape or event.is_action_pressed("ui_cancel") or event.is_action_pressed("pause_menu"):
 		toggle()
 		get_viewport().set_input_as_handled()
 
@@ -305,6 +345,12 @@ func _find_player_and_camera():
 			_camera = _player.find_child("Camera2D", true, false) as Camera2D
 
 func _process(_delta):
+	# Fallback affidabile per tastiere/controller che non propagano l'evento
+	# alla catena UI durante il cambio scena.
+	var escape_down := Input.is_key_pressed(KEY_ESCAPE)
+	if escape_down and not _escape_was_down:
+		toggle()
+	_escape_was_down = escape_down
 	if not panel.visible and hook_indicator:
 		_update_hook_indicator()
 

@@ -7,6 +7,7 @@ signal fast_travel_requested(site_id: String, debug_unlock: bool)
 @onready var _status: Label = $Overlay/Frame/Status
 @onready var _canvas: Control = $Overlay/Frame/MapCanvas
 @onready var _debug_travel: CheckButton = $Overlay/Frame/DebugTravel
+@onready var _boss_debug_button: Button = $Overlay/Frame/MapCanvas/Custode
 @onready var _buttons := {
 	"pontile": $Overlay/Frame/MapCanvas/Pontile,
 	"dogana": $Overlay/Frame/MapCanvas/Dogana,
@@ -63,6 +64,7 @@ func _ready() -> void:
 	call_deferred("_bind_global_debug")
 	for site_id in _buttons:
 		(_buttons[site_id] as Button).pressed.connect(_on_site_pressed.bind(site_id))
+	_boss_debug_button.pressed.connect(_on_debug_boss_pressed)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -144,24 +146,38 @@ func _refresh() -> void:
 		var button := _buttons[site_id] as Button
 		var data: Dictionary = _sites.get(site_id, {})
 		var discovered := bool(data.get("activated", false))
-		var available := discovered or _is_debug_travel_enabled()
+		# Una Grazia e' una destinazione solo dopo l'attivazione nel mondo. Il
+		# debug non la rende mai selezionabile e non altera la progressione.
+		var available := discovered
 		button.disabled = not available
 		button.text = "GRAZIA\n%s" % str(data.get("name", "Sconosciuto")) if available else "?\nNON SCOPERTO"
 		button.modulate = Color(1.0, 0.84, 0.45, 1.0) if site_id == _current_site else Color.WHITE
+	var debug_enabled := _is_debug_travel_enabled()
+	_boss_debug_button.visible = debug_enabled
+	_boss_debug_button.disabled = not debug_enabled
+	_boss_debug_button.text = "DEBUG\nBOSS"
+	_boss_debug_button.modulate = Color(0.6, 0.9, 1.0, 0.95)
 	_status.text = (
-		"DEBUG ATTIVO - tutte le Grazie sono selezionabili"
-		if _is_debug_travel_enabled()
+		"DEBUG ATTIVO - Grazie + viaggio diretto al Custode"
+		if debug_enabled
 		else "Seleziona un Altare della Marea scoperto per viaggiare"
 	)
 
 
 func _on_site_pressed(site_id: String) -> void:
 	var data: Dictionary = _sites.get(site_id, {})
-	if not bool(data.get("activated", false)) and not _is_debug_travel_enabled():
+	if not bool(data.get("activated", false)):
 		return
-	var debug_unlock := _is_debug_travel_enabled() and not bool(data.get("activated", false))
 	close_map()
-	fast_travel_requested.emit(site_id, debug_unlock)
+	fast_travel_requested.emit(site_id, false)
+
+
+func _on_debug_boss_pressed() -> void:
+	if not _is_debug_travel_enabled():
+		return
+	close_map()
+	# Non e' una Grazia: e' un teletrasporto di test, senza altare/checkpoint.
+	fast_travel_requested.emit("debug_boss", true)
 
 
 func _on_debug_travel_toggled(_enabled: bool) -> void:
@@ -182,6 +198,8 @@ func _on_global_debug_changed(_enabled: bool) -> void:
 func _is_debug_travel_enabled() -> bool:
 	# Il controllo nascosto resta compatibile con le scene di test; nel gioco
 	# il flag piccolo in alto a sinistra e' l'unico ingresso visibile.
+	if not OS.is_debug_build():
+		return false
 	if _debug_travel and _debug_travel.button_pressed:
 		return true
 	var debug_tools := get_tree().get_first_node_in_group("dogana_debug_tools")

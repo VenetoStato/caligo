@@ -1,10 +1,9 @@
 class_name EnemyArtKit
 extends Resource
 
-## Hollow Knight-style art kit: gameplay never reads pixels.
-## Code asks for clip names (idle, walk, wake, windup, attack, hurt, death, jump).
-## The illustrator fills a still portrait and/or a sprite sheet; extra clips can
-## reuse frames the way Team Cherry reuses one sprite across many animations.
+## Kit artistico aperto: il gameplay non legge i pixel. Le clip standard sono
+## convenzioni usate dalla logica, ma SpriteFrames e clip_layout possono
+## contenere qualsiasi altra animazione decisa dall'artista.
 
 const CLIP_NAMES := ["idle", "walk", "wake", "windup", "attack", "hurt", "death", "jump"]
 
@@ -16,6 +15,8 @@ const CLIP_NAMES := ["idle", "walk", "wake", "windup", "attack", "hurt", "death"
 @export var sheet_fps := 8.0
 ## Optional override: { "idle": { "from": 0, "len": 2, "fps": 4.0, "loop": true } }
 @export var clip_layout: Dictionary = {}
+## Layer aggiuntivi sincronizzati: corpo, costume, arma, maschera, VFX, ecc.
+@export var layers: Array[EnemyArtLayer] = []
 
 
 func resolved_still() -> Texture2D:
@@ -50,9 +51,8 @@ func available_clips() -> PackedStringArray:
 	var found := PackedStringArray()
 	if sprite_frames == null:
 		return found
-	for clip_name in CLIP_NAMES:
-		if sprite_frames.has_animation(clip_name):
-			found.append(clip_name)
+	for clip_name in sprite_frames.get_animation_names():
+		found.append(clip_name)
 	return found
 
 
@@ -66,7 +66,8 @@ func _frames_from_sheet(source: Texture2D) -> SpriteFrames:
 	)
 	var total := cols * rows
 	var layout: Dictionary = clip_layout if not clip_layout.is_empty() else default_layout(total)
-	for clip_name in CLIP_NAMES:
+	for clip_key in layout.keys():
+		var clip_name := str(clip_key)
 		if not layout.has(clip_name):
 			continue
 		var spec: Dictionary = layout[clip_name]

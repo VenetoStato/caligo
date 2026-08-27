@@ -1,12 +1,23 @@
-[gd_scene load_steps=21 format=3 uid="uid://c064mwp5bwak4"]
+[gd_scene load_steps=25 format=3 uid="uid://c064mwp5bwak4"]
 
-[ext_resource type="Texture2D" uid="uid://d3oicsx8lp473" path="res://Player/Sprites/sprite_sheet.png" id="1_gqxai"]
+[ext_resource type="Texture2D" uid="uid://d3oicsx8lp473" path="res://Art/Editable/Player/sprite_sheet.png" id="1_gqxai"]
 [ext_resource type="Script" uid="uid://c14so0210pd47" path="res://Player/Scene/player_controller.gd" id="1_qfdc6"]
 [ext_resource type="PackedScene" uid="uid://c1f8gxcoikcmq" path="res://hook.tscn" id="2_t3pcw"]
 [ext_resource type="PackedScene" uid="uid://b1hg15ugg6w4e" path="res://fishinghook.tscn" id="3_p0c61"]
 [ext_resource type="PackedScene" uid="uid://c3ppxe0weekk1" path="res://pastura.tscn" id="4_2qgpt"]
 [ext_resource type="PackedScene" uid="uid://b8k2m3n4p5q6r" path="res://Fx/black_particle.tscn" id="5_black"]
 [ext_resource type="PackedScene" uid="uid://o7x1gjykk2h6" path="res://Fx/ambient_particle.tscn" id="6_ambient"]
+[ext_resource type="Script" path="res://Player/Scene/player_visual_rig.gd" id="7_visual_rig"]
+
+[sub_resource type="Animation" id="Animation_artist_reset"]
+length = 0.001
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_artist"]
+_data = {
+&"RESET": SubResource("Animation_artist_reset")
+}
+
+[sub_resource type="AnimationNodeStateMachine" id="AnimationNodeStateMachine_artist"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_186t8"]
 size = Vector2(22, 38)
@@ -215,6 +226,36 @@ scale = Vector2(0.12, 0.12)
 texture = ExtResource("1_gqxai")
 hframes = 5
 vframes = 8
+
+[node name="VisualLayers" type="Node2D" parent="."]
+script = ExtResource("7_visual_rig")
+
+[node name="BodyOverlay" type="Sprite2D" parent="VisualLayers"]
+visible = false
+position = Vector2(3, -8)
+scale = Vector2(0.12, 0.12)
+hframes = 5
+vframes = 8
+
+[node name="EquipmentOverlay" type="Sprite2D" parent="VisualLayers"]
+visible = false
+position = Vector2(3, -8)
+scale = Vector2(0.12, 0.12)
+hframes = 5
+vframes = 8
+
+[node name="FreeAnimatedLayer" type="AnimatedSprite2D" parent="VisualLayers"]
+visible = false
+
+[node name="ArtAnimationPlayer" type="AnimationPlayer" parent="VisualLayers"]
+libraries = {
+&"": SubResource("AnimationLibrary_artist")
+}
+
+[node name="ArtAnimationTree" type="AnimationTree" parent="VisualLayers"]
+tree_root = SubResource("AnimationNodeStateMachine_artist")
+anim_player = NodePath("../ArtAnimationPlayer")
+active = false
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, -6)

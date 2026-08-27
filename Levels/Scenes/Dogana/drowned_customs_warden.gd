@@ -10,8 +10,12 @@ const TELEGRAPH_SCRIPT := preload("res://Levels/Scenes/Dogana/boss_telegraph.gd"
 const FOOTSTEP_DUST := preload("res://Fx/footstep_dust.gd")
 const FLOOD_SURGE_SCRIPT := preload("res://Levels/Scenes/Dogana/boss_flood_surge.gd")
 const BOSS_ATTACK_FX_SCRIPT := preload("res://Levels/Scenes/Dogana/boss_attack_fx.gd")
+const PAINTED_FX_SCRIPT := preload("res://Levels/Scenes/Dogana/boss_painted_fx.gd")
+const SALUTE_TILE_SCRIPT := preload("res://Levels/Scenes/Dogana/boss_salute_tile.gd")
+const INK_SPRAY_ART := preload("res://Art/Editable/VFX/warden_ink_spray.png")
+const SLAM_DEBRIS_ART := preload("res://Art/Editable/VFX/warden_slam_debris.png")
 
-const MAX_BOSS_TRANSIENTS := 72
+const MAX_BOSS_TRANSIENTS := 12
 const BASE_SPRITE_POSITION := Vector2(0.0, -96.0)
 const BASE_SPRITE_SCALE := Vector2(0.161, 0.161)
 const BASE_BODY_SHAPE_POSITION := Vector2(0.0, -31.0)
@@ -79,6 +83,7 @@ var _pillar_waves_left := 0
 var _pillar_timer := 0.0
 var _last_attack_kind := -1
 var _attack_chain_step := 0
+var _flood_used := false
 var _phase := 1
 var _phase_transitioning := false
 var _home_position := Vector2.ZERO
@@ -163,7 +168,7 @@ func _physics_process(delta: float) -> void:
 				velocity.x = -signf(to_player.x) * chase_speed * 0.62
 			else:
 				velocity.x = move_toward(velocity.x, 0.0, 850.0 * delta)
-			if _attack_timer <= 0.0 and absf(to_player.x) <= attack_range:
+			if _attack_timer <= 0.0 and absf(to_player.x) <= attack_range and not _has_active_attack_effects():
 				_begin_windup(to_player)
 		State.WINDUP:
 			velocity.x = move_toward(velocity.x, 0.0, 1200.0 * delta)
@@ -171,7 +176,7 @@ func _physics_process(delta: float) -> void:
 				_commit_attack(to_player)
 		State.LUNGE:
 			if _state_timer <= 0.0:
-				_begin_recovery(0.72)
+				_begin_recovery(1.55)
 		State.SLAM:
 			_slam_air_timer = maxf(0.0, _slam_air_timer - delta)
 			if _slam_armed and _slam_air_timer <= 0.0 and (is_on_floor() or _state_timer <= 0.0):
@@ -180,7 +185,7 @@ func _physics_process(delta: float) -> void:
 			_update_wave(delta, to_player)
 			velocity.x = move_toward(velocity.x, 0.0, 900.0 * delta)
 			if _wave_shots_left <= 0 and _state_timer <= 0.0:
-				_begin_recovery(0.7)
+				_begin_recovery(1.45)
 		State.SPIRAL:
 			_update_spiral(delta)
 			velocity.x = move_toward(velocity.x, 0.0, 900.0 * delta)
@@ -216,7 +221,7 @@ func _physics_process(delta: float) -> void:
 			# finestra in cui conviene appendersi e non pensare a colpirlo.
 			velocity.x = move_toward(velocity.x, 0.0, 950.0 * delta)
 			if _state_timer <= 0.0:
-				_begin_recovery(0.8)
+				_begin_recovery(2.0)
 		State.SWEEP:
 			if _state_timer <= 0.0:
 				_begin_recovery(0.95)
@@ -238,6 +243,13 @@ func _is_enraged() -> bool:
 
 func _is_desperate() -> bool:
 	return current_health <= maxi(1, max_health / 3)
+
+
+func _has_active_attack_effects() -> bool:
+	for effect in get_tree().get_nodes_in_group("enemy_transient_attack"):
+		if is_instance_valid(effect):
+			return true
+	return false
 
 
 func apply_art_kit(kit: EnemyArtKit) -> void:
@@ -422,8 +434,16 @@ func _spawn_step_dust() -> void:
 
 ## Morire nell'arena deve poter far ricominciare lo scontro da capo.
 func reset_encounter() -> void:
+	# Il reset del salvataggio deve poter riattivare anche un boss sconfitto
+	# senza richiedere una chiusura completa del processo.
 	if state == State.DEAD:
-		return
+		collision_layer = 2
+		collision_mask = 1
+		_hurtbox.set_deferred("monitoring", true)
+		_attack_hitbox.set_deferred("monitoring", false)
+		_contact_damage_area.set_deferred("monitoring", true)
+		_sprite.show()
+		set_physics_process(true)
 	for attack in get_tree().get_nodes_in_group("enemy_transient_attack"):
 		if is_instance_valid(attack):
 			attack.queue_free()
@@ -433,6 +453,7 @@ func reset_encounter() -> void:
 	_phase_transitioning = false
 	_last_attack_kind = -1
 	_attack_chain_step = 0
+	_flood_used = false
 	_invulnerability_timer = 0.0
 	_attack_timer = 0.0
 	_contact_damage_timer = 0.0
@@ -454,6 +475,19 @@ func reset_encounter() -> void:
 		_wound_light.energy = 0.0
 
 
+## Solo per il pannello Feel/Debug: permette di provare le soglie di fase e
+## la marea senza picchiare il boss per minuti. Non salva lo stato nel run.
+func debug_set_health(value: int) -> void:
+	if state == State.DEAD:
+		return
+	current_health = clampi(value, 1, max_health)
+	_phase = 3 if _is_desperate() else (2 if _is_enraged() else 1)
+	if _phase < 3:
+		_flood_used = false
+		_attack_chain_step = 0
+	_update_wound_signal(0.0)
+
+
 func _awaken() -> void:
 	state = State.CHASE
 	_attack_timer = 1.1
@@ -470,15 +504,15 @@ func _begin_windup(to_player: Vector2) -> void:
 	_attack_has_hit = false
 	match _pending_kind:
 		AttackKind.LUNGE:
-			_state_timer = 0.48
+			_state_timer = 1.2
 			_pending_damage = attack_damage
 			_sprite.modulate = Color(0.62, 1.05, 0.92, 1.0)
 		AttackKind.SLAM:
-			_state_timer = 0.72
+			_state_timer = 1.32
 			_pending_damage = heavy_attack_damage
 			_sprite.modulate = Color(1.15, 0.55, 0.4, 1.0)
 		AttackKind.WAVE:
-			_state_timer = 0.58
+			_state_timer = 1.18
 			_pending_damage = attack_damage
 			_sprite.modulate = Color(0.45, 0.9, 1.15, 1.0)
 		AttackKind.SWEEP:
@@ -510,7 +544,9 @@ func _begin_windup(to_player: Vector2) -> void:
 			_pending_damage = heavy_attack_damage
 			_sprite.modulate = Color(0.88, 0.42, 1.12, 1.0)
 		AttackKind.FLOOD:
-			_state_timer = 0.9
+			# La marea disegna il suo preavviso sul pavimento per 1.5 s: qui
+			# committiamo subito l'azione e lasciamo al surge il telegraph.
+			_state_timer = 0.05
 			_pending_damage = heavy_attack_damage
 			_sprite.modulate = Color(0.3, 0.66, 1.15, 1.0)
 	_windup_duration = _state_timer
@@ -521,31 +557,26 @@ func _pick_attack(to_player: Vector2) -> AttackKind:
 	var dist := absf(to_player.x)
 	var options: Array[AttackKind] = []
 	_attack_chain_step += 1
-	# Mega-attacco raro: non ogni combo, ma quando arriva dura diversi secondi.
-	if _attack_chain_step >= 8:
+	# Il climax arriva una sola volta: sotto un terzo di vita, dopo due azioni
+	# normali. Non esistono piu' pool segreti di proiettili nella fase finale.
+	if _is_desperate() and not _flood_used and _attack_chain_step >= 2:
 		_attack_chain_step = 0
+		_flood_used = true
 		_last_attack_kind = int(AttackKind.FLOOD)
 		return AttackKind.FLOOD
-	# Pool per fase: pochi pattern coerenti e imparabili. Le varianti dense
-	# entrano solo dopo che il player ha letto il moveset base.
+	# Le tre mosse base sono le uniche scelte fuori dal climax. L'ordine e'
+	# variabile, ma ogni segnale ha sempre un solo significato.
 	if dist <= 120.0:
-		options.append(AttackKind.SWEEP)
 		options.append(AttackKind.LUNGE)
 		options.append(AttackKind.SLAM)
+		options.append(AttackKind.WAVE)
 	elif dist <= 240.0:
 		options.append(AttackKind.LUNGE)
 		options.append(AttackKind.SLAM)
 		options.append(AttackKind.WAVE)
 	else:
 		options.append(AttackKind.WAVE)
-		options.append(AttackKind.FAN)
-	if _is_enraged():
-		options.append(AttackKind.STREAM)
-		options.append(AttackKind.RING)
-		options.append(AttackKind.PILLARS)
-	if _is_desperate():
-		options.append(AttackKind.SPIRAL)
-		options.append(AttackKind.CROSS)
+		options.append(AttackKind.LUNGE)
 	var filtered: Array[AttackKind] = []
 	for kind in options:
 		if int(kind) != _last_attack_kind:
@@ -587,7 +618,7 @@ func _commit_attack(to_player: Vector2) -> void:
 
 func _begin_lunge(to_player: Vector2) -> void:
 	state = State.LUNGE
-	_state_timer = 0.36
+	_state_timer = 0.32
 	velocity.x = signf(to_player.x) * lunge_speed * (1.15 if _is_enraged() else 1.0)
 	velocity.y = -70.0
 	_enable_melee_hitbox(1.0)
@@ -614,24 +645,15 @@ func _slam_impact() -> void:
 	get_tree().current_scene.add_child(area)
 	area.global_position = global_position + Vector2(0, 10)
 	_shake_camera(0.55)
-	PARTICLE_BURST.spawn(
-		get_tree().current_scene,
-		global_position + Vector2(0, 8),
-		Color(0.28, 0.85, 0.72, 0.9),
-		28,
-		Vector2.UP,
-		55.0,
-		160.0,
-		0.75
-	)
-	_begin_recovery(0.9)
+	_spawn_painted_fx(SLAM_DEBRIS_ART, global_position + Vector2(0, 10), Vector2.RIGHT, 0.72, Vector2(0.11, 0.11), Vector2(0.2, 0.2))
+	_begin_recovery(1.7)
 
 
 func _begin_wave(to_player: Vector2) -> void:
 	state = State.WAVE
-	_wave_shots_left = 5 if _is_enraged() else 3
+	_wave_shots_left = 2
 	_wave_shot_timer = 0.0
-	_state_timer = 0.12 + float(_wave_shots_left) * 0.16
+	_state_timer = 1.15
 	velocity.x = 0.0
 	_disable_melee_hitbox()
 	_fire_wave_shot(to_player)
@@ -644,27 +666,31 @@ func _update_wave(delta: float, to_player: Vector2) -> void:
 	_wave_shot_timer -= delta
 	if _wave_shot_timer > 0.0:
 		return
-	_wave_shot_timer = 0.16
+	_wave_shot_timer = 0.58
 	_fire_wave_shot(to_player)
 	_wave_shots_left -= 1
 
 
 func _fire_wave_shot(to_player: Vector2) -> void:
 	var base_dir := to_player.normalized() if to_player.length_squared() > 0.01 else Vector2.RIGHT
-	base_dir.y = clampf(base_dir.y, -0.35, 0.15)
+	base_dir.y = clampf(base_dir.y, -0.5, -0.12)
 	base_dir = base_dir.normalized()
-	var offsets := [-0.22, 0.0, 0.22] if _is_enraged() else [-0.14, 0.14]
-	for offset in offsets:
-		var dmg := heavy_attack_damage if absf(offset) < 0.01 and _is_enraged() else attack_damage
-		_spawn_boss_projectile(
-			base_dir.rotated(offset),
-			155.0 if _is_enraged() else 132.0,
-			dmg,
-			Color(0.35, 0.92, 0.86, 1.0),
-			6.5,
-			3.4
-		)
+	# La Salute risponde al colpo del Custode: tre piastrelle, arco ben leggibile
+	# e rimbalzi smorzati. La spaziatura lascia un corridoio tra i frammenti.
+	for index in 3:
+		var spread := (float(index) - 1.0) * 0.16
+		_spawn_salute_tile(base_dir.rotated(spread), 210.0 - absf(float(index) - 1.0) * 18.0)
+	_spawn_painted_fx(INK_SPRAY_ART, global_position + Vector2(0, -66) + base_dir * 26.0, base_dir, 0.48, Vector2(0.075, 0.075), Vector2(0.13, 0.13), base_dir * 28.0)
 	_shake_camera(0.12)
+
+
+func _spawn_salute_tile(direction: Vector2, speed: float) -> void:
+	if get_tree().get_nodes_in_group("enemy_transient_attack").size() >= MAX_BOSS_TRANSIENTS:
+		return
+	var tile := SALUTE_TILE_SCRIPT.new() as Area2D
+	tile.call("setup", direction * speed + Vector2(0, -105.0), global_position.y + 6.0, attack_damage)
+	get_tree().current_scene.add_child(tile)
+	tile.global_position = global_position + Vector2(0, -48) + direction * 34.0
 
 
 func _begin_spiral() -> void:
@@ -753,16 +779,23 @@ func _fire_ring_burst() -> void:
 ## parete a parete. Il pavimento smette di essere un posto sicuro.
 func _begin_flood() -> void:
 	state = State.FLOOD
-	_state_timer = 5.2
+	# 1.5 s di preavviso + 4.0 s di marea; il Custode e' vulnerabile solo
+	# dopo il ritiro, non mentre sovrappone altre minacce.
+	_state_timer = 5.55
 	_disable_melee_hitbox()
 	var floor_y := global_position.y
 	var surge := FLOOD_SURGE_SCRIPT.new() as Area2D
-	var span := Vector2(ARENA_RIGHT - ARENA_LEFT + 260.0, 168.0)
-	surge.call("setup", span, 2, 1.05, 4.15)
+	var span := Vector2(ARENA_RIGHT - ARENA_LEFT + 260.0, 150.0)
+	surge.call("setup", span, 1, 1.5, 4.0)
 	get_tree().current_scene.add_child(surge)
 	surge.global_position = Vector2(
-		(ARENA_LEFT + ARENA_RIGHT) * 0.5, floor_y - span.y * 0.5 + 26.0
+		# Il pelo resta poco sopra il pavimento, ma sotto il player appeso a una
+		# lampada (linea accorciata a 52 px): il controllo della quota e' reale.
+		(ARENA_LEFT + ARENA_RIGHT) * 0.5, floor_y + span.y * 0.5 - 50.0
 	)
+	for lamp in get_tree().get_nodes_in_group("dogana_hanging_lamp"):
+		if lamp.has_method("begin_flood_sway"):
+			lamp.call("begin_flood_sway")
 	_shake_camera(0.22)
 
 
@@ -956,10 +989,10 @@ func _begin_sweep(to_player: Vector2) -> void:
 
 func _begin_recovery(duration: float) -> void:
 	state = State.RECOVER
-	# Finestra punibile sempre presente; l'ultima fase accelera la cadenza ma
-	# non cancella la possibilita' di rispondere.
-	_state_timer = maxf(0.48, duration * (0.82 if _is_desperate() else (0.9 if _is_enraged() else 1.0)))
-	_attack_timer = attack_cooldown * (0.62 if _is_desperate() else (0.72 if _is_enraged() else 1.0))
+	# Nessuna scorciatoia nella fase finale: almeno 1.2 s di recupero e nessun
+	# attacco nuovo prima che l'hitbox/effetto precedente sia terminato.
+	_state_timer = maxf(1.2, duration)
+	_attack_timer = maxf(1.5, attack_cooldown)
 	_disable_melee_hitbox()
 	_slam_armed = false
 	_wave_shots_left = 0
@@ -976,7 +1009,9 @@ func _enable_melee_hitbox(scale_x: float) -> void:
 	_attack_has_hit = false
 	_attack_hitbox.monitoring = true
 	_attack_hitbox.monitorable = true
-	_attack_hitbox.scale = Vector2(0.76 * scale_x, 0.72)
+	# La forma reale resta dentro la sagoma dipinta e coincide con il ventaglio
+	# mostrato dal telegraph: niente colpi "a vuoto" dai bordi del mantello.
+	_attack_hitbox.scale = Vector2(0.64 * scale_x, 0.64)
 	var facing := 1.0 if _sprite.flip_h else -1.0
 	_attack_hitbox.position = Vector2(58.0 * facing, BASE_ATTACK_HITBOX_POSITION.y)
 
@@ -984,7 +1019,7 @@ func _enable_melee_hitbox(scale_x: float) -> void:
 func _disable_melee_hitbox() -> void:
 	_attack_hitbox.set_deferred("monitoring", false)
 	_attack_hitbox.set_deferred("monitorable", false)
-	_attack_hitbox.scale = Vector2(0.76, 0.72)
+	_attack_hitbox.scale = Vector2(0.64, 0.64)
 	_attack_hitbox.position = BASE_ATTACK_HITBOX_POSITION
 
 
@@ -1011,6 +1046,11 @@ func take_damage(amount: int = 1, source_position: Vector2 = Vector2.ZERO) -> vo
 	var next_phase := 3 if _is_desperate() else (2 if _is_enraged() else 1)
 	if next_phase > _phase:
 		_phase = next_phase
+		if _phase == 3:
+			# La conta dei due pattern riparte entrando davvero nell'ultima fase;
+			# non eredita gli attacchi eseguiti quando il boss aveva ancora molta vita.
+			_attack_chain_step = 0
+			_last_attack_kind = -1
 		_begin_phase_transition()
 	var away := signf(global_position.x - source_position.x)
 	if is_zero_approx(away):
@@ -1069,7 +1109,9 @@ func _on_contact_body_entered(body: Node2D) -> void:
 
 
 func _update_contact_damage() -> void:
-	if _contact_damage_timer > 0.0 or state == State.DORMANT or state == State.DEAD:
+	# Durante un attacco il danno arriva solo dalla hitbox telegrafata: il
+	# contatto invisibile e' attivo esclusivamente mentre il Custode insegue.
+	if _contact_damage_timer > 0.0 or state != State.CHASE:
 		return
 	for body in _contact_damage_area.get_overlapping_bodies():
 		if body is Node2D and _try_contact_damage(body as Node2D):
@@ -1077,7 +1119,7 @@ func _update_contact_damage() -> void:
 
 
 func _try_contact_damage(body: Node2D) -> bool:
-	if _contact_damage_timer > 0.0 or state == State.DORMANT or state == State.DEAD:
+	if _contact_damage_timer > 0.0 or state != State.CHASE:
 		return false
 	if not body.is_in_group("player") or not body.has_method("take_damage"):
 		return false
@@ -1115,6 +1157,17 @@ func _spawn_attack_release_fx(to_player: Vector2) -> void:
 	var direction := to_player.normalized() if to_player.length_squared() > 0.01 else Vector2.RIGHT
 	var heavy := _pending_damage >= 2
 	var tint := Color(1.0, 0.38, 0.2, 0.92) if heavy else Color(0.32, 0.95, 0.84, 0.9)
+	if _pending_kind == AttackKind.LUNGE:
+		_spawn_painted_fx(INK_SPRAY_ART, global_position + Vector2(0.0, -52.0) + direction * 42.0, direction, 0.44, Vector2(0.09, 0.09), Vector2(0.16, 0.16), direction * 46.0)
+		return
+	elif _pending_kind == AttackKind.WAVE:
+		_spawn_painted_fx(INK_SPRAY_ART, global_position + Vector2(0.0, -66.0) + direction * 18.0, direction, 0.52, Vector2(0.07, 0.07), Vector2(0.13, 0.13), direction * 22.0)
+		return
+	elif _pending_kind == AttackKind.SLAM:
+		# Lo sprite di pietra/acqua viene emesso all'impatto, non in anticipo.
+		return
+	elif _pending_kind == AttackKind.FLOOD:
+		return
 	PARTICLE_BURST.spawn(
 		scene,
 		global_position + Vector2(0.0, -42.0) + direction * 18.0,
@@ -1129,6 +1182,24 @@ func _spawn_attack_release_fx(to_player: Vector2) -> void:
 	release_fx.call("setup", direction, tint, heavy, 0)
 	scene.add_child(release_fx)
 	release_fx.global_position = global_position + Vector2(0.0, -42.0) + direction * 18.0
+
+
+func _spawn_painted_fx(
+	art: Texture2D,
+	at: Vector2,
+	direction: Vector2,
+	duration: float,
+	start_scale: Vector2,
+	end_scale: Vector2,
+	drift := Vector2.ZERO
+) -> void:
+	var scene := get_tree().current_scene
+	if scene == null or art == null:
+		return
+	var painted_fx := PAINTED_FX_SCRIPT.new() as Sprite2D
+	painted_fx.call("setup", art, direction, duration, start_scale, end_scale, drift)
+	scene.add_child(painted_fx)
+	painted_fx.global_position = at
 
 
 func _spawn_charge_fx(to_player: Vector2) -> void:

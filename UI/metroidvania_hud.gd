@@ -24,6 +24,9 @@ var _grace_reveal := 0.0
 
 
 func _ready() -> void:
+	visible = true
+	modulate = Color.WHITE
+	z_index = 60
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	get_viewport().size_changed.connect(_apply_responsive_layout)
 	_apply_responsive_layout()

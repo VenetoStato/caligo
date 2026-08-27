@@ -1437,6 +1437,13 @@ func flip_logic():
 	_update_attack_hitbox_position()
 
 func set_animation():
+	# Durante il pendolo l'animazione deve essere stabile: la velocita verticale
+	# cambia segno a ogni arco e non deve alternare Grab/Falling/Jump.
+	if is_swinging:
+		_disable_attack_hitbox()
+		if anim.has_animation("Grab") and anim.current_animation != "Grab":
+			anim.play("Grab")
+		return
 	var can_nail := _attack_cooldown <= 0.0 and (not line_extended or enemy_hooked)
 	if Input.is_action_just_pressed("ui_attack_strong") and can_nail:
 		if anim.has_animation("Attack_strong"):
@@ -1588,6 +1595,25 @@ func take_damage(
 	
 	if current_health <= 0:
 		_on_death()
+
+
+## Ingresso dedicato per la marea del Custode. Non congela il controllo: un
+## singolo tick infligge danno, solleva il player e lo porta leggermente verso
+## il lato della corrente. L'invulnerabilita' normale e' la protezione contro
+## tick troppo ravvicinati.
+func receive_flood_surge(amount: int, source_position: Vector2, _surface_y: float) -> void:
+	if is_dead or is_swinging or is_invincible:
+		return
+	take_damage(amount, source_position)
+	if is_dead:
+		return
+	var side := signf(global_position.x - source_position.x)
+	if is_zero_approx(side):
+		side = -1.0 if randf() < 0.5 else 1.0
+	velocity.y = minf(velocity.y, -370.0)
+	velocity.x = lerpf(velocity.x, side * 118.0, 0.72)
+	_knockback_timer = maxf(_knockback_timer, 0.16)
+	_request_impact_feedback(0.34, 0.014)
 
 func add_life_vessel() -> void:
 	max_health += 1
@@ -2039,7 +2065,11 @@ func _update_swing(delta: float) -> void:
 
 	var climb := Input.get_axis("ui_up", "ui_down")
 	if Input.is_action_pressed("reel") and not pulling_droppable_lamp:
+		# R e' il comando di trascinamento vero e proprio: oltre a raccogliere
+		# la corda imprime velocita' verso l'aggancio, cosi' il secondo amo non
+		# resta una semplice altalena ma porta il player nella direzione scelta.
 		climb = -1.0
+		velocity = velocity.move_toward(direction * grab_pull_speed, grab_pull_speed * 4.5 * delta)
 	if absf(climb) > 0.1:
 		current_line_length = clampf(
 			current_line_length + climb * swing_climb_speed * delta,
@@ -3262,6 +3292,10 @@ func is_line_extended() -> bool:
 
 func unlock_grab_hook() -> void:
 	grab_hook_unlocked = true
+	using_fishing_hook = true
+
+func lock_grab_hook() -> void:
+	grab_hook_unlocked = false
 	using_fishing_hook = true
 
 

@@ -328,6 +328,15 @@ func _test_map_and_fast_travel() -> void:
 	if _player.global_position.distance_to(dogana.call("get_respawn_position")) > 24.0:
 		_fail("debug travel did not reach target grace")
 		return
+	var boss_debug_button := map.get_node("Overlay/Frame/MapCanvas/Custode") as Button
+	if not boss_debug_button.visible or boss_debug_button.disabled:
+		_fail("debug travel did not expose direct boss command")
+		return
+	_level.call("_on_fast_travel_requested", "debug_boss", true)
+	await get_tree().process_frame
+	if _player.global_position.distance_to(Vector2(5100.0, -545.0)) > 24.0:
+		_fail("debug travel did not reach the boss arena")
+		return
 	# Assicura pontile attivato, poi teletrasporto diretto (senza attendere fade async).
 	var pontile := _level.get_node("Gameplay/GraceSites/Pontile") as Area2D
 	_level.call("_activate_grace", pontile, false)
@@ -380,18 +389,23 @@ func _test_boss_cycle() -> void:
 	for attack in get_tree().get_nodes_in_group("enemy_transient_attack"):
 		attack.queue_free()
 	await get_tree().process_frame
-	boss.call("_begin_fan", _player.global_position - boss.global_position)
-	await get_tree().process_frame
-	if get_tree().get_nodes_in_group("enemy_transient_attack").size() < 5:
-		_fail("boss fan pattern did not emit its telegraphed volley")
+	# Fase finale: niente fan/pillars/spiral. Dopo due mosse normali la marea
+	# compare una volta sola ed e' l'unico transient ambientale dell'arena.
+	boss.set("_flood_used", false)
+	boss.set("_attack_chain_step", 0)
+	var normal_pick := int(boss.call("_pick_attack", Vector2(90, 0)))
+	var flood_pick := int(boss.call("_pick_attack", Vector2(90, 0)))
+	if normal_pick > 2 or flood_pick != 10:
+		_fail("boss final pool is not limited to normal attacks then one flood (%d, %d)" % [normal_pick, flood_pick])
 		return
-	for attack in get_tree().get_nodes_in_group("enemy_transient_attack"):
-		attack.queue_free()
+	boss.call("_begin_flood")
 	await get_tree().process_frame
-	boss.call("_begin_pillars")
-	await get_tree().process_frame
-	if get_tree().get_nodes_in_group("enemy_transient_attack").size() < 5:
-		_fail("boss pillar pattern did not create marked ground attacks")
+	if get_tree().get_nodes_in_group("enemy_transient_attack").size() != 1:
+		_fail("boss flood did not create exactly one arena-wide tide")
+		return
+	var post_flood_pick := int(boss.call("_pick_attack", Vector2(90, 0)))
+	if post_flood_pick > 2:
+		_fail("boss attempted a second flood in the same encounter")
 		return
 	for attack in get_tree().get_nodes_in_group("enemy_transient_attack"):
 		attack.queue_free()

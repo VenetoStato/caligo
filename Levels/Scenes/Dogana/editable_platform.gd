@@ -1,7 +1,7 @@
 @tool
 extends StaticBody2D
 
-const PLATFORM_TEXTURE := preload("res://Landscape/Dogana/Generated/quay_platform.png")
+const PLATFORM_TEXTURE := preload("res://Art/Editable/Props/quay_platform.png")
 
 @export var platform_size := Vector2(700.0, 96.0):
 	set(value):

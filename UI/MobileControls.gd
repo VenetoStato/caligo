@@ -1,12 +1,13 @@
 extends CanvasLayer
 ## HUD touch compatto: movimento a sinistra, azioni a destra, pesca contestuale.
 
-const MOVE_SIZE := 72.0
-const ACTION_SIZE := 68.0
-const SMALL_SIZE := 50.0
-const CAST_SIZE := 72.0
-const EDGE := 24.0
-const GAP := 10.0
+const MOBILE_ACTION_BUTTON := preload("res://UI/MobileActionButton.gd")
+const MOVE_SIZE := 82.0
+const ACTION_SIZE := 78.0
+const SMALL_SIZE := 58.0
+const CAST_SIZE := 88.0
+const EDGE := 34.0
+const GAP := 12.0
 
 const BUTTON_LABELS := {
 	"ui_left": "‹",
@@ -54,13 +55,14 @@ func _build_controls() -> void:
 	_cast_joystick = null
 
 	var viewport_size := get_viewport().get_visible_rect().size
-	var scale_factor := clampf(minf(viewport_size.x / 1280.0, viewport_size.y / 720.0), 0.72, 1.08)
+	var scale_factor := clampf(minf(viewport_size.x / 1280.0, viewport_size.y / 720.0), 0.82, 1.12)
 	var move_size := roundf(MOVE_SIZE * scale_factor)
 	var action_size := roundf(ACTION_SIZE * scale_factor)
 	var small_size := roundf(SMALL_SIZE * scale_factor)
 	var cast_size := roundf(CAST_SIZE * scale_factor)
 	var gap := roundf(GAP * scale_factor)
-	var edge := maxf(14.0, EDGE * scale_factor)
+	# Margine ampio per gesture di sistema, notch e bordi curvi.
+	var edge := maxf(26.0, EDGE * scale_factor)
 	var bottom := viewport_size.y - edge
 
 	# Pad movimento: due tasti vicini, entrambi sotto lo stesso pollice.
@@ -101,25 +103,13 @@ func _place_cast_joystick(px: float, py: float, size_px: float) -> void:
 
 
 func _place(action: String, px: float, py: float, size_px: float, subdued: bool) -> void:
-	var button := Button.new()
+	var button := Control.new()
 	button.name = "Btn_%s" % action
-	button.text = str(BUTTON_LABELS.get(action, "?"))
+	button.set_script(MOBILE_ACTION_BUTTON)
 	button.position = Vector2(px, py)
 	button.size = Vector2(size_px, size_px)
 	button.custom_minimum_size = button.size
-	button.flat = true
-	button.focus_mode = Control.FOCUS_NONE
-	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	button.add_theme_font_size_override("font_size", maxi(13, int(size_px * (0.26 if button.text.length() > 2 else 0.46))))
-	button.add_theme_color_override("font_color", Color(0.86, 0.93, 0.91, 0.76 if subdued else 0.88))
-	button.add_theme_color_override("font_pressed_color", Color(0.98, 0.91, 0.68, 1.0))
-	button.add_theme_stylebox_override("normal", _make_button_style(size_px, subdued, false))
-	button.add_theme_stylebox_override("hover", _make_button_style(size_px, subdued, false))
-	button.add_theme_stylebox_override("pressed", _make_button_style(size_px, subdued, true))
-	button.add_theme_stylebox_override("disabled", _make_button_style(size_px, true, false))
-	button.button_down.connect(_on_down.bind(action))
-	button.button_up.connect(_on_up.bind(action))
-	button.tree_exiting.connect(_release_action.bind(action))
+	button.call("configure", action, str(BUTTON_LABELS.get(action, "?")), subdued)
 	_buttons[action] = button
 	add_child(button)
 
@@ -152,9 +142,9 @@ func _update_context() -> void:
 		_cast_joystick.modulate.a = 0.88 if fishing_context else 0.58
 		_cast_joystick.mouse_filter = Control.MOUSE_FILTER_IGNORE if locked else Control.MOUSE_FILTER_STOP
 	for action in ["ui_left", "ui_right", "ui_accept", "ui_attack", "ui_attack_strong", "dash", "interact"]:
-		var button := _buttons.get(action) as Button
+		var button := _buttons.get(action) as Control
 		if button:
-			button.disabled = locked
+			button.call("set_locked", locked)
 			button.modulate.a = 0.22 if locked else 1.0
 
 
@@ -177,22 +167,8 @@ func _is_mobile() -> bool:
 	return force_preview or OS.get_name() == "Android" or OS.has_feature("mobile")
 
 
-func _on_down(action: String) -> void:
-	var event := InputEventAction.new()
-	event.action = action
-	event.pressed = true
-	Input.parse_input_event(event)
-
-
-func _on_up(action: String) -> void:
-	_release_action(action)
-
-
 func _release_action(action: String) -> void:
-	var event := InputEventAction.new()
-	event.action = action
-	event.pressed = false
-	Input.parse_input_event(event)
+	Input.action_release(action)
 
 
 func _release_all_actions() -> void:

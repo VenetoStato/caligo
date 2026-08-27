@@ -1,6 +1,9 @@
 # Drop art — Punta della Dogana
 
-Cartella pensata per la disegnatrice: **non serve toccare script né collisioni**.
+Cartella rapida per sostituire gli asset già collegati. Non impone palette,
+tecnica, dimensioni o struttura delle animazioni. Per cambiare silhouette,
+aggiungere layer, creare AnimationTree o nuovi nemici usare anche
+`Art/Editable` e leggere `ARTIST_GUIDE.md`.
 
 ## Come sostituire un disegno
 
@@ -57,33 +60,38 @@ sostituito da solo; conserva il piede sul bordo inferiore del canvas.
 | `31_lagoon_oracle_sheet.png` | Sheet 8 clip | 3448×512 |
 | `32_drowned_warden_sheet.png` | Sheet 8 clip boss | 4096×512 |
 
-### Animazioni nemico (stile Hollow Knight)
+### Animazioni nemico — percorso rapido facoltativo
 
 Il ritratto still è sufficiente. Per far muovere il personaggio a frame, lascia
 nella stessa cartella lo sheet `*_sheet.png` accanto al PNG still: il gioco lo
 carica da solo, senza toccare script o collisioni.
 
-Clip obbligatorie, da sinistra a destra sulla riga:
+Lo sheet a 8 celle qui sotto è soltanto compatibilità con il vecchio drop rapido,
+non un formato obbligatorio:
 
 `idle` `idle` `walk` `walk` `wake` `windup` `attack` `hurt/death`
 
-- Una cella può essere riusata in più clip (Team Cherry fa così).
-- Piedi sul bordo basso di **ogni** cella, stessa larghezza/altezza.
-- `wake` e `windup` devono avere una posa unica e leggibile: sono il telegraph.
-- Collisioni e hitbox restano in Godot. Non disegnarle nello sheet.
+- Per griglie, quantità di frame e nomi diversi creare/modificare un
+  `EnemyArtKit` nell'Inspector.
+- Si possono aggiungere più `EnemyArtLayer` e clip extra senza limite.
+- `wake` e `windup` sono agganci gameplay utili per il telegraph, non vincoli
+  grafici.
+- Se silhouette e punto d'appoggio cambiano, verificare le hitbox in Godot.
 
 ### Interno della Salute
 
 `00g_salute_interior.png` è il fondale laterale della navata e dell'arena boss
 (1774×887). Può essere sostituito senza toccare collisioni, porta o boss.
 
-## Regole rapide
+## Indicazioni tecniche, non vincoli artistici
 
-- **Moduli laterali:** camera ortogonale, PNG trasparenti, piede sul bordo inferiore; niente vista aerea o isometrica.
-- **Fondali:** tieni l’orizzonte allineato agli altri.
+- **Moduli laterali:** la sostituzione diretta è più semplice se i giunti restano
+  compatibili; una composizione nuova può essere riallineata nella scena.
+- **Fondali:** se cambia l'orizzonte, riallineare i nodi della scena.
 - **Platform:** il bordo calpestabile deve stare **in alto** nell’immagine.
 - **Props / nemici / altare / spine:** PNG **trasparente** (niente sfondo nero o bianco), poco padding vuoto, piede sul bordo basso.
 - **Non** disegnare collisioni: restano nel livello.
-- Player sheet separato: `Player/Sprites/player-Sheet.png` (griglia 5×8).
+- Player: usare `Art/Editable/Player` e `Player/Scene/Player.tscn`; il nodo
+  `VisualLayers` accetta fogli, sprite e AnimationTree aggiuntivi con griglie libere.
 
 Dettagli tecnici: `Landscape/Dogana/ART_HANDOFF.md`.
