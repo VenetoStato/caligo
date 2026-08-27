@@ -15,6 +15,8 @@ run/main_scene="res://splash_screen.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 run/max_fps=60
 config/icon="res://icon.svg"
+boot_splash/show_image=false
+boot_splash/bg_color=Color(0.003, 0.014, 0.02, 1)
 
 [autoload]
 
