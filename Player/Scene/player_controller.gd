@@ -54,6 +54,24 @@ signal locked_skill_requested
 @export var half_grav_threshold: float = 48.0
 @export var dash_invincibility: bool = true
 
+@export_category("Wall")
+## Mantis Claw: scivolata lenta sul muro premendo verso di esso, salto che
+## stacca dal muro. Disattivabile per trasformarlo in abilita' da sbloccare.
+@export var wall_jump_enabled: bool = true
+@export var wall_slide_speed: float = 135.0
+@export var wall_jump_push: float = 250.0
+@export var wall_jump_vertical_scale: float = 0.92
+## Dopo il wall jump l'input orizzontale e' ignorato per poco: senza, premendo
+## ancora verso il muro si torna subito attaccati e il salto sembra "mangiato".
+@export var wall_jump_input_lock: float = 0.13
+@export var wall_coyote_time: float = 0.1
+
+@export_category("Hit feel")
+## Freeze quando il player viene colpito (HK ~0.1-0.15s): il colpo "pesa".
+@export var damage_hitstop: float = 0.11
+## Freeze sul colpo che uccide un nemico, piu' lungo del colpo normale.
+@export var kill_hitstop: float = 0.085
+
 @export_category("Water")
 @export var water_bounce_speed: float = 390.0
 
@@ -343,6 +361,11 @@ var move_particle_timer: float = 0.0
 var _was_on_floor := false
 var _coyote_timer: float = 0.0
 var _jump_buffer_timer: float = 0.0
+var is_wall_sliding := false
+var _wall_dir := 0.0  # -1 muro a sinistra, +1 muro a destra
+var _wall_coyote_timer := 0.0
+var _wall_jump_lock := 0.0
+var _wall_dust_timer := 0.0
 var _dash_was_invincible: bool = false
 var _footstep_side := -1.0
 var _player_soft_light: PointLight2D
@@ -566,6 +589,8 @@ func _try_hit_enemy(target: Node) -> void:
 		target.take_damage(_current_attack_damage, global_position)
 		var defeated := ("current_health" in target and int(target.get("current_health")) <= 0)
 		_request_impact_feedback(0.34 if defeated else 0.2, 0.014 if defeated else 0.008)
+		if defeated:
+			_hitstop_timer = maxf(_hitstop_timer, kill_hitstop)
 	if _power_strike_left > 0.0 and target == _power_strike_target:
 		_power_strike_hit = true
 		_spawn_power_strike_impact(target)
@@ -1123,10 +1148,14 @@ func _physics_process(delta: float):
 			return
 
 	_apply_gravity(delta)
+	if is_wall_sliding:
+		velocity.y = minf(velocity.y, wall_slide_speed)
 	# Durante il rinculo non applicare movimento orizzontale da input
 	if _knockback_timer > 0.0:
 		_knockback_timer -= delta
 		velocity.x = move_toward(velocity.x, 0.0, knockback_speed * 4.0 * delta)
+	elif _wall_jump_lock > 0.0:
+		_wall_jump_lock = maxf(0.0, _wall_jump_lock - delta)
 	else:
 		horizontal_movement(delta)
 	flip_logic()
@@ -1148,6 +1177,7 @@ func _physics_process(delta: float):
 	
 	var impact_speed := velocity.y
 	move_and_slide()
+	_update_wall_slide(delta)
 	_update_footstep_fx(delta)
 	if particles_on_land and not _was_on_floor and is_on_floor() and impact_speed > 95.0:
 		if black_particle_scene:
@@ -1543,6 +1573,8 @@ func jump_logic():
 			_spawn_particles(global_position, Vector2.DOWN, 0.2)
 		if particles_on_jump and ambient_trail_scene:
 			_spawn_trail(global_position, Vector2.DOWN)
+	elif wants_jump and wall_jump_enabled and _wall_coyote_timer > 0.0 and not is_on_floor():
+		_wall_jump()
 	elif wants_jump and jump_amount > 0 and not is_on_floor():
 		_jump_buffer_timer = 0.0
 		jump_amount -= 1
@@ -1553,6 +1585,64 @@ func jump_logic():
 			_spawn_particles(global_position, Vector2.DOWN, 0.2)
 		if particles_on_jump and ambient_trail_scene:
 			_spawn_trail(global_position, Vector2.DOWN)
+
+func _wall_jump() -> void:
+	_jump_buffer_timer = 0.0
+	_wall_coyote_timer = 0.0
+	is_wall_sliding = false
+	var away := -_wall_dir
+	velocity.x = away * wall_jump_push
+	velocity.y = -jump_speed * wall_jump_vertical_scale
+	_wall_jump_lock = wall_jump_input_lock
+	facing_right = away > 0.0
+	_begin_variable_jump(velocity.y)
+	tutorial_action_performed.emit(&"wall_jump")
+	var foot := global_position + Vector2(_wall_dir * 8.0, 0.0)
+	if particles_on_jump and black_particle_scene:
+		_spawn_particles(foot, Vector2(away, -0.4), 0.2)
+	if particles_on_jump and ambient_trail_scene:
+		_spawn_trail(foot, Vector2(away, 0.0))
+
+
+## Chiamata dopo move_and_slide: aggiorna lo stato di scivolata per il frame
+## successivo. Solo muri statici: nemici e corpi rigidi non sono appigli.
+func _update_wall_slide(delta: float) -> void:
+	_wall_coyote_timer = maxf(0.0, _wall_coyote_timer - delta)
+	is_wall_sliding = false
+	if not wall_jump_enabled or is_on_floor() or is_dashing or is_swinging:
+		return
+	if not is_on_wall_only() or not _touching_static_wall():
+		return
+	var normal_x := get_wall_normal().x
+	if is_zero_approx(normal_x):
+		return
+	var input := Input.get_axis("ui_left", "ui_right")
+	if input * normal_x >= -0.1 or velocity.y < 0.0:
+		return
+	is_wall_sliding = true
+	_wall_dir = -signf(normal_x)
+	_wall_coyote_timer = wall_coyote_time
+	# Come la Mantis Claw: attaccarsi al muro restituisce il doppio salto.
+	jump_amount = maxi(jump_amount, 1)
+	_wall_dust_timer -= delta
+	if _wall_dust_timer <= 0.0:
+		_wall_dust_timer = 0.09
+		if black_particle_scene:
+			_spawn_particles(global_position + Vector2(_wall_dir * 8.0, -6.0), Vector2.UP, 0.15, 1)
+
+
+func _touching_static_wall() -> bool:
+	for i in get_slide_collision_count():
+		var col := get_slide_collision(i)
+		if absf(col.get_normal().x) < 0.7:
+			continue
+		var other := col.get_collider()
+		if other is CharacterBody2D or other is RigidBody2D:
+			continue
+		if other is Node and (other as Node).is_in_group("enemy"):
+			continue
+		return true
+	return false
 
 # ===========================================
 # HEALTH & DEATH SYSTEM
@@ -1592,6 +1682,8 @@ func take_damage(
 	blink_timer = 0.0
 	
 	_request_impact_feedback(0.5, 0.018)
+	if current_health > 0:
+		_hitstop_timer = maxf(_hitstop_timer, damage_hitstop)
 	
 	if current_health <= 0:
 		_on_death()
