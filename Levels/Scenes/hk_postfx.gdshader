@@ -46,6 +46,16 @@ uniform float u_motion_breath : hint_range(0.0, 1.0) = 0.16;
 // Keep it externally tunable so the debug panel can turn it down to zero.
 uniform float u_sharpen : hint_range(0.0, 0.3) = 0.0;
 
+// Feedback di combattimento, pilotato dalla camera (tutto a 0 = nessun costo
+// visivo). hurt: colpo subito, onda d'urto dal player + desaturazione.
+// impact: colpo inflitto, aberrazione su tutto lo schermo. low_health: battito
+// all'ultima vita (gia' modulato nel tempo dalla camera).
+uniform float u_hurt : hint_range(0.0, 1.0) = 0.0;
+uniform float u_hurt_wave : hint_range(0.0, 1.0) = 0.0;
+uniform float u_impact : hint_range(0.0, 1.0) = 0.0;
+uniform float u_low_health : hint_range(0.0, 1.0) = 0.0;
+uniform vec4 u_low_health_tint : source_color = vec4(0.32, 0.05, 0.12, 1.0);
+
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
 uniform vec4 u_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 
@@ -140,15 +150,28 @@ vec3 harmonize_palette(vec3 color, float accent) {
 
 void fragment() {
 	vec2 px = SCREEN_PIXEL_SIZE;
+	float aspect_ratio = SCREEN_PIXEL_SIZE.y / SCREEN_PIXEL_SIZE.x;
 	vec2 dir = normalize(SCREEN_UV - u_center_uv + vec2(0.0001));
 	float chroma = u_chroma * 0.00115;
 
-	// Aberrazione cromatica leggera ai bordi.
+	// Onda d'urto del colpo subito: un anello che si allarga dal player e
+	// spinge i pixel verso l'esterno mentre passa.
+	vec2 uv = SCREEN_UV;
+	float hurt_ring = 0.0;
+	if (u_hurt > 0.001) {
+		vec2 rel = (SCREEN_UV - u_center_uv) * vec2(aspect_ratio, 1.0);
+		float d = length(rel);
+		float radius = u_hurt_wave * 1.1;
+		hurt_ring = smoothstep(0.09, 0.0, abs(d - radius)) * (1.0 - u_hurt_wave);
+		uv += dir * hurt_ring * 0.018 * u_hurt;
+	}
+
+	// Aberrazione cromatica leggera ai bordi, piena durante gli impatti.
 	float edge = length((SCREEN_UV - vec2(0.5)) * vec2(1.4, 1.0));
-	float ca = chroma * smoothstep(0.15, 0.85, edge);
-	float r = sample_screen(SCREEN_UV + dir * ca).r;
-	float g = sample_screen(SCREEN_UV).g;
-	float b = sample_screen(SCREEN_UV - dir * ca).b;
+	float ca = chroma * smoothstep(0.15, 0.85, edge) + (u_impact * 0.0045 + hurt_ring * 0.006);
+	float r = sample_screen(uv + dir * ca).r;
+	float g = sample_screen(uv).g;
+	float b = sample_screen(uv - dir * ca).b;
 	vec3 col = vec3(r, g, b) * u_tint.rgb;
 
 	// Respiro luminoso a costo costante. La profondita' viene dai piani reali:
@@ -158,26 +181,26 @@ void fragment() {
 
 	// Contorno percettivo screen-space: separa silhouette e architettura senza
 	// trasformare l'immagine in un filtro cartoon o oscurare le texture.
-	float center_luma = dot(sample_screen(SCREEN_UV), vec3(0.299, 0.587, 0.114));
-	float edge_x = abs(center_luma - dot(sample_screen(SCREEN_UV + vec2(px.x * 1.5, 0.0)), vec3(0.299, 0.587, 0.114)));
-	edge_x += abs(center_luma - dot(sample_screen(SCREEN_UV - vec2(px.x * 1.5, 0.0)), vec3(0.299, 0.587, 0.114)));
-	float edge_y = abs(center_luma - dot(sample_screen(SCREEN_UV + vec2(0.0, px.y * 1.5)), vec3(0.299, 0.587, 0.114)));
-	edge_y += abs(center_luma - dot(sample_screen(SCREEN_UV - vec2(0.0, px.y * 1.5)), vec3(0.299, 0.587, 0.114)));
+	float center_luma = dot(sample_screen(uv), vec3(0.299, 0.587, 0.114));
+	float edge_x = abs(center_luma - dot(sample_screen(uv + vec2(px.x * 1.5, 0.0)), vec3(0.299, 0.587, 0.114)));
+	edge_x += abs(center_luma - dot(sample_screen(uv - vec2(px.x * 1.5, 0.0)), vec3(0.299, 0.587, 0.114)));
+	float edge_y = abs(center_luma - dot(sample_screen(uv + vec2(0.0, px.y * 1.5)), vec3(0.299, 0.587, 0.114)));
+	edge_y += abs(center_luma - dot(sample_screen(uv - vec2(0.0, px.y * 1.5)), vec3(0.299, 0.587, 0.114)));
 	float ink = smoothstep(u_ink_threshold, u_ink_threshold + 0.22, max(edge_x, edge_y));
 	col *= 1.0 - ink * u_ink_strength;
 
 	// Soft bloom multi-tap più pieno.
 	if (u_bloom > 0.001) {
 		vec3 blur = vec3(0.0);
-		blur += sample_screen(SCREEN_UV) * 0.18;
-		blur += sample_screen(SCREEN_UV + vec2(px.x * 2.0, 0.0)) * 0.12;
-		blur += sample_screen(SCREEN_UV - vec2(px.x * 2.0, 0.0)) * 0.12;
-		blur += sample_screen(SCREEN_UV + vec2(0.0, px.y * 2.0)) * 0.12;
-		blur += sample_screen(SCREEN_UV - vec2(0.0, px.y * 2.0)) * 0.12;
-		blur += sample_screen(SCREEN_UV + vec2(px.x * 4.5, px.y * 2.5)) * 0.09;
-		blur += sample_screen(SCREEN_UV - vec2(px.x * 4.5, px.y * 2.5)) * 0.09;
-		blur += sample_screen(SCREEN_UV + vec2(px.x * 2.5, -px.y * 4.5)) * 0.08;
-		blur += sample_screen(SCREEN_UV - vec2(px.x * 2.5, -px.y * 4.5)) * 0.08;
+		blur += sample_screen(uv) * 0.18;
+		blur += sample_screen(uv + vec2(px.x * 2.0, 0.0)) * 0.12;
+		blur += sample_screen(uv - vec2(px.x * 2.0, 0.0)) * 0.12;
+		blur += sample_screen(uv + vec2(0.0, px.y * 2.0)) * 0.12;
+		blur += sample_screen(uv - vec2(0.0, px.y * 2.0)) * 0.12;
+		blur += sample_screen(uv + vec2(px.x * 4.5, px.y * 2.5)) * 0.09;
+		blur += sample_screen(uv - vec2(px.x * 4.5, px.y * 2.5)) * 0.09;
+		blur += sample_screen(uv + vec2(px.x * 2.5, -px.y * 4.5)) * 0.08;
+		blur += sample_screen(uv - vec2(px.x * 2.5, -px.y * 4.5)) * 0.08;
 		float bloom_luma = dot(blur, vec3(0.299, 0.587, 0.114));
 		float bloom_mask = smoothstep(u_bloom_threshold, u_bloom_threshold + 0.28, bloom_luma);
 		col = mix(col, max(col, blur * 1.25), bloom_mask * u_bloom);
@@ -197,13 +220,15 @@ void fragment() {
 	col *= u_exposure;
 
 	// Micro-sharpen sui mezzi toni (legge meglio sprite/animazioni).
+	if (u_sharpen > 0.001) {
 	vec3 sharp = col * 2.0 - (
-		sample_screen(SCREEN_UV + vec2(px.x, 0.0)) +
-		sample_screen(SCREEN_UV - vec2(px.x, 0.0)) +
-		sample_screen(SCREEN_UV + vec2(0.0, px.y)) +
-		sample_screen(SCREEN_UV - vec2(0.0, px.y))
+		sample_screen(uv + vec2(px.x, 0.0)) +
+		sample_screen(uv - vec2(px.x, 0.0)) +
+		sample_screen(uv + vec2(0.0, px.y)) +
+		sample_screen(uv - vec2(0.0, px.y))
 	) * 0.25;
 	col = mix(col, sharp, u_sharpen * (1.0 - abs(luma - 0.5) * 1.6));
+	}
 
 	// Contrasto + saturazione.
 	col = (col - vec3(0.5)) * u_contrast + vec3(0.5);
@@ -224,6 +249,17 @@ void fragment() {
 	float dist = pow(pow(abs(p.x), 1.35) + pow(abs(p.y), 1.35), 1.0 / 1.35);
 	float vig = smoothstep(u_vignette_radius, u_vignette_radius - u_vignette_softness, dist);
 	col *= mix(1.0 - u_vignette_strength, 1.0, vig);
+
+	// Colpo subito: lo schermo perde colore e si chiude per un istante.
+	// Ultima vita: bordi che respirano verso un cremisi scuro, a battito.
+	float drain = u_hurt * 0.8 + u_low_health * 0.35;
+	if (drain > 0.001) {
+		float l = dot(col, vec3(0.299, 0.587, 0.114));
+		col = mix(col, vec3(l), clamp(drain, 0.0, 1.0));
+		float rim = 1.0 - vig;
+		col *= 1.0 - rim * (u_hurt * 0.55 + u_low_health * 0.25);
+		col = mix(col, col * 0.6 + u_low_health_tint.rgb * 0.4, rim * u_low_health);
+	}
 
 	// Grain film.
 	vec2 pix = SCREEN_UV / SCREEN_PIXEL_SIZE;

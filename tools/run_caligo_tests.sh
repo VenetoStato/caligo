@@ -23,6 +23,7 @@ tests=(
   "script res://tests/fishing_reentry_reel_test.gd FISHING_REENTRY_REEL_TEST_OK 30"
   "script res://tests/fishing_attract_swim_test.gd FISHING_ATTRACT_SWIM_TEST_OK 30"
   "scene res://tests/player_jump_test.tscn CALIGO_JUMP_TEST 30"
+  "scene res://tests/player_wall_jump_test.tscn CALIGO_WALL_JUMP_OK 30"
   "scene res://tests/pogo_bounce_test.tscn CALIGO_POGO_BOUNCE_OK 30"
   "scene res://tests/boss_lamp_aim_test.tscn CALIGO_BOSS_LAMP_AIM_OK 30"
   "scene res://tests/guided_tutorial_geometry_test.tscn CALIGO_GUIDED_TUTORIAL 90"
