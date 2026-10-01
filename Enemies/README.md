@@ -1,14 +1,21 @@
-# Nemici (Enemies)
+# Sistema nemici aperto alla direzione artistica
 
-## Enemy (enemy.tscn)
+`enemy.tscn` contiene il gameplay condiviso; l'aspetto viene assegnato con un
+`EnemyArtKit`. Non impone palette, canvas, griglia o numero di layer.
 
-- **Comportamento:** resta in **Idle** finché non viene colpito dall’attacco del player (Z o click destro).
-- **Dopo il colpo:** passa in **Aggro**, insegue il player, **saltella** a intervalli e può **colpire** il player se è vicino.
-- **Layer:** Hurtbox su layer 2 (mask 4), così viene rilevata dall’area d’attacco del player (layer 4).
-- **Uso:** aggiungi un’istanza di `res://Enemies/enemy.tscn` nella tua scena (es. test_area). Il player deve essere nel gruppo `"player"` e avere l’area d’attacco (AttackHitbox) attiva durante Attack_fast / Attack_strong.
+Un kit può usare uno still, SpriteFrames creati nell'editor, uno sheet con layout
+personalizzato e qualsiasi numero di `EnemyArtLayer` per corpo, abiti, armi,
+maschere, luci o VFX. Le clip gameplay convenzionali sono `idle`, `walk`, `wake`,
+`windup`, `attack`, `hurt`, `death`, `jump`; clip ulteriori sono ammesse e si
+richiamano con `play_art_clip("nome")`.
 
-## Sostituire lo sprite
+Per creare un nuovo nemico:
 
-Lo sprite di default è l’icona del progetto. Per usare il tuo nemico:
-1. Assegna al nodo **Sprite2D** la texture che preferisci.
-2. Se il tuo sprite ha frame (es. AnimatedSprite2D), puoi cambiare il nodo e aggiornare gli animation path nello script/AnimationPlayer.
+1. duplicare `ArtistEnemyTemplate.tscn`;
+2. creare e assegnare un nuovo `EnemyArtKit`;
+3. scegliere liberamente asset, layer, animazioni, scala e statistiche;
+4. regolare `body_world_size` e verificare collisione, Hurtbox e AttackHitbox;
+5. aggiungere uno script derivato solo se serve un comportamento realmente nuovo.
+
+I kit esistenti sono in `Enemies/Art`. Il template artistico e le istruzioni sono
+in `Art/Editable/Characters/Enemies/_NEW_ENEMY_TEMPLATE`.

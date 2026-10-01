@@ -1,0 +1,24 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://tests/player_water_test.gd" id="1_test"]
+[ext_resource type="PackedScene" path="res://Player/Scene/Player.tscn" id="2_player"]
+[ext_resource type="Script" path="res://water_body.gd" id="3_water"]
+
+[node name="PlayerWaterTest" type="Node2D"]
+script = ExtResource("1_test")
+
+[node name="Water" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 3
+script = ExtResource("3_water")
+quality_preset = 1
+depth = 420.0
+fish_count = 0
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Water"]
+polygon = PackedVector2Array(40, 300, 760, 300, 760, 720, 40, 720)
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+position = Vector2(400, 190)
+reload_scene_on_death = false
+fall_death_y = 1000.0

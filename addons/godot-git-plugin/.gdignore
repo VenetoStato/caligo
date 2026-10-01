@@ -1,0 +1,2 @@
+# The repository does not ship this editor-only plugin's native binaries.
+# Ignore its metadata so runtime imports and exports stay warning-free.

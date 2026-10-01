@@ -1,0 +1,22 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://tests/player_jump_test.gd" id="1_test"]
+[ext_resource type="PackedScene" path="res://Player/Scene/Player.tscn" id="2_player"]
+
+[sub_resource type="RectangleShape2D" id="FloorShape"]
+size = Vector2(600, 24)
+
+[node name="PlayerJumpTest" type="Node2D"]
+script = ExtResource("1_test")
+
+[node name="Floor" type="StaticBody2D" parent="."]
+position = Vector2(300, 260)
+collision_layer = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Floor"]
+shape = SubResource("FloorShape")
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+position = Vector2(200, 210)
+reload_scene_on_death = false
+fall_death_y = 1000.0

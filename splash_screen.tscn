@@ -4,6 +4,3 @@
 
 [node name="SplashScreen" type="CanvasLayer"]
 script = ExtResource("1_splash")
-
-[node name="Background" parent="." index="0"]
-[node name="TitleLabel" parent="." index="1"]

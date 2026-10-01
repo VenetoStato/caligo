@@ -1,0 +1,7 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://Enemies/enemy.tscn" id="1_enemy"]
+[ext_resource type="Resource" path="res://Art/Editable/Characters/Enemies/_NEW_ENEMY_TEMPLATE/enemy_art_kit.tres" id="2_kit"]
+
+[node name="ArtistEnemyTemplate" instance=ExtResource("1_enemy")]
+art_kit = ExtResource("2_kit")

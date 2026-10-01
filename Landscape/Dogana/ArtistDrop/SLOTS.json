@@ -1,0 +1,222 @@
+{
+  "_readme": "Drop PNG files with these exact names into ArtistDrop/, then run: python tools/sync_artist_drop.py",
+  "slots": [
+    {
+      "file": "00a_torre_fortuna.png",
+      "dest": "Art/Editable/Environment/Modules/module_torre_fortuna.png",
+      "profile": "torre_fortuna",
+      "size": [1374, 1145],
+      "kind": "architecture",
+      "notes": "Modulo Punta/Torre. PNG trasparente, piede sul bordo inferiore, vista laterale."
+    },
+    {
+      "file": "00b_dogana_ovest.png",
+      "dest": "Art/Editable/Environment/Modules/module_dogana_ovest.png",
+      "profile": "dogana_ovest",
+      "size": [1983, 793],
+      "kind": "architecture",
+      "notes": "Ala ovest Dogana. PNG trasparente; giunti verticali puliti ai bordi."
+    },
+    {
+      "file": "00c_dogana_est.png",
+      "dest": "Art/Editable/Environment/Modules/module_dogana_est.png",
+      "profile": "dogana_est",
+      "size": [1983, 793],
+      "kind": "architecture",
+      "notes": "Ala est Dogana. Slot indipendente dall'ala ovest."
+    },
+    {
+      "file": "00d_seminario.png",
+      "dest": "Art/Editable/Environment/Modules/module_seminario.png",
+      "profile": "seminario",
+      "size": [1536, 1024],
+      "kind": "architecture",
+      "notes": "Blocco Seminario. PNG trasparente e accessi appoggiati alla baseline."
+    },
+    {
+      "file": "00e_collegamento_salute.png",
+      "dest": "Art/Editable/Environment/Modules/module_collegamento_salute.png",
+      "profile": "collegamento_salute",
+      "size": [1774, 887],
+      "kind": "architecture",
+      "notes": "Passaggio basso tra Seminario e Salute. Arco attraversabile visivamente."
+    },
+    {
+      "file": "00f_salute.png",
+      "dest": "Art/Editable/Environment/Modules/module_salute.png",
+      "profile": "salute",
+      "size": [1983, 793],
+      "kind": "architecture",
+      "notes": "Santa Maria della Salute / arena boss. Cupola completa, PNG trasparente."
+    },
+    {
+      "file": "00g_salute_interior.png",
+      "dest": "Art/Editable/Environment/Salute/salute_interior.png",
+      "profile": "salute_interior",
+      "size": [1774, 887],
+      "kind": "interior",
+      "notes": "Navata laterale della Salute. Mantieni il pavimento continuo sulla baseline; collisioni e boss separati."
+    },
+    {
+      "file": "01_arrival.png",
+      "dest": "Landscape/Dogana/Illustrated/arrival.png",
+      "profile": "arrival_background",
+      "size": [1536, 1024],
+      "kind": "background",
+      "notes": "Sezione arrivo / pontile. Mantieni la linea d'orizzonte."
+    },
+    {
+      "file": "02_customs.png",
+      "dest": "Landscape/Dogana/Illustrated/customs.png",
+      "profile": "customs_background",
+      "size": [1536, 1024],
+      "kind": "background",
+      "notes": "Dogana / dogana da mar."
+    },
+    {
+      "file": "03_canal.png",
+      "dest": "Landscape/Dogana/Illustrated/canal.png",
+      "profile": "canal_background",
+      "size": [1536, 1024],
+      "kind": "background",
+      "notes": "Grand Canal."
+    },
+    {
+      "file": "04_fortuna.png",
+      "dest": "Landscape/Dogana/Illustrated/fortuna.png",
+      "profile": "fortuna_background",
+      "size": [1536, 1024],
+      "kind": "background",
+      "notes": "Torre Atlante / Fortuna."
+    },
+    {
+      "file": "10_quay_platform.png",
+      "dest": "Art/Editable/Props/quay_platform.png",
+      "profile": "walkable_platform",
+      "size": [1024, 371],
+      "kind": "architecture",
+      "notes": "Bordo calpestabile in alto nell'immagine. Collisioni separate."
+    },
+    {
+      "file": "11_central_wedge.png",
+      "dest": "Landscape/Dogana/Generated/central_dogana_wedge.png",
+      "profile": "central_wedge",
+      "size": [1280, 502],
+      "kind": "architecture",
+      "notes": "Cuneo centrale Dogana."
+    },
+    {
+      "file": "12_tide_altar.png",
+      "dest": "Art/Editable/Props/tide_altar.png",
+      "profile": "tide_altar",
+      "size": [1024, 1024],
+      "kind": "prop",
+      "notes": "Altare delle maree. PNG con trasparenza, padding stretto."
+    },
+    {
+      "file": "20_fishing_cache.png",
+      "dest": "Art/Editable/Props/breakable_fishing_cache.png",
+      "profile": "fishing_cache",
+      "size": [384, 288],
+      "kind": "prop",
+      "notes": "Cassa tutorial rompibile."
+    },
+    {
+      "file": "21_urn.png",
+      "dest": "Art/Editable/Props/breakable_urn.png",
+      "profile": "cracked_urn",
+      "size": [1024, 1024],
+      "kind": "prop",
+      "notes": "Anfora incrinata."
+    },
+    {
+      "file": "22_net_bundle.png",
+      "dest": "Art/Editable/Props/breakable_net_bundle.png",
+      "profile": "net_bundle",
+      "size": [1024, 1024],
+      "kind": "prop",
+      "notes": "Fascio di reti."
+    },
+    {
+      "file": "23_fishbone_wall.png",
+      "dest": "Art/Editable/Props/breakable_fishbone_wall.png",
+      "profile": "fishbone_wall",
+      "size": [320, 427],
+      "kind": "prop",
+      "notes": "Muro osseo rompibile."
+    },
+    {
+      "file": "24_thorn_cluster.png",
+      "dest": "Landscape/Dogana/Generated/dogana_thorn_cluster.png",
+      "profile": "thorn_cluster",
+      "size": [757, 849],
+      "kind": "prop",
+      "notes": "Ciuffo di spine pogoabili. PNG TRASPARENTE, piede sul bordo inferiore, niente sfondo nero/bianco. Hitbox restano in Godot."
+    },
+    {
+      "file": "25_thorn_bed.png",
+      "dest": "Landscape/Dogana/Generated/dogana_thorn_bed.png",
+      "profile": "thorn_bed",
+      "size": [1482, 486],
+      "kind": "prop",
+      "notes": "Striscia di spine a terra. PNG TRASPARENTE, base sul bordo inferiore. Si scala in larghezza; non disegnare collisioni."
+    },
+    {
+      "file": "30_tide_bloater.png",
+      "dest": "Art/Editable/Characters/Enemies/tide_bloater.png",
+      "profile": "tide_bloater",
+      "size": [512, 436],
+      "kind": "character",
+      "notes": "Nemico base. Piedi in basso, trasparenza."
+    },
+    {
+      "file": "31_lagoon_oracle.png",
+      "dest": "Art/Editable/Characters/Enemies/lagoon_oracle.png",
+      "profile": "lagoon_oracle",
+      "size": [431, 512],
+      "kind": "character",
+      "notes": "Nemico speciale / oracolo."
+    },
+    {
+      "file": "32_drowned_warden.png",
+      "dest": "Art/Editable/Characters/Bosses/drowned_customs_warden.png",
+      "profile": "drowned_warden",
+      "size": [512, 512],
+      "kind": "character",
+      "notes": "Boss custode sommerso."
+    },
+    {
+      "file": "30_tide_bloater_sheet.png",
+      "dest": "Art/Editable/Characters/Enemies/tide_bloater_sheet.png",
+      "profile": "",
+      "size": [4096, 436],
+      "kind": "character_sheet",
+      "optional": true,
+      "columns": 8,
+      "rows": 1,
+      "notes": "Formato legacy per il drop rapido. Per layout, frame e clip liberi usare EnemyArtKit nell'Inspector."
+    },
+    {
+      "file": "31_lagoon_oracle_sheet.png",
+      "dest": "Art/Editable/Characters/Enemies/lagoon_oracle_sheet.png",
+      "profile": "",
+      "size": [3448, 512],
+      "kind": "character_sheet",
+      "optional": true,
+      "columns": 8,
+      "rows": 1,
+      "notes": "Formato legacy facoltativo; EnemyArtKit accetta layout e animazioni personalizzate."
+    },
+    {
+      "file": "32_drowned_warden_sheet.png",
+      "dest": "Art/Editable/Characters/Bosses/drowned_customs_warden_sheet.png",
+      "profile": "",
+      "size": [4096, 512],
+      "kind": "character_sheet",
+      "optional": true,
+      "columns": 8,
+      "rows": 1,
+      "notes": "Formato legacy facoltativo; la grafica e le animazioni del boss possono essere rifatte liberamente."
+    }
+  ]
+}

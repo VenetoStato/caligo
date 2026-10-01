@@ -1,0 +1,62 @@
+[gd_resource type="Resource" script_class="DoganaArtProfile" load_steps=30 format=3]
+
+[ext_resource type="Script" path="res://Levels/Scenes/Dogana/dogana_art_profile.gd" id="1_profile"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Illustrated/arrival.png" id="2_arrival"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Illustrated/customs.png" id="3_customs"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Illustrated/canal.png" id="4_canal"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Illustrated/fortuna.png" id="5_fortuna"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Props/quay_platform.png" id="7_platform"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/central_dogana_wedge.png" id="8_wedge"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Props/tide_altar.png" id="9_altar"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Props/breakable_fishing_cache.png" id="10_cache"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Props/breakable_fishbone_wall.png" id="11_wall"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Characters/Enemies/tide_bloater.png" id="12_bloater"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Characters/Enemies/lagoon_oracle.png" id="13_oracle"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Characters/Bosses/drowned_customs_warden.png" id="14_boss"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Props/breakable_urn.png" id="15_urn"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Props/breakable_net_bundle.png" id="16_net"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Environment/Modules/module_torre_fortuna.png" id="17_torre"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Environment/Modules/module_dogana_ovest.png" id="18_dogana_w"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Environment/Modules/module_dogana_est.png" id="19_dogana_e"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Environment/Modules/module_seminario.png" id="20_seminario"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Environment/Modules/module_collegamento_salute.png" id="21_connector"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Environment/Modules/module_salute.png" id="22_salute"]
+[ext_resource type="Texture2D" path="res://Art/Editable/Environment/Salute/salute_interior.png" id="24_salute_interior"]
+[ext_resource type="Resource" path="res://Enemies/Art/tide_bloater_kit.tres" id="25_bloater_kit"]
+[ext_resource type="Resource" path="res://Enemies/Art/lagoon_oracle_kit.tres" id="26_oracle_kit"]
+[ext_resource type="Resource" path="res://Enemies/Art/drowned_warden_kit.tres" id="27_warden_kit"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/dogana_thorn_cluster.png" id="28_thorn_cluster"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/dogana_thorn_bed.png" id="29_thorn_bed"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/dogana_pier_plank.png" id="30_pier"]
+[ext_resource type="Texture2D" path="res://Landscape/Dogana/Generated/dogana_pier_plank_cracked.png" id="31_pier_cracked"]
+
+[resource]
+script = ExtResource("1_profile")
+torre_fortuna = ExtResource("17_torre")
+dogana_ovest = ExtResource("18_dogana_w")
+dogana_est = ExtResource("19_dogana_e")
+seminario = ExtResource("20_seminario")
+collegamento_salute = ExtResource("21_connector")
+salute = ExtResource("22_salute")
+salute_interior = ExtResource("24_salute_interior")
+arrival_background = ExtResource("2_arrival")
+customs_background = ExtResource("3_customs")
+canal_background = ExtResource("4_canal")
+fortuna_background = ExtResource("5_fortuna")
+walkable_platform = ExtResource("7_platform")
+central_wedge = ExtResource("8_wedge")
+tide_altar = ExtResource("9_altar")
+fishing_cache = ExtResource("10_cache")
+cracked_urn = ExtResource("15_urn")
+net_bundle = ExtResource("16_net")
+fishbone_wall = ExtResource("11_wall")
+thorn_cluster = ExtResource("28_thorn_cluster")
+thorn_bed = ExtResource("29_thorn_bed")
+pier_plank = ExtResource("30_pier")
+pier_plank_cracked = ExtResource("31_pier_cracked")
+tide_bloater = ExtResource("12_bloater")
+lagoon_oracle = ExtResource("13_oracle")
+drowned_warden = ExtResource("14_boss")
+tide_bloater_kit = ExtResource("25_bloater_kit")
+lagoon_oracle_kit = ExtResource("26_oracle_kit")
+drowned_warden_kit = ExtResource("27_warden_kit")

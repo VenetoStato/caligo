@@ -1,0 +1,18 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://tests/water_benchmark.gd" id="1_benchmark"]
+[ext_resource type="Script" path="res://water_body.gd" id="2_water"]
+
+[node name="WaterBenchmark" type="Node2D"]
+script = ExtResource("1_benchmark")
+
+[node name="Water" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 3
+script = ExtResource("2_water")
+quality_preset = 1
+depth = 500.0
+fish_count = 0
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Water"]
+polygon = PackedVector2Array(80, 320, 1200, 320, 1200, 760, 80, 760)

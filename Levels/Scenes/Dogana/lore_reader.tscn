@@ -1,0 +1,105 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Levels/Scenes/Dogana/lore_reader.gd" id="1_script"]
+
+[sub_resource type="StyleBoxFlat" id="ReaderPanel"]
+bg_color = Color(0.012, 0.02, 0.024, 0.97)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.78, 0.66, 0.38, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.88)
+shadow_size = 28
+
+[node name="LoreReader" type="CanvasLayer"]
+layer = 96
+script = ExtResource("1_script")
+
+[node name="Overlay" type="Control" parent="."]
+process_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.002, 0.006, 0.01, 0.9)
+
+[node name="Panel" type="Panel" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -360.0
+offset_top = -220.0
+offset_right = 360.0
+offset_bottom = 220.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("ReaderPanel")
+
+[node name="Title" type="Label" parent="Overlay/Panel"]
+offset_left = 48.0
+offset_top = 34.0
+offset_right = 672.0
+offset_bottom = 78.0
+theme_override_colors/font_color = Color(0.98, 0.88, 0.58, 1)
+theme_override_colors/font_outline_color = Color(0.02, 0.04, 0.05, 0.95)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 28
+text = "REGISTRO"
+horizontal_alignment = 1
+
+[node name="Divider" type="ColorRect" parent="Overlay/Panel"]
+offset_left = 70.0
+offset_top = 88.0
+offset_right = 650.0
+offset_bottom = 90.0
+color = Color(0.45, 0.74, 0.68, 0.42)
+
+[node name="Body" type="Label" parent="Overlay/Panel"]
+offset_left = 70.0
+offset_top = 116.0
+offset_right = 650.0
+offset_bottom = 350.0
+theme_override_colors/font_color = Color(0.96, 0.94, 0.86, 1)
+theme_override_colors/font_outline_color = Color(0.02, 0.04, 0.05, 0.92)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 20
+text = "Testo"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="Hint" type="Label" parent="Overlay/Panel"]
+offset_left = 150.0
+offset_top = 378.0
+offset_right = 570.0
+offset_bottom = 410.0
+theme_override_colors/font_color = Color(0.88, 0.84, 0.68, 0.95)
+theme_override_colors/font_outline_color = Color(0.02, 0.04, 0.05, 0.9)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 15
+text = "E / ESC - CHIUDI"
+horizontal_alignment = 1
+
+[node name="Close" type="Button" parent="Overlay/Panel"]
+offset_left = 662.0
+offset_top = 14.0
+offset_right = 706.0
+offset_bottom = 54.0
+text = "X"

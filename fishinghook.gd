@@ -19,9 +19,9 @@ extends RigidBody2D
 
 @export_category("Water Physics")
 @export var water_drag: float = 4.0
-@export var water_vertical_brake: float = 900.0
-@export var sink_slowly_in_water: bool = false
-@export var sink_speed: float = 20.0
+@export var water_vertical_brake: float = 260.0
+@export var sink_slowly_in_water: bool = true
+@export var sink_speed: float = 38.0
 
 @export_category("Fish Detection")
 @export var fish_detection_radius: float = 25.0
@@ -35,6 +35,7 @@ extends RigidBody2D
 var player_ref: Node = null
 var sprite: Node2D = null
 var hooked_fish: Node2D = null
+var hooked_enemy: CharacterBody2D = null
 var point_light: PointLight2D = null
 
 # Stato
@@ -46,6 +47,10 @@ var original_linear_damp: float = 0.0
 var is_visible: bool = true
 
 var fish_detection_area: Area2D = null
+var _fish_scan_timer := 0.0
+var _enemy_scan_timer := 0.0
+var _enemy_contact_grace := 0.0
+var _grapple_target: Node2D = null
 
 func _ready():
 	original_gravity_scale = gravity_scale
@@ -66,9 +71,18 @@ func _ready():
 
 	_find_point_light()
 	_setup_fish_detection()
+	_apply_fishing_pass_through()
 
 	contact_monitor = true
 	max_contacts_reported = 4
+	z_index = 14
+
+
+func _apply_fishing_pass_through() -> void:
+	# L'amo da pesca non deve rimbalzare sul pontile/pavimento:
+	# se sotto c'è acqua, attraversa il deck e affonda.
+	collision_layer = 0
+	collision_mask = 0
 
 func _find_sprite():
 	if sprite_node_name != "":
@@ -97,6 +111,7 @@ func _apply_body_collision_scale():
 			var cs := child as CollisionShape2D
 			if cs.shape == null:
 				continue
+			cs.shape = cs.shape.duplicate()
 
 			if cs.shape is CircleShape2D:
 				var c := cs.shape as CircleShape2D
@@ -123,6 +138,11 @@ func _find_point_light():
 func _setup_fish_detection():
 	fish_detection_area = Area2D.new()
 	fish_detection_area.name = "FishDetection"
+	fish_detection_area.collision_layer = 0
+	# Layer 128 = pesci, layer 2 = hurtbox enemy.
+	fish_detection_area.collision_mask = 131
+	fish_detection_area.monitoring = true
+	fish_detection_area.monitorable = false
 	add_child(fish_detection_area)
 
 	var collision = CollisionShape2D.new()
@@ -139,12 +159,48 @@ func _setup_fish_detection():
 	fish_detection_area.area_exited.connect(_on_area_exited)
 
 func _physics_process(delta: float):
+	_enemy_contact_grace = maxf(0.0, _enemy_contact_grace - delta)
+	if is_instance_valid(hooked_enemy):
+		global_position = hooked_enemy.global_position + Vector2(0.0, -14.0)
+		linear_velocity = Vector2.ZERO
+	if is_anchored and is_instance_valid(_grapple_target):
+		global_position = _grapple_target.global_position
+	if not is_anchored and hooked_fish == null and hooked_enemy == null:
+		_scan_grapples()
+		_enemy_scan_timer -= delta
+		if _enemy_scan_timer <= 0.0:
+			_enemy_scan_timer = 0.06
+			_scan_nearby_enemies()
 	if in_water and not is_anchored:
 		# In acqua: gravità 0, quindi smorza la velocità verticale verso target
 		var target_vy = sink_speed if sink_slowly_in_water else 0.0
 		linear_velocity.y = move_toward(linear_velocity.y, target_vy, water_vertical_brake * delta)
+		_fish_scan_timer -= delta
+		if hooked_fish == null and _fish_scan_timer <= 0.0:
+			_fish_scan_timer = 0.12
+			_scan_nearby_fish()
 
 	_update_sprite_rotation()
+
+
+func _scan_nearby_fish() -> void:
+	var radius_squared := pow(fish_detection_radius * 1.6, 2)
+	for fish in get_tree().get_nodes_in_group(fish_group_name):
+		if fish is Node2D and (fish as Node2D).global_position.distance_squared_to(global_position) <= radius_squared:
+			_check_if_fish(fish)
+
+
+func _scan_nearby_enemies() -> void:
+	# Polling leggero di riserva: alcune varianti hanno hurtbox piccole o molto
+	# scalate e il solo segnale area_entered poteva mancare un lancio veloce.
+	if _enemy_contact_grace > 0.0:
+		return
+	var radius_squared := pow(fish_detection_radius * 1.15, 2)
+	for candidate in get_tree().get_nodes_in_group("enemy"):
+		if candidate is Node2D and (candidate as Node2D).global_position.distance_squared_to(global_position) <= radius_squared:
+			_check_if_enemy(candidate)
+			if hooked_enemy != null:
+				return
 
 func _update_sprite_rotation():
 	if sprite == null:
@@ -181,12 +237,17 @@ func orient_to_line(line_origin: Vector2):
 # ===========================================
 func set_hook_type(type: String):
 	hook_type = type
+	if hook_type == "fishing":
+		_apply_fishing_pass_through()
 
 func get_hook_type() -> String:
 	return hook_type
 
 func set_player_reference(player: Node):
 	player_ref = player
+	# Dopo un nuovo lancio la scansione di riserva non può agganciare un enemy
+	# solo perché il player è già vicino: il contatto deve arrivare con la canna.
+	_enemy_contact_grace = 0.12
 
 func get_player_reference() -> Node:
 	return player_ref
@@ -209,16 +270,70 @@ func show_hook():
 func set_hooked_fish(fish: Node2D):
 	hooked_fish = fish
 
+func set_hooked_enemy(enemy: CharacterBody2D):
+	hooked_enemy = enemy
+	if enemy == null:
+		freeze = false
+
+func get_hooked_enemy() -> CharacterBody2D:
+	return hooked_enemy
+
 # ===========================================
 # FISH DETECTION
 # ===========================================
+func _scan_grapples() -> void:
+	if player_ref == null or not player_ref.has_method("on_grapple_latched"):
+		return
+	for node in get_tree().get_nodes_in_group("dogana_grapple_point"):
+		if not (node is Node2D):
+			continue
+		var target := node as Node2D
+		if target.global_position.distance_squared_to(global_position) <= 900.0:
+			_latch_grapple(target)
+			return
+
+
+func _latch_grapple(target: Node2D) -> void:
+	if is_anchored:
+		return
+	is_anchored = true
+	_grapple_target = target
+	freeze = true
+	linear_velocity = Vector2.ZERO
+	angular_velocity = 0.0
+	if target.has_method("get_grapple_point"):
+		global_position = target.call("get_grapple_point")
+	else:
+		global_position = target.global_position
+	if player_ref:
+		player_ref.call("on_grapple_latched", self)
+
+
+func get_grapple_owner() -> Node:
+	if not is_instance_valid(_grapple_target):
+		return null
+	var owner: Variant = _grapple_target.get_meta("grapple_owner", null)
+	if owner is Node and is_instance_valid(owner):
+		return owner as Node
+	var parent := _grapple_target.get_parent()
+	return parent if parent and parent.has_method("reel_grapple") else null
+
+
 func _on_fish_body_entered(body: Node2D):
+	if body != null and body.is_in_group("dogana_grapple_point"):
+		_latch_grapple(body)
+		return
 	_check_if_fish(body)
 
 func _on_fish_area_entered(area: Area2D):
 	var parent = area.get_parent()
 	if parent != null:
-		_check_if_fish(parent)
+		if parent.is_in_group("enemy"):
+			if _enemy_contact_grace > 0.0:
+				return
+			_check_if_enemy(parent)
+		else:
+			_check_if_fish(parent)
 
 func _check_if_fish(node: Node):
 	# Non agganciare subito: il pesce deve andare verso l'amo e abboccare quando è vicino (logica in fish.gd)
@@ -227,6 +342,9 @@ func _check_if_fish(node: Node):
 	if node == null or node == self:
 		return
 	if player_ref != null and node == player_ref:
+		return
+	if node.has_method("is_bait_carcass") and bool(node.call("is_bait_carcass")):
+		_hook_fish(node as Node2D)
 		return
 
 	var is_fish := false
@@ -239,9 +357,30 @@ func _check_if_fish(node: Node):
 	elif "fish" in node.name.to_lower():
 		is_fish = true
 
-	# Non chiamare _hook_fish: il pesce rileva l'amo (area/body), va verso, e abbocca a distanza < 30
-	# if is_fish:
-	# 	_hook_fish(node as Node2D)
+	# Non agganciare subito: notifichiamo però esplicitamente il pesce. Affidarsi
+	# soltanto all'Area del pesce rendeva l'abboccata dipendente dalla scala del
+	# collider e poteva lasciare l'amo invisibile ai pesci del tutorial.
+	if is_fish and node.has_method("_on_hook_detected"):
+		node.call_deferred("_on_hook_detected", self)
+
+
+func _check_if_enemy(node: Node) -> void:
+	if hooked_enemy != null or hooked_fish != null or node == null:
+		return
+	if not node.is_in_group("enemy") or not node.has_method("can_be_combat_hooked"):
+		return
+	if not bool(node.call("can_be_combat_hooked")):
+		return
+	var enemy := node as CharacterBody2D
+	if enemy == null or player_ref == null or not player_ref.has_method("on_enemy_hooked"):
+		return
+	hooked_enemy = enemy
+	freeze = true
+	linear_velocity = Vector2.ZERO
+	global_position = enemy.global_position + Vector2(0.0, -14.0)
+	if sprite:
+		sprite.visible = false
+	player_ref.call_deferred("on_enemy_hooked", enemy, self)
 
 func _hook_fish(fish: Node2D):
 	if fish == null:
@@ -278,6 +417,18 @@ func _exit_water():
 
 func is_in_water() -> bool:
 	return in_water
+
+
+func set_in_water(value: bool, _gravity_reduction := 0.0, _water_owner: Node = null) -> void:
+	if value:
+		_enter_water()
+	else:
+		_exit_water()
+
+
+func exit_water() -> void:
+	_exit_water()
+
 
 func _on_area_entered(area: Area2D):
 	var area_name = area.name.to_lower()

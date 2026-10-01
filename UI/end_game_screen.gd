@@ -10,10 +10,13 @@ var _title_label: Label = null
 var _time_label: Label = null
 var _tier_label: Label = null
 var _buttons_container: HBoxContainer = null
+var _panel_style: StyleBoxFlat
 
 func _ready() -> void:
 	layer = 100
 	_build_ui()
+	get_viewport().size_changed.connect(_apply_responsive_layout)
+	_apply_responsive_layout()
 	hide()
 
 func show_with_result(elapsed_sec: float) -> void:
@@ -38,6 +41,11 @@ func show_with_result(elapsed_sec: float) -> void:
 			c = Color(0.6, 0.85, 1.0, 1)
 		_tier_label.add_theme_color_override("font_color", c)
 	show()
+	_panel.modulate.a = 0.0
+	_panel.scale = Vector2.ONE * 0.95
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(_panel, "modulate:a", 1.0, 0.3).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(_panel, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK)
 
 func _build_ui() -> void:
 	var bg = ColorRect.new()
@@ -49,20 +57,13 @@ func _build_ui() -> void:
 
 	_panel = PanelContainer.new()
 	_panel.name = "Panel"
-	_panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_panel.set_anchor(SIDE_TOP, 0.35)
-	_panel.set_offset(SIDE_LEFT, -220)
-	_panel.set_offset(SIDE_TOP, 0)
-	_panel.set_offset(SIDE_RIGHT, 220)
-	_panel.set_offset(SIDE_BOTTOM, 380)
-	_panel.custom_minimum_size = Vector2(440, 340)
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.08, 0.08, 0.18, 0.98)
-	style.border_color = Color(0.45, 0.5, 0.7, 1)
-	style.set_border_width_all(3)
-	style.set_corner_radius_all(16)
-	style.set_content_margin_all(32)
-	_panel.add_theme_stylebox_override("panel", style)
+	_panel.set_anchors_preset(Control.PRESET_CENTER)
+	_panel_style = StyleBoxFlat.new()
+	_panel_style.bg_color = Color(0.08, 0.08, 0.18, 0.98)
+	_panel_style.border_color = Color(0.45, 0.5, 0.7, 1)
+	_panel_style.set_border_width_all(3)
+	_panel_style.set_corner_radius_all(16)
+	_panel.add_theme_stylebox_override("panel", _panel_style)
 	add_child(_panel)
 
 	var vbox = VBoxContainer.new()
@@ -105,6 +106,25 @@ func _build_ui() -> void:
 	_buttons_container.add_child(btn_esci)
 	var btn_ricomincia = _make_button("Ricomincia", _on_ricomincia_pressed)
 	_buttons_container.add_child(btn_ricomincia)
+
+
+func _apply_responsive_layout() -> void:
+	if _panel == null:
+		return
+	var viewport_size := CaligoResponsiveLayout.viewport_size(self)
+	var compact := CaligoResponsiveLayout.is_compact(viewport_size)
+	var panel_size := CaligoResponsiveLayout.fitted_panel(viewport_size, Vector2(440, 380), 12.0)
+	_panel.offset_left = -panel_size.x * 0.5
+	_panel.offset_right = panel_size.x * 0.5
+	_panel.offset_top = -panel_size.y * 0.5
+	_panel.offset_bottom = panel_size.y * 0.5
+	_panel.custom_minimum_size = panel_size
+	_panel_style.set_content_margin_all(16.0 if compact else 32.0)
+	_title_label.add_theme_font_size_override("font_size", 30 if compact else 42)
+	_buttons_container.add_theme_constant_override("separation", 8 if compact else 24)
+	for child in _buttons_container.get_children():
+		if child is Button:
+			(child as Button).custom_minimum_size = Vector2(108, 46) if compact else Vector2(160, 52)
 
 func _make_button(text: String, callback: Callable) -> Button:
 	var btn = Button.new()

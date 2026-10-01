@@ -23,6 +23,8 @@ var _show_btn: Button = null  # pulsante per riaprire quando nascosto
 func _ready():
 	layer = 5
 	_build_ui()
+	get_viewport().size_changed.connect(_apply_responsive_layout)
+	_apply_responsive_layout()
 	var am = get_node_or_null("/root/AchievementManager")
 	if am != null:
 		if am.fish_caught_count_changed.is_connected(_on_fish_changed) == false:
@@ -114,6 +116,19 @@ func _build_ui():
 	_leoni_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
 	_leoni_label.add_theme_constant_override("outline_size", 1)
 	vbox.add_child(_leoni_label)
+
+
+func _apply_responsive_layout() -> void:
+	if _container == null:
+		return
+	var viewport_size := CaligoResponsiveLayout.viewport_size(self)
+	var compact := CaligoResponsiveLayout.is_compact(viewport_size)
+	var panel_width := clampf(viewport_size.x - 24.0, 250.0, 380.0)
+	_container.custom_minimum_size = Vector2(panel_width, 86.0 if compact else 100.0)
+	_fish_label.custom_minimum_size.x = panel_width - 40.0
+	_leoni_label.custom_minimum_size.x = panel_width - 40.0
+	_fish_label.add_theme_font_size_override("font_size", 17 if compact else font_size)
+	_leoni_label.add_theme_font_size_override("font_size", 17 if compact else font_size)
 
 func _on_fish_changed(_count: int):
 	_update_labels()

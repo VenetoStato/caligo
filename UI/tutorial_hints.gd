@@ -1,148 +1,473 @@
 extends CanvasLayer
 
-# ===========================================
-# TUTORIAL HINTS - Indicazioni all'inizio e vicino all'acqua
-# ===========================================
-# All'inizio: attacco e doppio salto
-# Vicino all'acqua: pesca
+signal tutorial_completed
 
-@export var start_hint_duration: float = 12.0
-@export var near_water_distance: float = 320.0
+enum Step {
+	MOVE,
+	INTERACT,
+	JUMP,
+	DOUBLE_JUMP,
+	DASH,
+	ATTACK,
+	CAST,
+	REEL,
+	MAP,
+	POGO,
+	COMPLETE,
+}
 
-var _player: Node2D = null
-var _start_panel: PanelContainer = null
-var _fishing_panel: PanelContainer = null
-var _start_timer: float = 0.0
-var _start_hint_hidden: bool = false
+const STEP_ORDER: Array[Step] = [
+	Step.MOVE,
+	Step.INTERACT,
+	Step.JUMP,
+	Step.DOUBLE_JUMP,
+	Step.DASH,
+	Step.ATTACK,
+	Step.POGO,
+	Step.CAST,
+	Step.REEL,
+	Step.MAP,
+]
 
-func _ready():
-	layer = 15
-	_build_start_hint()
-	_build_fishing_hint()
-	_start_timer = start_hint_duration
-	_start_panel.visible = true
-	_fishing_panel.visible = false
+## Ritardo prima che il glifo compaia: se l'azione la scopri da solo non vedi
+## mai nulla. Il suggerimento arriva solo quando resti davvero fermo.
+const HINT_DELAY := 4.2
 
-func _process(delta: float):
+var _player: CharacterBody2D
+var _panel: PanelContainer
+var _fishing_panel: PanelContainer
+var _cast_nudge: PanelContainer
+var _cast_nudge_mark: HintMark
+var _mark: HintMark
+var _hint_wait := 0.0
+var _hint_shown := false
+var _start_position := Vector2.INF
+var _completed: Dictionary = {}
+var _observed: Dictionary = {}
+var _current_step: Step = Step.MOVE
+var _completion_started := false
+var _player_signal_connected := false
+var _fish_signal_connected := false
+var _step_transition: Tween
+var _armed := false
+
+
+func _ready() -> void:
+	# Sopra PostFX/vignetta (20), sotto HUD (60) e mappa (90)
+	layer = 45
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	for step in STEP_ORDER:
+		_completed[step] = false
+		_observed[step] = false
+	_build_panel()
+	_build_cast_nudge()
+	get_viewport().size_changed.connect(_apply_responsive_layout)
+	_apply_responsive_layout()
+	_fishing_panel = _panel
+	if _panel:
+		_panel.visible = false
+	var level := get_tree().current_scene
+	if level and level.has_signal("grace_activated"):
+		level.connect("grace_activated", _on_grace_activated)
+	var training_cache := level.get_node_or_null("Gameplay/Breakables/ArrivalCache") if level else null
+	if training_cache and training_cache.has_signal("prop_broken"):
+		training_cache.connect("prop_broken", _on_training_cache_broken)
+	# Hook subito: le azioni fatte prima dell'arm possono valere come step.
+	call_deferred("_ensure_player_hooks")
+	# Dopo tutti i _ready: se non c'è cutscene di arrivo, arma subito.
+	call_deferred("_maybe_auto_arm")
+
+
+func _maybe_auto_arm() -> void:
+	if _armed:
+		return
+	if get_tree().get_first_node_in_group("dogana_arrival_cutscene") != null:
+		return
+	arm_tutorial()
+
+
+func set_armed(armed: bool) -> void:
+	_armed = armed
+	if _panel and not armed:
+		_panel.visible = false
+
+
+func arm_tutorial() -> void:
+	if _armed:
+		return
+	_armed = true
+	_ensure_player_hooks()
+	if _player and _start_position == Vector2.INF:
+		_start_position = _player.global_position
+	_refresh_step()
+
+
+func _ensure_player_hooks() -> void:
 	if _player == null:
-		_player = get_tree().get_first_node_in_group("player") as Node2D
-		if _player == null:
+		_player = get_tree().get_first_node_in_group("player") as CharacterBody2D
+	if _player == null:
+		return
+	if _start_position == Vector2.INF:
+		_start_position = _player.global_position
+	if not _player_signal_connected and _player.has_signal("tutorial_action_performed"):
+		_player.connect("tutorial_action_performed", _on_player_tutorial_action)
+		_player_signal_connected = true
+	if not _fish_signal_connected and _player.has_signal("fish_caught"):
+		_player.connect("fish_caught", _on_fish_caught)
+		_fish_signal_connected = true
+
+
+func _process(_delta: float) -> void:
+	# Sempre: cattura azioni anticipate anche con tutorial non ancora armato.
+	_ensure_player_hooks()
+	if _player == null:
+		return
+	if _start_position != Vector2.INF:
+		var moved := absf(_player.global_position.x - _start_position.x) >= 24.0
+		if moved:
+			_observe_step(Step.MOVE)
+	if Input.is_action_pressed("ui_left") or Input.is_action_pressed("ui_right"):
+		_observe_step(Step.MOVE)
+	var map_overlay := get_tree().current_scene.get_node_or_null("DoganaMap/Overlay") as Control if get_tree().current_scene else null
+	if map_overlay and map_overlay.visible:
+		_observe_step(Step.MAP)
+	if not _armed:
+		_update_fish_cast_nudge(_delta)
+		return
+	if _current_step == Step.INTERACT and _player_near_interactable() and _panel and not _panel.visible:
+		_apply_step_copy(Step.INTERACT)
+	_update_hint_fade(_delta)
+	_update_fish_cast_nudge(_delta)
+
+
+## Il glifo emerge dal nero solo dopo l'attesa e pulsa appena, come un riflesso.
+func _update_hint_fade(delta: float) -> void:
+	if _panel == null or _completion_started:
+		return
+	if _current_step == Step.COMPLETE:
+		return
+	if _current_step == Step.CAST or _current_step == Step.REEL:
+		_panel.visible = false
+		return
+	if _current_step == Step.INTERACT and not _player_near_interactable():
+		_panel.visible = false
+		_panel.modulate.a = 0.0
+		return
+	_hint_wait += delta
+	if _hint_wait < HINT_DELAY:
+		_panel.modulate.a = move_toward(_panel.modulate.a, 0.0, delta * 3.0)
+		return
+	_hint_shown = true
+	var breathe: float = 0.42 + 0.12 * sin(Time.get_ticks_msec() * 0.0021)
+	_panel.modulate.a = move_toward(_panel.modulate.a, breathe, delta * 0.9)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	# Le azioni vengono confermate dai sistemi che le hanno realmente eseguite,
+	# non dal solo tasto premuto. Manteniamo l'hook per compatibilità con la scena.
+	if event is InputEventKey and event.pressed and event.physical_keycode == KEY_M:
+		var map_overlay := get_tree().current_scene.get_node_or_null("DoganaMap/Overlay") as Control
+		if map_overlay and map_overlay.visible:
+			_observe_step(Step.MAP)
+
+
+func _on_player_tutorial_action(action: StringName) -> void:
+	match action:
+		&"jump":
+			_observe_step(Step.JUMP)
+		&"double_jump":
+			_observe_step(Step.DOUBLE_JUMP)
+		&"dash":
+			_observe_step(Step.DASH)
+		&"attack":
+			_observe_step(Step.ATTACK)
+		&"pogo":
+			_observe_step(Step.POGO)
+		&"cast":
+			_observe_step(Step.CAST)
+		# REEL si completa solo con una cattura reale (vedi _on_fish_caught).
+
+
+func _on_fish_caught(_health_restored: int) -> void:
+	_observe_step(Step.REEL)
+
+
+func _on_grace_activated(_site_id: String) -> void:
+	_observe_step(Step.INTERACT)
+
+
+func _on_training_cache_broken() -> void:
+	# Anche se il tutorial non è armato / non è ancora ATTACK: memorizza.
+	_observed[Step.ATTACK] = true
+	_observe_step(Step.ATTACK)
+
+
+func notify_altar_used() -> void:
+	_observe_step(Step.INTERACT)
+
+
+func _observe_step(step: Step) -> void:
+	# Latch sempre: azioni fatte in anticipo non si perdono.
+	_observed[step] = true
+	if not _armed:
+		return
+	# Solo lo step corrente si completa subito; i futuri verranno skippati in advance.
+	if step != _current_step:
+		return
+	_mark_completed(step)
+
+
+func _mark_completed(step: Step) -> void:
+	if not _armed:
+		return
+	if step != _current_step:
+		return
+	if bool(_completed.get(step, false)):
+		return
+	_completed[step] = true
+	_advance_to_next_step()
+
+
+func _advance_to_next_step() -> void:
+	for step in STEP_ORDER:
+		if not bool(_completed.get(step, false)):
+			_current_step = step
+			# Se lo step era già stato fatto in anticipo, completa subito senza mostrarlo.
+			if bool(_observed.get(step, false)):
+				_completed[step] = true
+				continue
+			if step == Step.ATTACK and _is_training_cache_already_broken():
+				_observed[step] = true
+				_completed[step] = true
+				continue
+			if step == Step.INTERACT and _is_altar_already_used():
+				_observed[step] = true
+				_completed[step] = true
+				continue
+			_apply_step_copy(step)
 			return
+	_current_step = Step.COMPLETE
+	_unlock_tutorial_gate()
+	_show_completion()
 
-	# Hint iniziale: attacco e doppio salto (nasconde dopo durata o primo input attacco/salto)
-	if _start_panel.visible and not _start_hint_hidden:
-		_start_timer -= delta
-		if _start_timer <= 0.0 or Input.is_action_just_pressed("ui_attack") or Input.is_action_just_pressed("ui_attack_strong") or Input.is_action_just_pressed("ui_accept"):
-			_hide_start_hint()
-			_start_hint_hidden = true
 
-	# Hint pesca: solo vicino all'acqua
-	var near_water := _is_player_near_water()
-	if near_water:
-		_fishing_panel.visible = true
-	else:
-		_fishing_panel.visible = false
+func _is_altar_already_used() -> bool:
+	# Solo se il player ha davvero usato un altare (notify / grace_activated).
+	# L'attivazione silenziosa del pontile all'avvio NON conta.
+	return bool(_observed.get(Step.INTERACT, false))
 
-func _is_player_near_water() -> bool:
-	if _player == null:
+
+func _player_near_interactable() -> bool:
+	if _player == null or not is_instance_valid(_player):
 		return false
-	if _player.get("is_in_water") != null and bool(_player.get("is_in_water")):
-		return true
-	var waters = get_tree().get_nodes_in_group("water")
-	for w in waters:
-		if w is Node2D:
-			var dist = _player.global_position.distance_to((w as Node2D).global_position)
-			if dist < near_water_distance:
-				return true
+	var tree := get_tree()
+	if tree == null:
+		return false
+	for node in tree.get_nodes_in_group("dogana_grace"):
+		if node is Node2D and (node as Node2D).global_position.distance_to(_player.global_position) <= 78.0:
+			return true
+	for node in tree.get_nodes_in_group("dogana_interactable"):
+		if node is Node2D and (node as Node2D).global_position.distance_to(_player.global_position) <= 78.0:
+			return true
 	return false
 
-func _build_style_panel(bg_alpha: float = 0.88) -> StyleBoxFlat:
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.08, 0.08, 0.14, bg_alpha)
-	style.border_color = Color(0.35, 0.5, 0.7, 0.9)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(10)
-	style.set_content_margin_all(14)
-	return style
 
-func _is_touch_platform() -> bool:
-	return OS.get_name() == "Android" or DisplayServer.is_touchscreen_available()
+func _is_training_cache_already_broken() -> bool:
+	var level := get_tree().current_scene
+	if level == null:
+		return bool(_observed.get(Step.ATTACK, false))
+	var cache := level.get_node_or_null("Gameplay/Breakables/ArrivalCache")
+	if cache == null:
+		return true
+	return bool(cache.get("_broken"))
 
-func _build_start_hint():
-	_start_panel = PanelContainer.new()
-	_start_panel.name = "StartHint"
-	_start_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	_start_panel.set_anchor(SIDE_LEFT, 0.5)
-	_start_panel.set_anchor(SIDE_TOP, 0.0)
-	_start_panel.set_offset(SIDE_LEFT, -200)
-	_start_panel.set_offset(SIDE_TOP, 24)
-	_start_panel.set_custom_minimum_size(Vector2(400, 0))
-	_start_panel.add_theme_stylebox_override("panel", _build_style_panel())
-	add_child(_start_panel)
 
-	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 6)
-	_start_panel.add_child(vbox)
+func _refresh_step() -> void:
+	_advance_to_next_step()
 
-	var title = Label.new()
-	title.text = "Combat & movimento"
-	title.add_theme_font_size_override("font_size", 20)
-	title.add_theme_color_override("font_color", Color(0.9, 0.85, 0.7, 1))
-	title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-	title.add_theme_constant_override("outline_size", 2)
-	vbox.add_child(title)
 
-	var l1 = Label.new()
-	l1.text = "Attacco: Z o Click sinistro  |  Attacco forte: Click destro" if not _is_touch_platform() else "Usa i pulsanti a schermo: ◀▶ movimento, ↑ salto, Z/Pwr attacco, D dash"
-	l1.add_theme_font_size_override("font_size", 18)
-	l1.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
-	l1.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
-	l1.add_theme_constant_override("outline_size", 1)
-	vbox.add_child(l1)
-
-	var l2 = Label.new()
-	l2.text = "Doppio salto: SPAZIO due volte" if not _is_touch_platform() else "Pesca: pulsanti Lenza, Tira, G, Amo in basso a destra"
-	l2.add_theme_font_size_override("font_size", 18)
-	l2.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
-	l2.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
-	l2.add_theme_constant_override("outline_size", 1)
-	vbox.add_child(l2)
-
-func _build_fishing_hint():
-	_fishing_panel = PanelContainer.new()
-	_fishing_panel.name = "FishingHint"
-	_fishing_panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	_fishing_panel.set_anchor(SIDE_LEFT, 0.5)
-	_fishing_panel.set_anchor(SIDE_BOTTOM, 1.0)
-	_fishing_panel.set_offset(SIDE_LEFT, -200)
-	_fishing_panel.set_offset(SIDE_BOTTOM, -28)
-	_fishing_panel.set_custom_minimum_size(Vector2(400, 0))
-	_fishing_panel.add_theme_stylebox_override("panel", _build_style_panel())
-	add_child(_fishing_panel)
-
-	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 6)
-	_fishing_panel.add_child(vbox)
-
-	var title = Label.new()
-	title.text = "Pesca"
-	title.add_theme_font_size_override("font_size", 20)
-	title.add_theme_color_override("font_color", Color(0.7, 0.9, 1, 1))
-	title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-	title.add_theme_constant_override("outline_size", 2)
-	vbox.add_child(title)
-
-	var l1 = Label.new()
-	l1.text = "F lancia lenza  |  R recupera  |  C cambia amo (pesca / lancio)" if not _is_touch_platform() else "Pulsanti Lenza, Tira, G, Amo in basso a destra"
-	l1.add_theme_font_size_override("font_size", 18)
-	l1.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
-	l1.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
-	l1.add_theme_constant_override("outline_size", 1)
-	vbox.add_child(l1)
-
-func _hide_start_hint():
-	if _start_panel == null:
+func _apply_step_copy(step: Step) -> void:
+	var touch := OS.get_name() == "Android"
+	if _step_transition and _step_transition.is_valid():
+		_step_transition.kill()
+	# Pesca: niente cartelli. La canna e la lenza insegnano da sole.
+	if step == Step.CAST or step == Step.REEL:
+		_panel.visible = false
+		_panel.modulate.a = 0.0
+		_hint_wait = 0.0
+		_hint_shown = false
+		_mark.clear_mark()
 		return
-	var tween = create_tween()
-	tween.tween_property(_start_panel, "modulate:a", 0.0, 0.4)
-	tween.tween_callback(func(): _start_panel.visible = false)
+	# E solo quando c'è davvero qualcosa da usare. All'inizio del pontile no.
+	if step == Step.INTERACT and not _player_near_interactable():
+		_panel.visible = false
+		_panel.modulate.a = 0.0
+		_hint_wait = 0.0
+		_hint_shown = false
+		_mark.clear_mark()
+		return
+	_panel.visible = true
+	_panel.modulate.a = 0.0
+	_hint_wait = 0.0
+	_hint_shown = false
+	_mark.show_mark(_step_mark(step), _step_key(step, touch))
+
+
+## Il disegno dice cosa fare, il tasto dice con cosa farlo.
+func _step_mark(step: Step) -> HintMark.Mark:
+	match step:
+		Step.MOVE:
+			return HintMark.Mark.MOVE
+		Step.INTERACT:
+			return HintMark.Mark.INTERACT
+		Step.JUMP:
+			return HintMark.Mark.JUMP
+		Step.DOUBLE_JUMP:
+			return HintMark.Mark.DOUBLE_JUMP
+		Step.DASH:
+			return HintMark.Mark.DASH
+		Step.ATTACK:
+			return HintMark.Mark.ATTACK
+		Step.POGO:
+			return HintMark.Mark.POGO
+		Step.CAST:
+			return HintMark.Mark.CAST
+		Step.REEL:
+			return HintMark.Mark.REEL
+		Step.MAP:
+			return HintMark.Mark.MAP
+	return HintMark.Mark.NONE
+
+
+## Su touch il comando e' un pulsante a schermo: il tasto non si scrive.
+func _step_key(step: Step, touch: bool) -> String:
+	if touch:
+		return ""
+	match step:
+		Step.MOVE:
+			return "A D"
+		Step.INTERACT:
+			return "E"
+		Step.JUMP, Step.DOUBLE_JUMP:
+			return "SPAZIO"
+		Step.DASH:
+			return "SHIFT"
+		Step.ATTACK:
+			return "CLICK"
+		Step.POGO:
+			return "S + CLICK"
+		Step.CAST:
+			return "F"
+		Step.REEL:
+			return "R"
+		Step.MAP:
+			return "M"
+	return ""
+
+
+func _completed_count() -> int:
+	var count := 0
+	for step in STEP_ORDER:
+		if bool(_completed.get(step, false)):
+			count += 1
+	return count
+
+
+func _unlock_tutorial_gate() -> void:
+	var cam := get_tree().get_first_node_in_group("camera")
+	if cam and cam.has_method("add_shake"):
+		cam.call("add_shake", 0.16)
+
+
+func _show_completion() -> void:
+	if _completion_started:
+		return
+	_completion_started = true
+	_mark.clear_mark()
+	tutorial_completed.emit()
+	_fade_completed_tutorial()
+
+
+func _fade_completed_tutorial() -> void:
+	var tween := create_tween()
+	tween.tween_property(_panel, "modulate:a", 0.0, 0.8)
+	tween.tween_callback(func() -> void: _panel.visible = false)
+
+
+func _update_fish_cast_nudge(delta: float) -> void:
+	if _cast_nudge == null or _player == null:
+		return
+	if bool(_player.get("line_extended")) or bool(_player.get("is_charging")):
+		_cast_nudge.modulate.a = move_toward(_cast_nudge.modulate.a, 0.0, delta * 3.0)
+		if _cast_nudge.modulate.a <= 0.02:
+			_cast_nudge.visible = false
+		return
+	var well := get_tree().get_first_node_in_group("dogana_fishing_well") as Node2D
+	var in_zone := false
+	if well:
+		var delta_pos := _player.global_position - well.global_position
+		in_zone = absf(delta_pos.x) < 190.0 and absf(delta_pos.y) < 140.0
+	if not in_zone:
+		_cast_nudge.modulate.a = move_toward(_cast_nudge.modulate.a, 0.0, delta * 2.4)
+		if _cast_nudge.modulate.a <= 0.02:
+			_cast_nudge.visible = false
+		return
+	_cast_nudge.visible = true
+	_place_cast_nudge(well)
+	var breathe := 0.28 + 0.08 * sin(Time.get_ticks_msec() * 0.0024)
+	_cast_nudge.modulate.a = move_toward(_cast_nudge.modulate.a, breathe, delta * 1.1)
+
+
+func _place_cast_nudge(well: Node2D) -> void:
+	if _cast_nudge == null or well == null:
+		return
+	var screen := well.get_global_transform_with_canvas().origin + Vector2(-36.0, -58.0)
+	_cast_nudge.position = screen
+
+
+func _build_cast_nudge() -> void:
+	_cast_nudge = PanelContainer.new()
+	_cast_nudge.name = "FishCastNudge"
+	_cast_nudge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cast_nudge.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	_cast_nudge.modulate.a = 0.0
+	_cast_nudge.visible = false
+	_cast_nudge.size = Vector2(72, 40)
+	add_child(_cast_nudge)
+	_cast_nudge_mark = HintMark.new()
+	_cast_nudge_mark.name = "CastNudgeMark"
+	_cast_nudge_mark.set_scale_compact(true)
+	_cast_nudge_mark.show_mark(HintMark.Mark.CAST, "F")
+	_cast_nudge.add_child(_cast_nudge_mark)
+
+
+func _build_panel() -> void:
+	_panel = PanelContainer.new()
+	_panel.name = "GuidedTutorial"
+	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	# Nessuna cornice, nessuno sfondo: il glifo galleggia sulla scena.
+	_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	_panel.modulate.a = 0.0
+	add_child(_panel)
+
+	_mark = HintMark.new()
+	_mark.name = "HintMark"
+	_panel.add_child(_mark)
+
+
+func _apply_responsive_layout() -> void:
+	if _panel == null:
+		return
+	var viewport_size := CaligoResponsiveLayout.viewport_size(self)
+	var compact := CaligoResponsiveLayout.is_compact(viewport_size)
+	var margin := clampf(viewport_size.y * 0.09, 40.0, 76.0)
+	var mark_height := 40.0 if compact else 46.0
+	_panel.offset_bottom = -margin
+	_panel.offset_top = -margin - mark_height
+	_panel.offset_left = -70.0
+	_panel.offset_right = 70.0
+	if _mark:
+		_mark.set_scale_compact(compact)

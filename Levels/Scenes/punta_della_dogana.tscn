@@ -1,0 +1,936 @@
+[gd_scene load_steps=49 format=3 uid="uid://3ccaqnqh276l"]
+
+[ext_resource type="Script" uid="uid://b6j5qjydisr3v" path="res://Levels/Scenes/Dogana/dogana_level.gd" id="1_level"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/dogana_environment.tscn" id="2_environment"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/bricola.tscn" id="3_bricola"]
+[ext_resource type="PackedScene" uid="uid://c064mwp5bwak4" path="res://Player/Scene/Player.tscn" id="4_player"]
+[ext_resource type="Script" uid="uid://deh5lrua456gn" path="res://Levels/Scenes/camera_2d.gd" id="5_camera"]
+[ext_resource type="Shader" uid="uid://cqou5wyfr8spk" path="res://Levels/Scenes/hk_postfx.gdshader" id="6_postfx"]
+[ext_resource type="Script" uid="uid://bxmnjnyy4ciro" path="res://water_body.gd" id="7_water"]
+[ext_resource type="PackedScene" uid="uid://k3aff18qvqir" path="res://Enemies/enemy.tscn" id="8_enemy"]
+[ext_resource type="PackedScene" uid="uid://bruwmq46fel7d" path="res://Collectibles/LeoneSanMarco.tscn" id="9_collectible"]
+[ext_resource type="PackedScene" path="res://game_menu.tscn" id="10_menu"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/grace_site.tscn" id="12_grace"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/dogana_map.tscn" id="13_map"]
+[ext_resource type="PackedScene" path="res://UI/metroidvania_hud.tscn" id="14_hud"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/eldritch_fishing_props.tscn" id="15_props"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/dogana_foreground_decor.tscn" id="16_decor"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/platform_art.tscn" id="17_platform_art"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/breakable_prop.tscn" id="18_breakable_prop"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/drowned_customs_warden.tscn" id="19_boss"]
+[ext_resource type="PackedScene" path="res://UI/TutorialHints.tscn" id="20_tutorial"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/world_bounds.tscn" id="22_bounds"]
+[ext_resource type="Texture2D" uid="uid://d2q3x7eggomqn" path="res://Art/Editable/Characters/Enemies/tide_bloater.png" id="24_bloater"]
+[ext_resource type="Texture2D" uid="uid://ceusonr24cuky" path="res://Art/Editable/Characters/Enemies/lagoon_oracle.png" id="25_oracle"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/arrival_cutscene.tscn" id="28_arrival"]
+[ext_resource type="Script" uid="uid://dtx2rnqusvkmr" path="res://Levels/Scenes/Dogana/salute_church.gd" id="29_salute"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/salute_interior.tscn" id="30_salute_interior"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/simplified_waterfront.tscn" id="31_waterfront"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/lore_lectern.tscn" id="32_lore_lectern"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/lore_reader.tscn" id="33_lore_reader"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/pogo_thorn.tscn" id="34_thorn"]
+[ext_resource type="PackedScene" path="res://Levels/Scenes/Dogana/wooden_ledge.tscn" id="36_ledge"]
+[ext_resource type="Script" uid="uid://0lrabfmcg2dr" path="res://Levels/Scenes/Dogana/editable_platform.gd" id="37_editable_platform"]
+[ext_resource type="Texture2D" uid="uid://djs7txsxcmk4o" path="res://Art/Editable/Props/quay_platform.png" id="38_platform_texture"]
+[ext_resource type="Shader" path="res://Levels/Scenes/Dogana/boss_seal_fog.gdshader" id="39_boss_fog"]
+
+[sub_resource type="ShaderMaterial" id="BossSealFogMaterial"]
+shader = ExtResource("39_boss_fog")
+
+[sub_resource type="RectangleShape2D" id="GroundArrivalWest"]
+size = Vector2(700, 96)
+
+[sub_resource type="RectangleShape2D" id="GroundArrivalEast"]
+size = Vector2(630, 96)
+
+[sub_resource type="RectangleShape2D" id="BossArenaFloor"]
+size = Vector2(1120, 110)
+
+[sub_resource type="RectangleShape2D" id="BossArenaWall"]
+size = Vector2(50, 660)
+
+[sub_resource type="RectangleShape2D" id="EditableQuayA"]
+size = Vector2(915, 110)
+
+[sub_resource type="RectangleShape2D" id="EditableQuayB"]
+size = Vector2(1200, 110)
+
+[sub_resource type="RectangleShape2D" id="EditableQuayC"]
+size = Vector2(850, 110)
+
+[sub_resource type="RectangleShape2D" id="EditableQuayD"]
+size = Vector2(510, 110)
+
+[sub_resource type="RectangleShape2D" id="EditableQuayE"]
+size = Vector2(1120, 110)
+
+[sub_resource type="RectangleShape2D" id="CheckpointShape"]
+size = Vector2(90, 150)
+
+[sub_resource type="RectangleShape2D" id="FinishShape"]
+size = Vector2(170, 110)
+
+[sub_resource type="CircleShape2D" id="InteractionShape"]
+radius = 78.0
+
+[sub_resource type="ShaderMaterial" id="DoganaPostFX"]
+shader = ExtResource("6_postfx")
+shader_parameter/u_center_uv = Vector2(0.5, 0.52)
+shader_parameter/u_vignette_strength = 0.84
+shader_parameter/u_vignette_softness = 0.42
+shader_parameter/u_vignette_radius = 0.92
+shader_parameter/u_grain_amount = 0.16
+shader_parameter/u_grain_size = 1.45
+shader_parameter/u_grain_speed = 0.7
+shader_parameter/u_grain_midtones = 0.7
+shader_parameter/u_grain_shadows = 0.42
+shader_parameter/u_grain_highs = 0.38
+shader_parameter/u_desaturate = 0.0
+shader_parameter/u_shadow_lift = 0.018
+shader_parameter/u_contrast = 1.02
+shader_parameter/u_saturation = 0.98
+shader_parameter/u_shadow_tint = Color(0.2, 0.19, 0.38, 1)
+shader_parameter/u_mid_tint = Color(0.31, 0.62, 0.63, 1)
+shader_parameter/u_highlight_tint = Color(0.89, 0.97, 0.93, 1)
+shader_parameter/u_grade_strength = 0.18
+shader_parameter/u_exposure = 1.0
+shader_parameter/u_palette_unify = 0.18
+shader_parameter/u_palette_pastel = 0.12
+shader_parameter/u_palette_sat_cap = 0.52
+shader_parameter/u_palette_hues = Vector3(0.492, 0.752, 0.895)
+shader_parameter/u_chroma = 0.18
+shader_parameter/u_bloom = 0.06
+shader_parameter/u_bloom_threshold = 0.68
+shader_parameter/u_haze = 0.13
+shader_parameter/u_haze_color = Color(0.58, 0.76, 0.88, 1)
+shader_parameter/u_ink_strength = 0.0
+shader_parameter/u_ink_threshold = 0.075
+shader_parameter/u_motion_breath = 0.18
+shader_parameter/u_sharpen = 0.0
+shader_parameter/u_tint = Color(0.94, 0.98, 1, 1)
+
+[sub_resource type="StyleBoxFlat" id="LocationPanel"]
+bg_color = Color(0.025, 0.045, 0.06, 0.72)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.55, 0.51, 0.4, 0.55)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[node name="PuntaDellaDogana" type="Node2D"]
+script = ExtResource("1_level")
+
+[node name="GameMenu" parent="." instance=ExtResource("10_menu")]
+visible = false
+
+[node name="DoganaMap" parent="." instance=ExtResource("13_map")]
+visible = false
+
+[node name="LoreReader" parent="." instance=ExtResource("33_lore_reader")]
+visible = false
+
+[node name="MetroidvaniaHUD" parent="." instance=ExtResource("14_hud")]
+visible = false
+
+[node name="TutorialHints" parent="." instance=ExtResource("20_tutorial")]
+visible = false
+
+[node name="ArrivalCutscene" parent="." instance=ExtResource("28_arrival")]
+
+[node name="Environment" parent="." instance=ExtResource("2_environment")]
+
+[node name="Gameplay" type="Node2D" parent="." groups=["dogana_gameplay"]]
+
+[node name="DoganaForegroundDecor" parent="Gameplay" instance=ExtResource("16_decor")]
+visible = false
+
+[node name="GeneratedPlatformArt" parent="Gameplay" instance=ExtResource("17_platform_art")]
+visible = false
+z_index = 50
+
+[node name="EldritchFishingProps" parent="Gameplay" instance=ExtResource("15_props")]
+visible = false
+
+[node name="SaluteInterior" parent="Gameplay" instance=ExtResource("30_salute_interior")]
+
+[node name="SimplifiedWaterfront" parent="Gameplay" instance=ExtResource("31_waterfront")]
+build_continuous_collision = false
+
+[node name="WorldBounds" parent="Gameplay" instance=ExtResource("22_bounds")]
+
+[node name="Spawn" type="Marker2D" parent="Gameplay" groups=["spawn"]]
+position = Vector2(70, 447)
+
+[node name="Geometry" type="Node2D" parent="Gameplay" groups=["dogana_geometry"]]
+
+[node name="ArrivalBoatDockWest" type="StaticBody2D" parent="Gameplay/Geometry" groups=["dogana_platform"]]
+position = Vector2(-85, 508)
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/ArrivalBoatDockWest"]
+shape = SubResource("GroundArrivalWest")
+
+[node name="ArrivalBoatDockEast" type="StaticBody2D" parent="Gameplay/Geometry" groups=["dogana_platform"]]
+position = Vector2(710, 508)
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/ArrivalBoatDockEast"]
+shape = SubResource("GroundArrivalEast")
+
+[node name="Quay" type="StaticBody2D" parent="Gameplay/Geometry" groups=["dogana_platform"]]
+position = Vector2(1585, 540)
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Gameplay/Geometry/Quay"]
+polygon = PackedVector2Array(-395, -55, 520, -55, 520, 55, -395, 55)
+
+[node name="QuayVisual" type="Polygon2D" parent="Gameplay/Geometry/Quay"]
+visible = false
+z_index = -2
+color = Color(0.18, 0.2, 0.2, 1)
+polygon = PackedVector2Array(-395, -55, 520, -55, 520, 55, -395, 55)
+
+[node name="BossArena" type="Node2D" parent="Gameplay/Geometry" groups=["dogana_boss_arena", "dogana_salute_nave"]]
+script = ExtResource("29_salute")
+
+[node name="Floor" type="StaticBody2D" parent="Gameplay/Geometry/BossArena" groups=["dogana_platform"]]
+position = Vector2(5180, 540)
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/BossArena/Floor"]
+shape = SubResource("BossArenaFloor")
+
+[node name="EntranceSeal" type="StaticBody2D" parent="Gameplay/Geometry/BossArena" groups=["dogana_boss_seal"]]
+position = Vector2(4640, -620)
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/BossArena/EntranceSeal"]
+shape = SubResource("BossArenaWall")
+disabled = true
+
+[node name="FogSealVisual" type="ColorRect" parent="Gameplay/Geometry/BossArena/EntranceSeal"]
+visible = false
+z_index = 30
+offset_left = -72.0
+offset_top = -330.0
+offset_right = 72.0
+offset_bottom = 330.0
+mouse_filter = 2
+material = SubResource("BossSealFogMaterial")
+color = Color(0.52, 0.9, 0.94, 0.82)
+
+[node name="ExitWall" type="StaticBody2D" parent="Gameplay/Geometry/BossArena" groups=["dogana_boss_seal"]]
+position = Vector2(5700, -620)
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Geometry/BossArena/ExitWall"]
+shape = SubResource("BossArenaWall")
+disabled = true
+
+[node name="FogSealVisual" type="ColorRect" parent="Gameplay/Geometry/BossArena/ExitWall"]
+visible = false
+z_index = 30
+offset_left = -72.0
+offset_top = -330.0
+offset_right = 72.0
+offset_bottom = 330.0
+mouse_filter = 2
+material = SubResource("BossSealFogMaterial")
+color = Color(0.52, 0.9, 0.94, 0.82)
+
+[node name="EditablePlatforms" type="Node2D" parent="Gameplay" groups=["dogana_editable_platforms"]]
+
+[node name="PontileWest" type="StaticBody2D" parent="Gameplay/EditablePlatforms" groups=["dogana_platform"]]
+z_index = -1
+position = Vector2(-435, 460)
+collision_mask = 2
+script = ExtResource("37_editable_platform")
+
+[node name="PlatformArt" type="Sprite2D" parent="Gameplay/EditablePlatforms/PontileWest"]
+texture_filter = 2
+scale = Vector2(0.68359375, 0.2587601)
+texture = ExtResource("38_platform_texture")
+centered = false
+
+[node name="EditorGuide" type="Polygon2D" parent="Gameplay/EditablePlatforms/PontileWest"]
+z_index = 90
+color = Color(0.05, 0.95, 1, 0.25)
+polygon = PackedVector2Array(0, 0, 700, 0, 700, 96, 0, 96)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/PontileWest"]
+position = Vector2(350, 48)
+shape = SubResource("GroundArrivalWest")
+
+[node name="PontileEast" type="StaticBody2D" parent="Gameplay/EditablePlatforms" groups=["dogana_platform"]]
+z_index = -1
+position = Vector2(395, 460)
+collision_mask = 2
+script = ExtResource("37_editable_platform")
+platform_size = Vector2(630, 96)
+
+[node name="PlatformArt" type="Sprite2D" parent="Gameplay/EditablePlatforms/PontileEast"]
+texture_filter = 2
+scale = Vector2(0.6152344, 0.2587601)
+texture = ExtResource("38_platform_texture")
+centered = false
+
+[node name="EditorGuide" type="Polygon2D" parent="Gameplay/EditablePlatforms/PontileEast"]
+z_index = 90
+color = Color(0.05, 0.95, 1, 0.25)
+polygon = PackedVector2Array(0, 0, 630, 0, 630, 96, 0, 96)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/PontileEast"]
+position = Vector2(315, 48)
+shape = SubResource("GroundArrivalEast")
+
+[node name="DoganaQuay" type="StaticBody2D" parent="Gameplay/EditablePlatforms" groups=["dogana_platform"]]
+z_index = -1
+position = Vector2(1190, 485)
+collision_mask = 2
+script = ExtResource("37_editable_platform")
+platform_size = Vector2(915, 110)
+
+[node name="PlatformArt" type="Sprite2D" parent="Gameplay/EditablePlatforms/DoganaQuay"]
+texture_filter = 2
+scale = Vector2(0.8935547, 0.29649594)
+texture = ExtResource("38_platform_texture")
+centered = false
+
+[node name="EditorGuide" type="Polygon2D" parent="Gameplay/EditablePlatforms/DoganaQuay"]
+z_index = 90
+color = Color(0.05, 0.95, 1, 0.25)
+polygon = PackedVector2Array(0, 0, 915, 0, 915, 110, 0, 110)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/DoganaQuay"]
+position = Vector2(457.5, 55)
+shape = SubResource("EditableQuayA")
+
+[node name="CustomsFront" type="StaticBody2D" parent="Gameplay/EditablePlatforms" groups=["dogana_platform"]]
+z_index = -1
+position = Vector2(2060, 485)
+collision_mask = 2
+script = ExtResource("37_editable_platform")
+platform_size = Vector2(1200, 110)
+
+[node name="PlatformArt" type="Sprite2D" parent="Gameplay/EditablePlatforms/CustomsFront"]
+texture_filter = 2
+scale = Vector2(1.171875, 0.29649594)
+texture = ExtResource("38_platform_texture")
+centered = false
+
+[node name="EditorGuide" type="Polygon2D" parent="Gameplay/EditablePlatforms/CustomsFront"]
+z_index = 90
+color = Color(0.05, 0.95, 1, 0.25)
+polygon = PackedVector2Array(0, 0, 1200, 0, 1200, 110, 0, 110)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/CustomsFront"]
+position = Vector2(600, 55)
+shape = SubResource("EditableQuayB")
+
+[node name="CanalFront" type="StaticBody2D" parent="Gameplay/EditablePlatforms" groups=["dogana_platform"]]
+z_index = -1
+position = Vector2(3260, 485)
+collision_mask = 2
+script = ExtResource("37_editable_platform")
+platform_size = Vector2(850, 110)
+
+[node name="PlatformArt" type="Sprite2D" parent="Gameplay/EditablePlatforms/CanalFront"]
+texture_filter = 2
+scale = Vector2(0.8300781, 0.29649594)
+texture = ExtResource("38_platform_texture")
+centered = false
+
+[node name="EditorGuide" type="Polygon2D" parent="Gameplay/EditablePlatforms/CanalFront"]
+z_index = 90
+color = Color(0.05, 0.95, 1, 0.25)
+polygon = PackedVector2Array(0, 0, 850, 0, 850, 110, 0, 110)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/CanalFront"]
+position = Vector2(425, 55)
+shape = SubResource("EditableQuayC")
+
+[node name="FortunaFront" type="StaticBody2D" parent="Gameplay/EditablePlatforms" groups=["dogana_platform"]]
+z_index = -1
+position = Vector2(4110, 485)
+collision_mask = 2
+script = ExtResource("37_editable_platform")
+platform_size = Vector2(510, 110)
+
+[node name="PlatformArt" type="Sprite2D" parent="Gameplay/EditablePlatforms/FortunaFront"]
+texture_filter = 2
+scale = Vector2(0.49804688, 0.29649594)
+texture = ExtResource("38_platform_texture")
+centered = false
+
+[node name="EditorGuide" type="Polygon2D" parent="Gameplay/EditablePlatforms/FortunaFront"]
+z_index = 90
+color = Color(0.05, 0.95, 1, 0.25)
+polygon = PackedVector2Array(0, 0, 510, 0, 510, 110, 0, 110)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/FortunaFront"]
+position = Vector2(255, 55)
+shape = SubResource("EditableQuayD")
+
+[node name="SaluteFront" type="StaticBody2D" parent="Gameplay/EditablePlatforms" groups=["dogana_platform"]]
+z_index = -1
+position = Vector2(4620, 485)
+collision_mask = 2
+script = ExtResource("37_editable_platform")
+platform_size = Vector2(1120, 110)
+
+[node name="PlatformArt" type="Sprite2D" parent="Gameplay/EditablePlatforms/SaluteFront"]
+texture_filter = 2
+scale = Vector2(1.09375, 0.29649594)
+texture = ExtResource("38_platform_texture")
+centered = false
+
+[node name="EditorGuide" type="Polygon2D" parent="Gameplay/EditablePlatforms/SaluteFront"]
+z_index = 90
+color = Color(0.05, 0.95, 1, 0.25)
+polygon = PackedVector2Array(0, 0, 1120, 0, 1120, 110, 0, 110)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/EditablePlatforms/SaluteFront"]
+position = Vector2(560, 55)
+shape = SubResource("EditableQuayE")
+
+[node name="FishingWellMarker" type="Marker2D" parent="Gameplay" groups=["dogana_fishing_well"]]
+position = Vector2(330, 500)
+
+[node name="Breakables" type="Node2D" parent="Gameplay" groups=["dogana_breakable_route"]]
+
+[node name="ArrivalCache" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
+position = Vector2(770, 472)
+
+[node name="FirstCombatCache" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
+position = Vector2(1275, 488)
+hits_required = 2
+visual_variant = 1
+
+[node name="QuayCache" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
+position = Vector2(1555, 493)
+visual_variant = 2
+
+[node name="CanalCacheA" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
+position = Vector2(3360, 485)
+visual_variant = 1
+
+[node name="CanalCacheB" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
+position = Vector2(3830, 485)
+hits_required = 2
+visual_variant = 2
+
+[node name="CustomsCrate" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
+position = Vector2(2137, 492)
+hits_required = 2
+
+[node name="CanalCrate" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
+position = Vector2(3520, 485)
+hits_required = 2
+visual_variant = 2
+
+[node name="SaluteCrate" parent="Gameplay/Breakables" instance=ExtResource("18_breakable_prop")]
+position = Vector2(5200, 485)
+hits_required = 2
+visual_variant = 1
+
+[node name="WaterBasins" type="Node2D" parent="Gameplay" groups=["dogana_water_basins"]]
+
+[node name="GiudeccaBasin" type="Area2D" parent="Gameplay/WaterBasins" groups=["water"]]
+script = ExtResource("7_water")
+depth = 430.0
+fish_count = 9
+tutorial_fish_count = 3
+tutorial_fish_center_ratio = 0.48
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Gameplay/WaterBasins/GiudeccaBasin"]
+polygon = PackedVector2Array(-1400, 565, 7200, 565, 7200, 900, -1400, 900)
+
+[node name="Bricole" type="Node2D" parent="Gameplay" groups=["dogana_seabed_props"]]
+
+[node name="BricolaPontile" parent="Gameplay/Bricole" instance=ExtResource("3_bricola")]
+position = Vector2(330, 900)
+scale = Vector2(0.72, 0.9)
+
+[node name="BricolaPunta" parent="Gameplay/Bricole" instance=ExtResource("3_bricola")]
+position = Vector2(1100, 900)
+scale = Vector2(0.64, 0.86)
+
+[node name="BricolaSalute" parent="Gameplay/Bricole" instance=ExtResource("3_bricola")]
+position = Vector2(5920, 900)
+scale = Vector2(0.68, 0.9)
+
+[node name="PogoSchool" type="Node2D" parent="Gameplay"]
+
+[node name="WestBed" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+z_index = 12
+z_as_relative = false
+position = Vector2(212, 473)
+kind = 1
+bed_width = 108.0
+
+[node name="WestBed2" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+z_index = 12
+z_as_relative = false
+position = Vector2(441, 476)
+kind = 1
+bed_width = 108.0
+
+[node name="EastBed" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+z_index = 12
+z_as_relative = false
+position = Vector2(931, 469)
+kind = 1
+bed_width = 168.0
+
+[node name="CustomsGapBed" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+z_index = 12
+z_as_relative = false
+position = Vector2(2120, 485)
+kind = 1
+bed_width = 210.0
+
+[node name="CustomsGapCluster" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+z_index = 12
+z_as_relative = false
+position = Vector2(2280, 430)
+
+[node name="QuayWedgeBed" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+z_index = 12
+z_as_relative = false
+position = Vector2(2661, 495)
+kind = 1
+bed_width = 190.0
+
+[node name="WedgeCanalClusterA" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+z_index = 12
+z_as_relative = false
+position = Vector2(3088, 485)
+
+[node name="WedgeCanalClusterA3" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+z_index = 12
+z_as_relative = false
+position = Vector2(2986, 348)
+
+[node name="WedgeCanalClusterA2" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+z_index = 12
+z_as_relative = false
+position = Vector2(2966, 486)
+
+[node name="WedgeCanalBed" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+z_index = 12
+z_as_relative = false
+position = Vector2(3188, 485)
+kind = 1
+bed_width = 200.0
+
+[node name="WedgeCanalBed2" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+z_index = 12
+z_as_relative = false
+position = Vector2(3178, 337)
+rotation = 3.1429594
+kind = 1
+bed_width = 200.0
+
+[node name="WedgeCanalBed4" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+z_index = 12
+z_as_relative = false
+position = Vector2(3180.9998, 350)
+rotation = 0.008752223
+kind = 1
+bed_width = 200.0
+
+[node name="WedgeCanalBed5" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+z_index = 12
+z_as_relative = false
+position = Vector2(3380.9995, 352)
+rotation = 0.008752223
+kind = 1
+bed_width = 200.0
+
+[node name="WedgeCanalBed3" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+z_index = 12
+z_as_relative = false
+position = Vector2(3376, 339)
+rotation = 3.1429594
+kind = 1
+bed_width = 200.0
+
+[node name="WedgeCanalClusterB" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+z_index = 12
+z_as_relative = false
+position = Vector2(3290, 485)
+
+[node name="CanalFortunaBed" parent="Gameplay/PogoSchool" instance=ExtResource("34_thorn")]
+z_index = 12
+z_as_relative = false
+position = Vector2(4240, 485)
+kind = 1
+bed_width = 200.0
+
+[node name="WoodenLedges" type="Node2D" parent="Gameplay"]
+
+[node name="DockToQuayPlank" parent="Gameplay/WoodenLedges" instance=ExtResource("36_ledge")]
+z_index = 5
+position = Vector2(1397, 420)
+collision_mask = 2
+ledge_width = 132.0
+pile_depth = 92.0
+
+[node name="EastBedSkip" parent="Gameplay/WoodenLedges" instance=ExtResource("36_ledge")]
+z_index = 5
+position = Vector2(932, 396)
+collision_mask = 2
+ledge_width = 96.0
+pile_depth = 72.0
+
+[node name="CanalPierA" parent="Gameplay/WoodenLedges" instance=ExtResource("36_ledge")]
+z_index = 5
+position = Vector2(2288, 418)
+collision_mask = 2
+ledge_width = 108.0
+pile_depth = 80.0
+
+[node name="CanalPierB" parent="Gameplay/WoodenLedges" instance=ExtResource("36_ledge")]
+z_index = 5
+position = Vector2(2575, 359)
+collision_mask = 2
+ledge_width = 94.0
+pile_depth = 74.0
+unstable = true
+
+[node name="CanalPierC" parent="Gameplay/WoodenLedges" instance=ExtResource("36_ledge")]
+z_index = 5
+position = Vector2(2663, 430)
+collision_mask = 2
+ledge_width = 108.0
+pile_depth = 80.0
+
+[node name="CanalPierD" parent="Gameplay/WoodenLedges" instance=ExtResource("36_ledge")]
+z_index = 5
+position = Vector2(2860, 377)
+collision_mask = 2
+ledge_width = 92.0
+pile_depth = 72.0
+unstable = true
+
+[node name="CanalPierD2" parent="Gameplay/WoodenLedges" instance=ExtResource("36_ledge")]
+z_index = 5
+position = Vector2(2979, 340)
+collision_mask = 2
+ledge_width = 92.0
+pile_depth = 72.0
+unstable = true
+
+[node name="CanalPierE" parent="Gameplay/WoodenLedges" instance=ExtResource("36_ledge")]
+z_index = 5
+position = Vector2(3028, 430)
+collision_mask = 2
+ledge_width = 100.0
+pile_depth = 76.0
+
+[node name="Checkpoints" type="Node2D" parent="Gameplay" groups=["dogana_checkpoints"]]
+visible = false
+
+[node name="DoganaWedge" type="Area2D" parent="Gameplay/Checkpoints" groups=["dogana_landmark"]]
+position = Vector2(1960, 448)
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Checkpoints/DoganaWedge"]
+shape = SubResource("CheckpointShape")
+
+[node name="Beacon" type="Polygon2D" parent="Gameplay/Checkpoints/DoganaWedge"]
+visible = false
+color = Color(0.38, 0.55, 0.58, 0.42)
+polygon = PackedVector2Array(-8, 40, 0, -42, 8, 40)
+
+[node name="TowerApproach" type="Area2D" parent="Gameplay/Checkpoints" groups=["dogana_landmark"]]
+position = Vector2(3830, 255)
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Checkpoints/TowerApproach"]
+shape = SubResource("CheckpointShape")
+
+[node name="Beacon" type="Polygon2D" parent="Gameplay/Checkpoints/TowerApproach"]
+visible = false
+color = Color(0.38, 0.55, 0.58, 0.42)
+polygon = PackedVector2Array(-8, 40, 0, -42, 8, 40)
+
+[node name="GraceSites" type="Node2D" parent="Gameplay" groups=["dogana_grace_sites"]]
+
+[node name="Pontile" parent="Gameplay/GraceSites" instance=ExtResource("12_grace")]
+position = Vector2(650, 460)
+display_name = "Pontile della Salute"
+activated = true
+
+[node name="Dogana" parent="Gameplay/GraceSites" instance=ExtResource("12_grace")]
+position = Vector2(1900, 485)
+site_id = "dogana"
+display_name = "Dogana da Mar"
+
+[node name="Fortuna" parent="Gameplay/GraceSites" instance=ExtResource("12_grace")]
+position = Vector2(3830, 485)
+site_id = "fortuna"
+display_name = "Ingresso della Salute"
+
+[node name="FortunaSummit" type="Area2D" parent="Gameplay" groups=["dogana_finish"]]
+position = Vector2(5680, 420)
+collision_layer = 0
+collision_mask = 2
+monitoring = false
+metadata/requires_boss = true
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/FortunaSummit"]
+shape = SubResource("FinishShape")
+disabled = true
+
+[node name="Interactions" type="Node2D" parent="Gameplay" groups=["dogana_interactions"]]
+
+[node name="RegistroMerci" parent="Gameplay/Interactions" instance=ExtResource("32_lore_lectern")]
+position = Vector2(2430, 485)
+entry_title = "Registro delle merci sommerse"
+entry_text = "Anno 1631. Le navi in quarantena scaricarono sale, spezie e una cassa senza sigillo. Il doganiere che la aprì annotò soltanto: 'il mare era già dentro'. La riga successiva è stata cancellata con cera turchese."
+
+[node name="LibroLonghena" parent="Gameplay/Interactions" instance=ExtResource("32_lore_lectern")]
+position = Vector2(4050, 485)
+scale = Vector2(0.92, 0.92)
+entry_title = "Taccuino di Baldassare"
+entry_text = "La Salute non guarda la Punta: la trattiene. Otto lati, otto spinte contro l'acqua. Fra i conti della fabbrica compare ogni mese una voce impossibile: 'una campana restituita dalla laguna'."
+
+[node name="MessaleCustode" parent="Gameplay/Interactions" instance=ExtResource("32_lore_lectern")]
+position = Vector2(4380, -500)
+scale = Vector2(0.9, 0.9)
+entry_title = "Messale del custode"
+entry_text = "Chi attraversa la Dogana paga in moneta. Chi attraversa la Salute paga in memoria. Sotto l'ultima frase qualcuno ha disegnato un piccolo gamberetto con una corona troppo grande."
+enabled_region = "interior"
+
+[node name="SaluteVista" type="Area2D" parent="Gameplay/Interactions" groups=["dogana_interactable"]]
+position = Vector2(280, 430)
+collision_layer = 0
+collision_mask = 2
+metadata/prompt = "Guarda verso la Salute"
+metadata/action = "lore"
+metadata/message = "\"Santa Maria della Salute: cupola ottagonale di Longhena. Il Custode attende nella nave — oltre la Torre della Fortuna, dentro la basilica.\""
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Interactions/SaluteVista"]
+position = Vector2(47, 6)
+shape = SubResource("InteractionShape")
+
+[node name="PuntaTarga" type="Area2D" parent="Gameplay/Interactions" groups=["dogana_interactable"]]
+position = Vector2(1100, 448)
+collision_layer = 0
+collision_mask = 2
+metadata/prompt = "Targa della Punta"
+metadata/action = "lore"
+metadata/message = "\"Punta della Dogana: cuneo tra Bacino di San Marco e Canale della Giudecca. Qui le navi attendevano il dazio.\""
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gameplay/Interactions/PuntaTarga"]
+shape = SubResource("InteractionShape")
+
+[node name="Encounters" type="Node2D" parent="Gameplay" groups=["dogana_encounters"]]
+
+[node name="GamberoArrival" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(1580, 473)
+scale = Vector2(0.05, 0.05)
+move_speed = 90.0
+patrol_range = 160.0
+wake_delay = 0.6
+
+[node name="GamberoQuay" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(2280, 485)
+scale = Vector2(0.05, 0.05)
+move_speed = 88.0
+patrol_range = 140.0
+wake_delay = 0.7
+
+[node name="GamberoWedge" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(2923, 454)
+scale = Vector2(0.05, 0.05)
+move_speed = 92.0
+wake_delay = 0.5
+heavy_melee_chance = 0.4
+
+[node name="LagoonOracleWedge" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(2680, 365)
+scale = Vector2(0.0468, 0.0468)
+move_speed = 62.0
+max_health = 7
+aggro_range = 245.0
+wake_delay = 0.9
+attack_pattern = 2
+variant_texture = ExtResource("25_oracle")
+variant_scale_multiplier = 1.02
+hovering = true
+special_attack_cooldown = 3.0
+projectile_count = 6
+projectile_speed = 152.0
+
+[node name="GamberoCanal" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(3460, 485)
+scale = Vector2(0.05, 0.05)
+move_speed = 90.0
+patrol_range = 120.0
+wake_delay = 0.6
+heavy_melee_chance = 0.38
+
+[node name="TideBloaterCanal" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(3360, 485)
+scale = Vector2(0.0504, 0.0504)
+move_speed = 50.0
+max_health = 8
+aggro_range = 210.0
+wake_delay = 0.8
+attack_damage = 2
+attack_pattern = 1
+variant_texture = ExtResource("24_bloater")
+variant_scale_multiplier = 0.88
+special_attack_cooldown = 3.5
+area_attack_radius = 98.0
+combat_hook_heavy = true
+
+[node name="LagoonOracleFortuna" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(4220, 365)
+scale = Vector2(0.0468, 0.0468)
+move_speed = 58.0
+max_health = 9
+aggro_range = 270.0
+wake_delay = 0.9
+attack_pattern = 3
+variant_texture = ExtResource("25_oracle")
+variant_scale_multiplier = 1.02
+hovering = true
+special_attack_cooldown = 3.6
+projectile_count = 10
+projectile_speed = 118.0
+
+[node name="HarpoonGambero" parent="Gameplay/Encounters" instance=ExtResource("8_enemy")]
+position = Vector2(4480, 493)
+scale = Vector2(0.05, 0.05)
+move_speed = 72.0
+max_health = 8
+aggro_range = 250.0
+wake_delay = 0.7
+attack_pattern = 9
+special_attack_range = 320.0
+special_attack_cooldown = 3.1
+special_windup = 0.55
+projectile_speed = 160.0
+heavy_melee_chance = 0.35
+
+[node name="DrownedCustomsWarden" parent="Gameplay" instance=ExtResource("19_boss")]
+position = Vector2(5260, -500)
+
+[node name="Collectibles" type="Node2D" parent="Gameplay" groups=["dogana_collectibles"]]
+
+[node name="LeonePontile" parent="Gameplay/Collectibles" groups=["dogana_collectible_grounded"] instance=ExtResource("9_collectible")]
+position = Vector2(1076, 401)
+prop_id = "dogana_leone_pontile"
+
+[node name="Player" parent="." instance=ExtResource("4_player")]
+position = Vector2(70, 447)
+use_last_ground_as_respawn = false
+reload_scene_on_death = false
+fall_death_y = 1040.0
+
+[node name="Camera2D" type="Camera2D" parent="Player"]
+position = Vector2(0, -60)
+zoom = Vector2(1.16, 1.16)
+script = ExtResource("5_camera")
+target_path = NodePath("..")
+follow_speed = 7.0
+look_ahead_x = 125.0
+look_ahead_y = 52.0
+deadzone_y = 46.0
+use_room_limits = true
+room_limits = Rect2(-520, -1200, 6600, 2120)
+postfx_colorrect_path = NodePath("PostFX/Overlay")
+vignette_strength = 0.84
+vignette_softness = 0.42
+vignette_radius = 0.92
+grain_amount = 0.16
+grain_size = 1.45
+grain_speed = 0.7
+grain_midtones = 0.7
+grain_shadows = 0.42
+grain_highs = 0.38
+desaturate = 0.0
+contrast = 1.08
+saturation = 0.98
+grade_strength = 0.52
+chroma = 0.4
+bloom = 0.2
+bloom_threshold = 0.7
+haze = 0.13
+ink_strength = 0.2
+motion_breath = 0.18
+
+[node name="PostFX" type="CanvasLayer" parent="Player/Camera2D"]
+layer = 20
+
+[node name="Overlay" type="ColorRect" parent="Player/Camera2D/PostFX"]
+visible = false
+material = SubResource("DoganaPostFX")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Interface" type="CanvasLayer" parent="."]
+layer = 25
+
+[node name="Title" type="Label" parent="Interface"]
+visible = false
+offset_left = 40.0
+offset_top = 34.0
+offset_right = 430.0
+offset_bottom = 78.0
+theme_override_colors/font_color = Color(0.82, 0.78, 0.67, 0.9)
+theme_override_font_sizes/font_size = 24
+text = "PUNTA DELLA DOGANA"
+
+[node name="Route" type="Label" parent="Interface"]
+visible = false
+offset_left = 42.0
+offset_top = 74.0
+offset_right = 470.0
+offset_bottom = 102.0
+theme_override_colors/font_color = Color(0.69, 0.75, 0.77, 0.72)
+theme_override_font_sizes/font_size = 14
+text = "Torre della Fortuna  →  Dogana  →  Seminario  →  Salute"
+
+[node name="FishingHint" type="Label" parent="Interface"]
+visible = false
+offset_left = 40.0
+offset_top = 110.0
+offset_right = 500.0
+offset_bottom = 154.0
+theme_override_colors/font_color = Color(0.58, 0.86, 0.81, 0.86)
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("LocationPanel")
+text = "PESCA  •  F lancia  •  R tira a impulsi  •  ogni pesce = +1 vita"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Location" type="Label" parent="Interface"]
+modulate = Color(1, 1, 1, 0)
+offset_left = 240.0
+offset_top = 452.0
+offset_right = 1040.0
+offset_bottom = 508.0
+theme_override_colors/font_color = Color(0.96, 0.93, 0.82, 1)
+theme_override_colors/font_outline_color = Color(0.02, 0.04, 0.05, 0.95)
+theme_override_constants/outline_size = 8
+theme_override_font_sizes/font_size = 18
+text = "CHECKPOINT"
+horizontal_alignment = 1
+vertical_alignment = 1
