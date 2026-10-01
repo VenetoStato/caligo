@@ -71,6 +71,9 @@ signal locked_skill_requested
 @export var damage_hitstop: float = 0.11
 ## Freeze sul colpo che uccide un nemico, piu' lungo del colpo normale.
 @export var kill_hitstop: float = 0.085
+## Un attacco premuto poco prima della fine del cooldown (o durante un
+## hitstop) parte appena possibile invece di andare perso.
+@export var attack_buffer_time: float = 0.15
 
 @export_category("Water")
 @export var water_bounce_speed: float = 390.0
@@ -366,6 +369,8 @@ var _wall_dir := 0.0  # -1 muro a sinistra, +1 muro a destra
 var _wall_coyote_timer := 0.0
 var _wall_jump_lock := 0.0
 var _wall_dust_timer := 0.0
+var _attack_buffer_timer := 0.0
+var _attack_buffer_strong := false
 var _dash_was_invincible: bool = false
 var _footstep_side := -1.0
 var _player_soft_light: PointLight2D
@@ -434,6 +439,9 @@ func _setup_attack_hitbox():
 	var shape = RectangleShape2D.new()
 	shape.size = Vector2(80, 72)
 	var col = CollisionShape2D.new()
+	# Il nome serve: _update_attack_hitbox_position la cerca per nome. Senza,
+	# Godot la chiama "@CollisionShape2D@N" e la hitbox resta fissa a destra.
+	col.name = "CollisionShape2D"
 	col.shape = shape
 	col.position = Vector2(32, -30)
 	_attack_hitbox.add_child(col)
@@ -503,10 +511,10 @@ func _update_attack_hitbox_position():
 	else:
 		# Il colpo orizzontale copre anche il bordo superiore del nemico:
 		# stare un poco sopra non deve far passare la lenza a vuoto.
-		# Il lato destro resta sul reach storico; a sinistra serve qualche pixel
-		# in più perché l'offset della posa e il bordo dell'hurtbox non coincidono.
-		shape.size = Vector2(94 if facing_right else 108, 78)
-		col.position = Vector2(38 if facing_right else -46, -30)
+		# Simmetrico: l'asimmetria precedente compensava la hitbox bloccata a
+		# destra (CollisionShape2D senza nome), non la posa.
+		shape.size = Vector2(94, 78)
+		col.position = Vector2(38 if facing_right else -38, -30)
 
 func _enable_attack_hitbox(damage: int = 1):
 	# Un colpo può partire anche con l'enemy agganciato: l'attacco interrompe
@@ -582,7 +590,9 @@ func _try_hit_enemy(target: Node) -> void:
 		return
 	if target in _attack_hit_enemies:
 		return
-	if "state" in target and int(target.get("state")) == 2:
+	# Nemici morti: si guarda la vita, non lo stato. Gli enum non coincidono
+	# (nel Custode 2 = WINDUP, e il telegraph e' proprio il momento di colpire).
+	if "current_health" in target and int(target.get("current_health")) <= 0:
 		return
 	_attack_hit_enemies.append(target)
 	if target.has_method("take_damage"):
@@ -591,6 +601,7 @@ func _try_hit_enemy(target: Node) -> void:
 		_request_impact_feedback(0.34 if defeated else 0.2, 0.014 if defeated else 0.008)
 		if defeated:
 			_hitstop_timer = maxf(_hitstop_timer, kill_hitstop)
+		_request_combat_pulse(&"impact", 1.0 if defeated else 0.55)
 	if _power_strike_left > 0.0 and target == _power_strike_target:
 		_power_strike_hit = true
 		_spawn_power_strike_impact(target)
@@ -756,6 +767,12 @@ func _request_shake(intensity: float):
 		cam.add_shake(intensity)
 
 
+func _request_combat_pulse(kind: StringName, strength: float = 1.0) -> void:
+	var cam := get_tree().get_first_node_in_group("camera")
+	if cam and cam.has_method("add_combat_pulse"):
+		cam.call("add_combat_pulse", kind, strength)
+
+
 func _request_impact_feedback(shake: float, zoom_amount: float) -> void:
 	var cam := get_tree().get_first_node_in_group("camera")
 	if cam == null:
@@ -917,17 +934,17 @@ func _draw_attack_slash() -> void:
 		edge = Color(1.0, 0.96, 0.86, 0.12 + fade * 0.9)
 		core = Color(1.0, 0.99, 0.94, 0.1 + fade * 0.98)
 	var origin := Vector2(10.0, -14.0)
-	var reach := lerpf(24.0, 54.0, 1.0 - t)
+	var reach := lerpf(30.0, 74.0, 1.0 - t)
 	var a0 := -1.05
 	var a1 := 0.68
 	if _attack_dir.y < -0.5:
 		origin = Vector2(2.0, -18.0)
-		reach = lerpf(20.0, 48.0, 1.0 - t)
+		reach = lerpf(24.0, 60.0, 1.0 - t)
 		a0 = -2.35
 		a1 = -0.75
 	elif _attack_dir.y > 0.5:
 		origin = Vector2(2.0, 6.0)
-		reach = lerpf(18.0, 44.0, 1.0 - t)
+		reach = lerpf(22.0, 56.0, 1.0 - t)
 		a0 = 0.75
 		a1 = 2.35
 	var width := 4.2 if empowered else 3.4
@@ -1111,6 +1128,7 @@ func _physics_process(delta: float):
 	if get_meta("arrival_locked", false):
 		velocity = Vector2.ZERO
 		return
+	_capture_input_buffers(delta)
 	if _hitstop_timer > 0.0:
 		_hitstop_timer = maxf(0.0, _hitstop_timer - delta)
 		return
@@ -1282,6 +1300,21 @@ func _check_dash_input():
 			right_dash_available = true
 			right_dash_timer = double_tap_time
 			left_dash_available = false
+
+## Gira anche durante l'hitstop: i tasti premuti nei frame congelati
+## (subito dopo un colpo, quando si martella) non devono andare persi.
+func _capture_input_buffers(delta: float) -> void:
+	if Input.is_action_just_pressed("ui_attack_strong"):
+		_attack_buffer_timer = attack_buffer_time
+		_attack_buffer_strong = true
+	elif Input.is_action_just_pressed("ui_attack"):
+		_attack_buffer_timer = attack_buffer_time
+		_attack_buffer_strong = false
+	else:
+		_attack_buffer_timer = maxf(0.0, _attack_buffer_timer - delta)
+	if _hitstop_timer > 0.0 and Input.is_action_just_pressed("ui_accept"):
+		_jump_buffer_timer = jump_buffer_time
+
 
 func _update_jump_assist_timers(delta: float) -> void:
 	if Input.is_action_just_pressed("ui_accept"):
@@ -1475,13 +1508,16 @@ func set_animation():
 			anim.play("Grab")
 		return
 	var can_nail := _attack_cooldown <= 0.0 and (not line_extended or enemy_hooked)
-	if Input.is_action_just_pressed("ui_attack_strong") and can_nail:
+	var wants_attack := can_nail and _attack_buffer_timer > 0.0
+	if wants_attack and _attack_buffer_strong:
 		if anim.has_animation("Attack_strong"):
+			_attack_buffer_timer = 0.0
 			anim.play("Attack_strong", -1.0, 2.05)
 			_enable_attack_hitbox(2)
 			tutorial_action_performed.emit(&"attack")
 		return
-	if Input.is_action_just_pressed("ui_attack") and can_nail:
+	if wants_attack and not _attack_buffer_strong:
+		_attack_buffer_timer = 0.0
 		_enable_attack_hitbox(enemy_power_damage if _power_strike_left > 0.0 else 1)
 		if _attack_dir.y < -0.5 and anim.has_animation("Attack_up"):
 			anim.play("Attack_up")
@@ -1684,6 +1720,7 @@ func take_damage(
 	_request_impact_feedback(0.5, 0.018)
 	if current_health > 0:
 		_hitstop_timer = maxf(_hitstop_timer, damage_hitstop)
+	_request_combat_pulse(&"hurt")
 	
 	if current_health <= 0:
 		_on_death()
