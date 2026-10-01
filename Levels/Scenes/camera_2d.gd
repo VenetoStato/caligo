@@ -74,6 +74,16 @@ var _post_mat: ShaderMaterial
 var _postfx_dirty := true
 var _last_postfx_key := ""
 var _rest_zoom := Vector2.ONE
+var _shake_time := 0.0
+
+# Feedback di combattimento verso lo shader (vedi hk_postfx.gdshader).
+@export var hurt_fx_duration: float = 0.45
+@export var impact_fx_decay: float = 6.0
+@export var low_health_fx: bool = true
+var _hurt_fx := 0.0
+var _impact_fx := 0.0
+var _low_health_fx := 0.0
+var _combat_fx_live := false
 var _zoom_pulse_tween: Tween
 
 func _ready() -> void:
@@ -95,6 +105,38 @@ func _ready() -> void:
 ## Chiama per far tremare lo schermo. intensity 0..1 (es. 0.15 = leggero, 0.4 = forte)
 func add_shake(intensity: float = 0.2) -> void:
 	_shake_trauma = min(1.0, _shake_trauma + intensity)
+
+
+## kind: "hurt" (colpo subito) o "impact" (colpo inflitto, strength 0..1).
+func add_combat_pulse(kind: StringName, strength: float = 1.0) -> void:
+	if kind == &"hurt":
+		_hurt_fx = 1.0
+	else:
+		_impact_fx = minf(1.0, _impact_fx + strength)
+
+
+func _update_combat_fx(delta: float) -> void:
+	_hurt_fx = maxf(0.0, _hurt_fx - delta / maxf(hurt_fx_duration, 0.01))
+	_impact_fx = maxf(0.0, _impact_fx - impact_fx_decay * delta)
+	var low_target := 0.0
+	if low_health_fx and "current_health" in _target and "max_health" in _target:
+		var hp := int(_target.get("current_health"))
+		if hp == 1 and int(_target.get("max_health")) > 1:
+			low_target = 1.0
+	_low_health_fx = move_toward(_low_health_fx, low_target, delta * 2.0)
+	if _post_mat == null or not postfx_enabled:
+		return
+	var live := _hurt_fx > 0.0 or _impact_fx > 0.0 or _low_health_fx > 0.0
+	if not live and not _combat_fx_live:
+		return
+	_combat_fx_live = live
+	# Battito doppio (lub-dub) ogni ~1,1 s.
+	var beat_t := fmod(Time.get_ticks_msec() / 1000.0, 1.1)
+	var beat := maxf(exp(-pow((beat_t - 0.08) * 14.0, 2.0)), 0.7 * exp(-pow((beat_t - 0.32) * 14.0, 2.0)))
+	_post_mat.set_shader_parameter("u_hurt", _hurt_fx)
+	_post_mat.set_shader_parameter("u_hurt_wave", 1.0 - _hurt_fx)
+	_post_mat.set_shader_parameter("u_impact", _impact_fx)
+	_post_mat.set_shader_parameter("u_low_health", _low_health_fx * (0.45 + 0.55 * beat))
 
 
 ## Impulso di lente locale: nessun campionamento dello schermo e nessun blur GPU.
@@ -265,11 +307,18 @@ func _process(delta: float) -> void:
 	global_position = global_position.lerp(desired_cam, t)
 	
 	# --- Screen shake ---
+	# Rumore continuo invece di randf per frame: lo shake resta violento ma
+	# non "sfarfalla", e non dipende dal framerate.
 	_shake_trauma = max(0.0, _shake_trauma - shake_decay * delta)
+	_shake_time += delta
 	if _shake_trauma > 0.001:
-		var trauma2 = _shake_trauma * _shake_trauma
-		var shake_offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * shake_max_offset * trauma2
-		offset = shake_offset
+		var trauma2 := _shake_trauma * _shake_trauma
+		var st := _shake_time * 38.0
+		var n := Vector2(
+			sin(st * 1.13) * 0.6 + sin(st * 2.71 + 1.3) * 0.4,
+			sin(st * 1.37 + 2.1) * 0.6 + sin(st * 2.29 + 0.4) * 0.4
+		)
+		offset = n * shake_max_offset * trauma2
 	else:
 		offset = Vector2.ZERO
 
@@ -283,6 +332,7 @@ func _process(delta: float) -> void:
 
 	# --- Update vignette center to follow player on screen ---
 	_update_postfx_center()
+	_update_combat_fx(delta)
 
 func _update_postfx_center() -> void:
 	if _post_mat == null or not postfx_enabled:
